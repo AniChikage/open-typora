@@ -2,6 +2,8 @@
 
 本地 Markdown 编辑器。0.3.0 在原生 AppKit/WebKit 和直接编辑正文的内核上，继续补齐 Typora 的段落/格式命令、Markdown 扩展、表格操作、文件导航和导出。
 
+当前版本为 0.3.1，更新了[应用图标](design/brand.md)，并让安装与打包流程只保留当前版本。
+
 ## 使用
 
 - 直接在排版后的正文输入；光标进入粗体、链接等行内格式时展开对应符号。
@@ -33,7 +35,7 @@ npm run package:mac
 npm run install:app
 ```
 
-原生包输出到 `release/native/Open Typora.app`；安装脚本备份现有应用后替换 `~/Applications/Open Typora.app`，不改动 Application Support 文档数据。安装前应正常退出旧应用。`npm run package:preview` 使用独立应用标识和 `Open Typora Preview` 数据目录。
+原生包输出到 `release/native/Open Typora.app`；打包只保留最新版本归档。安装脚本以临时回滚副本替换 `~/Applications/Open Typora.app`，签名验证成功后移除旧应用；失败则恢复原应用，不累积历史安装备份，也不改动 Application Support 文档数据。安装前应正常退出旧应用。`npm run package:preview` 使用独立应用标识和 `Open Typora Preview` 数据目录，仅用于需要隔离数据的验收。
 
 `npm run dev:app` 与 `npm start` 使用 Electron 开发/回归宿主；`npm run dev` 是浏览器预览，其保存会下载文件。它们不代表 macOS 原生包已经通过窗口验收。
 

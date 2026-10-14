@@ -1,4 +1,4 @@
-import { mkdir, cp, writeFile, rm } from "node:fs/promises";
+import { mkdir, cp, writeFile, rm, readdir } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { licenseNotices } from "./license-notices.mjs";
@@ -81,5 +81,11 @@ if (!preview) {
   execFileSync("/usr/bin/ditto", ["-c", "-k", "--keepParent", app, archive], {
     stdio: "inherit",
   });
+  // Keep only this release's archive after packaging has succeeded.
+  for (const name of await readdir(path.dirname(archive))) {
+    if (/^Open-Typora-[\d.]+-(?:arm64|x64)\.zip$/.test(name)
+      && name !== path.basename(archive))
+      await rm(path.join(path.dirname(archive), name));
+  }
   console.log(`Archive: ${archive}`);
 }

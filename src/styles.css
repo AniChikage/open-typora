@@ -640,19 +640,10 @@ svg {
   right: 12px;
 }
 .app-mark {
-  width: 66px;
-  height: 66px;
+  display: block;
+  width: 96px;
+  height: 96px;
   margin: 0 auto;
-  background: var(--accent);
-  color: var(--paper);
-  font-family: Georgia, serif;
-  font-size: 36px;
-  line-height: 66px;
-  border-radius: 15px;
-}
-.app-mark span {
-  font-size: 24px;
-  margin-left: -8px;
 }
 .about-dialog h2 {
   font-size: 23px;

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Open Typora</title>
+  <desc id="desc">Two open pages form a custom ink-blue T on a porcelain-white tile.</desc>
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="0.75" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#edf1f5"/>
+    </linearGradient>
+    <linearGradient id="ink" x1="0" y1="0" x2="0.25" y2="1">
+      <stop offset="0" stop-color="#35465e"/>
+      <stop offset="1" stop-color="#1d2a3e"/>
+    </linearGradient>
+    <filter id="tile-shadow" x="-20%" y="-15%" width="140%" height="145%">
+      <feDropShadow dx="0" dy="15" stdDeviation="15" flood-color="#18324b" flood-opacity=".17"/>
+    </filter>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="207" fill="url(#paper)" filter="url(#tile-shadow)"/>
+  <rect x="65.5" y="65.5" width="893" height="893" rx="205.5" fill="none" stroke="#ffffff" stroke-width="3"/>
+  <path d="M465 419H557V640C557 685 573 708 619 718V749H405V718C451 708 465 685 465 640Z" fill="url(#ink)"/>
+  <path d="M274 307C350 284 428 288 503 322V432C427 405 354 405 283 432Z" fill="url(#ink)"/>
+  <path d="M522 322C597 288 676 284 752 307L743 432C672 405 599 405 522 432Z" fill="url(#ink)"/>
+  <path d="M522 322C597 288 676 284 752 307L750 332C674 310 598 315 522 348Z" fill="#6d8cae"/>
+</svg>

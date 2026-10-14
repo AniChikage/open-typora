@@ -19,6 +19,8 @@ import { QuickOpen } from "./components/QuickOpen";
 import { Dialog } from "./components/Dialog";
 import { documentStatistics } from "./editor/statistics";
 import type { Command } from "./types";
+import appIcon from "../design/icon.svg";
+import { version as appVersion } from "../package.json";
 export default function App() {
   const session = useDocuments();
   const [preferences, setPreferences] = useState(() => { const initial = loadPreferences(); setMarkdownOptions(initial); return initial; });
@@ -320,13 +322,11 @@ export default function App() {
             >
               <X size={18} />
             </button>
-            <div className="app-mark">
-              O<span>T</span>
-            </div>
+            <img className="app-mark" src={appIcon} width={96} height={96} alt="" />
             <h2>Open Typora</h2>
             <p>让文字，回到文字。</p>
             <p className="about-details">
-              0.3.0 · 本地 Markdown 写作空间
+              {appVersion} · 本地 Markdown 写作空间
               <br />
               MIT 开源 · 独立实现
             </p>

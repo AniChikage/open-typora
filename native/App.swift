@@ -531,6 +531,10 @@ final class NativeApplication: NSObject, NSApplicationDelegate, NSMenuItemValida
   }
   func applicationDidFinishLaunching(_ notification: Notification) {
     NSWindow.allowsAutomaticWindowTabbing = false
+    if let resource = Bundle.main.resourceURL,
+      let icon = NSImage(contentsOf: resource.appendingPathComponent("icon.icns")) {
+      NSApp.applicationIconImage = icon
+    }
     launched = true
     makeWindow(directory: directory)
     let secondary = directory.appendingPathComponent("windows")
