@@ -1,24 +1,24 @@
-# Open Typora 设计规范
+# Open Typora 界面基准
 
-参考 editor-concept.png，完整编辑器主屏，1536×1024。
+用户要求 Typora 的样式。此前生成的自定义宋体、绿色主题已撤销，不再作为参考。
 
-- 52px 标题栏、232px 侧栏、28px 状态栏。
-- 纸张 #FFFFFF；侧栏 #F7F7F5；文字 #252A28；线条 #E7E8E5；强调色 #2F6D62。
-- 界面系统无衬线字体 13px；正文 Songti SC / Noto Serif SC / serif。
-- 文件与大纲共用侧栏；文件名顶部中间；即时渲染、源码、保存、更多位于右侧。
-- 默认中文；完整工作界面，不加入营销页或装饰卡片。
-- 首屏文案：让文字，回到文字。 / 从第一行开始 / 写作，不必分心。
-- Lucide 线性图标；底部包含主题、保存状态、字数、Markdown、UTF-8。
-- 所需新建、打开文件、查找、聚焦和导出操作放在更多菜单及原生菜单。
-- Markdown 原文是唯一内容数据。即时渲染只改变显示，活动块显示可编辑原文。
-- 窄窗口可折叠侧栏，正文保持可读边距。
+## 已观察的来源
 
-UI/UX Pro Max 的两次搜索均返回落地页布局，未采用其页面结构。使用其最简风格、键盘和对比度建议，并以本项目编辑器概念图确定结构与配色。
+2026-10-14，本机 `/Applications/Typora.app`，版本 1.14.10，偏好主题 `Github`。在独立的新窗口粘贴与 Open Typora 相同的欢迎文档，对照 961 × 653 pt 窗口、大纲侧栏和无侧栏状态。原窗口与用户文稿未修改。Typora 程序资源仅用于只读研究，本项目样式为独立实现。
 
-## 概念生成
+## 实现参数
 
-使用内置 Image Gen，生成完整桌面屏幕参考。最终提示词包含：
+- 正文 Open Sans，中文用系统无衬线字体；16 px，行高 1.6，颜色 #333。
+- H1 36 px / 1.2，H2 28 px / 1.225，粗体，浅灰下划线。
+- 白色正文，#fafafa 侧栏，270 px，1 px 灰分隔线；选中文件用中性灰，不加圆角。
+- 编辑区通常最大 860 px，左右 30 px 内边距；宽屏分别扩至 1024 / 1200 px。
+- 28 px 标题栏，居中文件名与未保存标记。系统交通灯位置 12 / 9 px。
+- 侧栏顶部只显示当前栏目名称，点击可切换文件与大纲。去掉品牌区与大号打开按钮。
+- 保存、查找和导出在系统菜单与底部菜单；源码切换为左下角小图标与 ⌘/。右下角只显示字数，保存状态与光标信息在其提示中。
+- 引用用灰色竖线，表格浅灰表头与交替底色，代码用灰底。
 
-> Create one complete high fidelity desktop application screenshot concept, landscape 1440x960, for Open Typora, an open source local Markdown writing app. Full primary screen edge to edge, not a presentation board or laptop photo. macOS traffic lights upper left. Native minimal titlebar; centered filename 欢迎.md; left sidebar with 文件 / 大纲, 打开文件夹 and three sample documents. Main white writing canvas, Chinese Songti serif document, system sans UI chrome, restrained teal #2F6D62. Header right 即时渲染 / 源码, 保存, more menu. Document title 让文字，回到文字。 Sections 从第一行开始 / 写作，不必分心, prose, three Markdown bullets, blockquote and two-column shortcut table. Bottom save status and word count / Markdown / UTF-8. Sidebar #F7F7F5, paper #FFFFFF, ink #252A28, border #E7E8E5. No marketing hero, badges, illustrations, cards, gradients or shadows. All text, controls and icons code-native. Restrained, editorial, precise layout.
+## 验证边界
 
-实际实现保留文档结构、白色纸张、衬线正文、青绿色选中态、顶部模式切换和底部状态栏。为真实文件工作流添加了文件夹名称、新建、刷新与关闭控件。侧栏使用规范指定的 232px，正文密度根据真实编辑器的段落与行高调整。
+使用同文档、同窗口尺寸的截图并排比较后调整间距；继续验证无侧栏、文件列表、源码、深色和窄窗口，并检查本机构建后的安装窗口。
+
+编辑内核仍为 CodeMirror 活动块源码编辑；字体栅格化、编辑光标行为、字数口径和部分原生控件与 Typora 不完全相同。此基准不宣称像素级一致或全功能兼容。

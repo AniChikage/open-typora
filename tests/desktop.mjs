@@ -24,6 +24,15 @@ async function menu(page, name) {
   await page.getByRole("button", { name: "更多操作" }).click();
   await page.getByRole("menuitem", { name, exact: true }).click();
 }
+async function mode(page, rendered) {
+  const toggle = page.locator(".source-toggle");
+  const source = (await toggle.getAttribute("aria-pressed")) === "true";
+  if (source === rendered) await toggle.click();
+}
+async function sidebarTab(page, name) {
+  await page.getByRole("button", { name: "切换侧栏内容" }).click();
+  await page.getByRole("menuitemradio", { name, exact: true }).click();
+}
 async function waitForFile(file, predicate) {
   for (let i = 0; i < 60; i++) {
     try {
@@ -45,16 +54,16 @@ try {
     path.join(dataDir, "示例笔记/欢迎.md"),
     "utf-8",
   );
-  await page.getByRole("button", { name: "源码", exact: true }).click();
+  await mode(page, false);
   const editor = page.locator(".document-editor:not([hidden]) .cm-content");
   await expect(editor).toContainText("# 让文字，回到文字。");
-  await page.getByRole("button", { name: "即时渲染", exact: true }).click();
+  await mode(page, true);
   assert.equal(
     await readFile(path.join(dataDir, "示例笔记/欢迎.md"), "utf-8"),
     original,
   );
   passed.push("Switching modes preserves original Markdown byte for byte");
-  await page.getByRole("button", { name: "源码", exact: true }).click();
+  await mode(page, false);
   await editor.click();
   await editor.press("ControlOrMeta+End");
   await page.keyboard.insertText("\n中文输入验收：你好，世界。\n");
@@ -69,7 +78,7 @@ try {
   await waitForFile(welcome, (text) => text.includes("中文输入验收"));
   passed.push("Undo and redo persist correct file contents");
   await page.getByRole("button", { name: "写作示例.md", exact: true }).click();
-  await page.getByRole("button", { name: "即时渲染", exact: true }).click();
+  await mode(page, true);
   await expect(
     page.locator(".document-editor:not([hidden]) .katex"),
   ).toBeVisible();
@@ -104,7 +113,7 @@ try {
   await expect(
     page.getByRole("button", { name: "CRLF.md", exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "源码", exact: true }).click();
+  await mode(page, false);
   const crlfEditor = page.locator(".document-editor:not([hidden]) .cm-content");
   await crlfEditor.click();
   await crlfEditor.press("ControlOrMeta+End");
@@ -139,8 +148,8 @@ try {
   );
   const imageRelative = /!\[paste.png\]\(([^)]+)\)/.exec(imageContent)[1];
   assert.deepEqual(await readFile(path.join(dataDir, imageRelative)), tinyPng);
-  await page.getByRole("button", { name: "即时渲染", exact: true }).click();
-  await page.getByRole("tab", { name: "大纲", exact: true }).click();
+  await mode(page, true);
+  await sidebarTab(page, "大纲");
   await page.getByRole("button", { name: "标题", exact: true }).click();
   await expect(
     page.locator(".document-editor:not([hidden]) img"),
@@ -153,23 +162,23 @@ try {
   passed.push(
     "Image paste copies bytes and renders through the local asset protocol",
   );
-  await page.getByRole("tab", { name: "文件", exact: true }).click();
+  await sidebarTab(page, "文件");
   await page.getByRole("button", { name: "欢迎.md", exact: true }).click();
-  await page.getByRole("tab", { name: "大纲", exact: true }).click();
+  await sidebarTab(page, "大纲");
   await page
     .getByRole("button", { name: "写作，不必分心", exact: true })
     .click();
-  await page.getByRole("tab", { name: "文件", exact: true }).click();
+  await sidebarTab(page, "文件");
   passed.push("Outline navigates to the selected Markdown heading");
   const target = path.join(dataDir, "验收文档.md");
   await application.evaluate(({ dialog }, file) => {
     dialog.showSaveDialog = async () => ({ canceled: false, filePath: file });
   }, target);
   await page.getByRole("button", { name: "新建文档" }).click();
-  await page.getByRole("button", { name: "源码", exact: true }).click();
+  await mode(page, false);
   const fresh = page.locator(".document-editor:not([hidden]) .cm-content");
   await fresh.fill("# 新文档\n\n这是一份真实保存的 Markdown。\n");
-  await page.getByRole("button", { name: "保存", exact: true }).click();
+  await menu(page, "保存");
   await waitForFile(target, (text) => text.includes("真实保存"));
   passed.push("New document Save uses native file persistence");
   await page.getByRole("button", { name: "更多操作" }).click();

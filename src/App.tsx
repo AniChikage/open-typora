@@ -52,6 +52,11 @@ export default function App() {
     else if (action === "quit") void session.quit();
     else if (action === "source") setRendered((value) => !value);
     else if (action === "sidebar") setSidebar((value) => !value);
+    else if (action === "outline" || action === "files") {
+      setTab(action);
+      setSidebar(true);
+    } else if (action === "theme")
+      setTheme((value) => (value === "dark" ? "light" : "dark"));
     else if (action === "focus") setFocus((value) => !value);
     else if (action === "find") editor()?.find();
     else if (action === "bold") editor()?.wrap("**", "**");
@@ -139,13 +144,12 @@ export default function App() {
     >
       <Toolbar
         name={active?.name || ""}
+        edited={!!active && active.content !== active.savedContent}
         rendered={rendered}
         setRendered={setRendered}
         sidebar={() => setSidebar(!sidebar)}
-        save={() => void session.save()}
         command={(action) => commands.current({ action })}
         autosave={session.autosave}
-        native={host.native}
         disabled={!active}
       />
       <Sidebar
@@ -182,8 +186,8 @@ export default function App() {
           <div className="empty-document">正在恢复文档…</div>
         ) : !active ? (
           <div className="empty-document">
-            <h1>留一页，给新的想法。</h1>
-            <p>打开一份 Markdown，或者从空白开始。</p>
+            <h1>Open Typora</h1>
+            <p>新建或打开 Markdown 文档。</p>
             <div>
               <button onClick={() => void session.create()}>
                 <FilePlus2 size={18} />
@@ -231,19 +235,12 @@ export default function App() {
         )}
       </main>
       <footer className="statusbar">
-        <span className={`save-status ${active?.conflict ? "warning" : ""}`}>
-          <i />
-          {status}
+        <span
+          title={`${status} · 第 ${cursor.line} 行，第 ${cursor.column} 列 · Markdown · UTF-8`}
+          aria-label={`${characters} 字，${status}`}
+        >
+          {characters} 字
         </span>
-        <div>
-          <span>{characters} 字</span>
-          <span className="cursor-status">
-            第 {cursor.line} 行，第 {cursor.column} 列
-          </span>
-          <span>Markdown</span>
-          <span>UTF-8</span>
-          <span>100%</span>
-        </div>
       </footer>
       {focus && (
         <button className="leave-focus" onClick={() => setFocus(false)}>
@@ -281,7 +278,7 @@ export default function App() {
             <h2>Open Typora</h2>
             <p>让文字，回到文字。</p>
             <p className="about-details">
-              0.1.0 · 本地 Markdown 写作空间
+              0.1.1 · 本地 Markdown 写作空间
               <br />
               MIT 开源 · 独立实现
             </p>

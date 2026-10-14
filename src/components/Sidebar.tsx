@@ -6,7 +6,9 @@ import {
   Moon,
   Sun,
   X,
+  ChevronDown,
 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import type { DocumentRecord, FileEntry } from "../types";
 import type { Heading } from "../editor/markdown";
 interface Props {
@@ -28,31 +30,57 @@ interface Props {
   toggleTheme(): void;
 }
 export function Sidebar(props: Props) {
+  const [switcher, setSwitcher] = useState(false);
+  const heading = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!switcher) return;
+    const dismiss = (event: MouseEvent) => {
+      if (!heading.current?.contains(event.target as Node)) setSwitcher(false);
+    };
+    const keyboard = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSwitcher(false);
+    };
+    document.addEventListener("mousedown", dismiss);
+    document.addEventListener("keydown", keyboard);
+    return () => {
+      document.removeEventListener("mousedown", dismiss);
+      document.removeEventListener("keydown", keyboard);
+    };
+  }, [switcher]);
   return (
     <aside className="sidebar" aria-label="文档侧栏">
-      <div className="sidebar-tabs" role="tablist" aria-label="侧栏内容">
+      <div className="sidebar-heading" ref={heading}>
         <button
-          role="tab"
-          aria-selected={props.tab === "files"}
-          onClick={() => props.setTab("files")}
+          className="sidebar-switcher"
+          aria-label="切换侧栏内容"
+          aria-expanded={switcher}
+          aria-haspopup="menu"
+          onClick={() => setSwitcher(!switcher)}
         >
-          文件
+          {props.tab === "files" ? "文件" : "大纲"}
+          <ChevronDown size={12} />
         </button>
-        <button
-          role="tab"
-          aria-selected={props.tab === "outline"}
-          onClick={() => props.setTab("outline")}
-        >
-          大纲
-        </button>
+        {switcher && (
+          <div className="sidebar-menu" role="menu">
+            {(["files", "outline"] as const).map((tab) => (
+              <button
+                role="menuitemradio"
+                aria-checked={tab === props.tab}
+                key={tab}
+                onClick={() => {
+                  props.setTab(tab);
+                  setSwitcher(false);
+                }}
+              >
+                {tab === "files" ? "文件" : "大纲"}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       <div className="sidebar-body">
         {props.tab === "files" ? (
           <>
-            <button className="folder-button" onClick={props.openFolder}>
-              <FolderOpen size={18} />
-              <span>打开文件夹</span>
-            </button>
             <div className="sidebar-section-label">
               <span>
                 {props.folder ? props.folder.split("/").at(-1) : "打开的文档"}
@@ -126,7 +154,7 @@ export function Sidebar(props: Props) {
                 <p className="sidebar-empty">
                   打开一个文件夹，
                   <br />
-                  让想法有处安放。
+                  浏览 Markdown 文档。
                 </p>
               )}
             </nav>
@@ -137,7 +165,7 @@ export function Sidebar(props: Props) {
               props.headings.map((heading, index) => (
                 <button
                   key={`${heading.line}-${index}`}
-                  style={{ paddingLeft: 20 + (heading.level - 1) * 13 }}
+                  style={{ paddingLeft: 18 + (heading.level - 1) * 14 }}
                   onClick={() => props.jump(heading.line)}
                 >
                   <span>{heading.text}</span>
@@ -154,7 +182,14 @@ export function Sidebar(props: Props) {
         )}
       </div>
       <div className="sidebar-footer">
-        <span>Open Typora</span>
+        <button
+          className="icon-button"
+          aria-label="打开文件夹"
+          title="打开文件夹"
+          onClick={props.openFolder}
+        >
+          <FolderOpen size={16} />
+        </button>
         <button
           className="icon-button"
           title="切换主题"

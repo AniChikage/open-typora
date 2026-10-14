@@ -126,7 +126,32 @@ function build(state: EditorState, documentId: string): DecorationSet {
     const intersects = selection.ranges.some(
       (range) => range.from <= to && range.to >= from,
     );
-    if (intersects || from === to) continue;
+    if (intersects) {
+      const heading = /^(#{1,6}) /.exec(block.source);
+      if (heading) {
+        ranges.push(
+          Decoration.line({
+            attributes: {
+              class: `live-heading live-h${heading[1].length} ${from === 0 ? "first-heading" : ""}`,
+            },
+          }).range(from),
+        );
+        ranges.push(
+          Decoration.mark({ class: "heading-marker" }).range(
+            from,
+            from + heading[0].length,
+          ),
+        );
+      } else {
+        ranges.push(
+          Decoration.line({ attributes: { class: "live-block-end" } }).range(
+            state.doc.line(block.toLine).from,
+          ),
+        );
+      }
+      continue;
+    }
+    if (from === to) continue;
     ranges.push(
       Decoration.replace({
         widget: new RenderedBlock(block, from, to, documentId),

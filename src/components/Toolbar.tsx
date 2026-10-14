@@ -16,13 +16,12 @@ import {
 import { useEffect, useRef, useState } from "react";
 interface Props {
   name: string;
+  edited: boolean;
   rendered: boolean;
   setRendered(value: boolean): void;
   sidebar(): void;
-  save(): void;
   command(action: string): void;
   autosave: boolean;
-  native: boolean;
   disabled: boolean;
 }
 export function Toolbar(props: Props) {
@@ -46,6 +45,7 @@ export function Toolbar(props: Props) {
   const items = [
     { action: "new", icon: FilePlus2, label: "新建文档", shortcut: "⌘ N" },
     { action: "open", icon: FolderOpen, label: "打开文件", shortcut: "⌘ O" },
+    { action: "save", icon: Save, label: "保存", shortcut: "⌘ S" },
     { action: "saveAs", icon: Copy, label: "另存为…", shortcut: "⇧ ⌘ S" },
     { action: "find", icon: Search, label: "查找与替换", shortcut: "⌘ F" },
     { action: "bold", icon: Bold, label: "粗体", shortcut: "⌘ B" },
@@ -55,15 +55,14 @@ export function Toolbar(props: Props) {
     { action: "pdf", icon: FileOutput, label: "导出 PDF", shortcut: "" },
   ];
   return (
-    <header className="toolbar">
-      <div className="titlebar-left">
-        {!props.native && (
-          <div className="traffic-lights" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-          </div>
-        )}
+    <>
+      <header className="toolbar">
+        <span className="document-title" title={props.name}>
+          {props.name || "Open Typora"}
+          {props.edited && <span className="title-edited"> — 已编辑</span>}
+        </span>
+      </header>
+      <div className="quick-actions" aria-label="编辑操作">
         <button
           className="icon-button sidebar-toggle"
           title="切换侧栏"
@@ -72,35 +71,15 @@ export function Toolbar(props: Props) {
         >
           <PanelLeft size={17} />
         </button>
-      </div>
-      <span className="document-title" title={props.name}>
-        {props.name || "Open Typora"}
-      </span>
-      <div className="toolbar-actions">
-        <div className="mode-switch" role="group" aria-label="编辑模式">
-          <button
-            aria-label="即时渲染"
-            aria-pressed={props.rendered}
-            onClick={() => props.setRendered(true)}
-          >
-            即时渲染
-          </button>
-          <button
-            aria-label="源码"
-            aria-pressed={!props.rendered}
-            onClick={() => props.setRendered(false)}
-          >
-            源码
-          </button>
-        </div>
         <button
-          className="save-button"
-          aria-label="保存"
+          className="icon-button source-toggle"
+          aria-label={props.rendered ? "源码" : "即时渲染"}
+          title="切换源码模式 ⌘/"
+          aria-pressed={!props.rendered}
           disabled={props.disabled}
-          onClick={props.save}
+          onClick={() => props.setRendered(!props.rendered)}
         >
-          <Save className="mobile-save-icon" size={16} />
-          <span>保存</span>
+          <Code2 size={16} />
         </button>
         <div className="menu-container" ref={root}>
           <button
@@ -130,6 +109,16 @@ export function Toolbar(props: Props) {
               ))}
               <div className="menu-divider" />
               <button
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  props.command("theme");
+                }}
+              >
+                <span className="menu-check" />
+                <span>切换明暗主题</span>
+              </button>
+              <button
                 role="menuitemcheckbox"
                 aria-checked={props.autosave}
                 onClick={() => props.command("autosave")}
@@ -148,12 +137,12 @@ export function Toolbar(props: Props) {
               >
                 <span className="menu-check" />
                 <span>关于 Open Typora</span>
-                <kbd>0.1.0</kbd>
+                <kbd>0.1.1</kbd>
               </button>
             </div>
           )}
         </div>
       </div>
-    </header>
+    </>
   );
 }

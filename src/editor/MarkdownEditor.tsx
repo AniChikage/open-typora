@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
-import { Compartment, EditorState } from "@codemirror/state";
+import { EditorState } from "@codemirror/state";
 import {
   EditorView,
   keymap,
@@ -46,8 +46,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
       view = useRef<EditorView | null>(null);
     const callbacks = useRef({ onChange, onError, onCursor });
     callbacks.current = { onChange, onError, onCursor };
-    const initial = useRef(record),
-      compartment = useRef(new Compartment());
+    const initial = useRef(record);
     useImperativeHandle(
       ref,
       () => ({
@@ -113,7 +112,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
               indentWithTab,
             ]),
             search({ top: true }),
-            compartment.current.of(rendered ? [] : [highlightActiveLine()]),
+            highlightActiveLine(),
             livePreview(doc.id),
             EditorView.contentAttributes.of({
               "aria-label": "Markdown 编辑器",
@@ -186,12 +185,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
       const editor = view.current;
       if (!editor) return;
       editor.dispatch({
-        effects: [
-          setRendered.of(rendered),
-          compartment.current.reconfigure(
-            rendered ? [] : [highlightActiveLine()],
-          ),
-        ],
+        effects: setRendered.of(rendered),
       });
     }, [rendered]);
     useEffect(() => {
