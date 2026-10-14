@@ -10,7 +10,7 @@ const destination = path.join(folder, "Open Typora.app");
 await stat(source);
 await mkdir(folder, { recursive: true });
 const staging = path.join(folder, `.Open Typora-${Date.now()}.app`);
-await cp(source, staging, { recursive: true });
+await cp(source, staging, { recursive: true, verbatimSymlinks: true });
 execFileSync(
   "/usr/bin/codesign",
   ["--force", "--deep", "--sign", "-", "--timestamp=none", staging],
