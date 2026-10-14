@@ -14,6 +14,7 @@ import {
   Code2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { commandGroups, shortcutLabel } from "../commands";
 interface Props {
   name: string;
   edited: boolean;
@@ -23,6 +24,7 @@ interface Props {
   command(action: string): void;
   autosave: boolean;
   disabled: boolean;
+  context: string;
 }
 export function Toolbar(props: Props) {
   const [open, setOpen] = useState(false),
@@ -51,7 +53,7 @@ export function Toolbar(props: Props) {
     { action: "bold", icon: Bold, label: "粗体", shortcut: "⌘ B" },
     { action: "italic", icon: Italic, label: "斜体", shortcut: "⌘ I" },
     { action: "code", icon: Code2, label: "代码块", shortcut: "" },
-    { action: "focus", icon: ScanLine, label: "专注模式", shortcut: "⇧ ⌘ F" },
+    { action: "focus", icon: ScanLine, label: "专注模式", shortcut: "F8" },
     { action: "pdf", icon: FileOutput, label: "导出 PDF", shortcut: "" },
   ];
   return (
@@ -91,7 +93,13 @@ export function Toolbar(props: Props) {
             <MoreHorizontal size={20} />
           </button>
           {open && (
-            <div className="more-menu" role="menu">
+            <div className="more-menu" role="menu" onKeyDown={event => {
+              const controls = [...event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not([disabled])")], index = controls.indexOf(document.activeElement as HTMLButtonElement);
+              if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+                event.preventDefault(); const next = event.key === "Home" ? 0 : event.key === "End" ? controls.length - 1 : (index + (event.key === "ArrowDown" ? 1 : controls.length - 1)) % controls.length;
+                controls[next]?.focus();
+              }
+            }}>
               {items.map(({ action, icon: Icon, label, shortcut }) => (
                 <button
                   role="menuitem"
@@ -111,6 +119,12 @@ export function Toolbar(props: Props) {
                   <kbd aria-hidden="true">{shortcut}</kbd>
                 </button>
               ))}
+              {commandGroups.filter(group => ["段落", "表格", "格式", "显示", "编辑", "文件"].includes(group.title)).map(group => {
+                const extra = group.items.filter(item => !item.selector && !items.some(quick => quick.action === item.action) && !["theme", "folder", "sidebar", "source", "close-window"].includes(item.action));
+                return <section className="command-group" key={group.title}><div className="menu-divider" /><p>{group.title}</p>{extra.map(item => <button key={item.action} role="menuitem" aria-label={item.label} disabled={
+                  !!item.context && (props.disabled || (["rich", "table"].includes(item.context) && !props.rendered) || (item.context === "table" && props.context !== "table_open"))
+                } onClick={() => { setOpen(false); props.command(item.action); }}><span className="menu-check" /><span>{item.label}</span><kbd>{shortcutLabel(item.key)}</kbd></button>)}</section>;
+              })}
               <div className="menu-divider" />
               <button
                 role="menuitem"
@@ -141,7 +155,7 @@ export function Toolbar(props: Props) {
               >
                 <span className="menu-check" />
                 <span>关于 Open Typora</span>
-                <kbd>0.2.0</kbd>
+                <kbd>0.3.0</kbd>
               </button>
             </div>
           )}

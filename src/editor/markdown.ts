@@ -3,6 +3,11 @@ import taskLists from "markdown-it-task-lists";
 import { configureMath } from "./mathMarkdown.ts";
 import hljs from "highlight.js/lib/common";
 import DOMPurify from "dompurify";
+import mark from "markdown-it-mark";
+import sub from "markdown-it-sub";
+import sup from "markdown-it-sup";
+import { full as emoji } from "markdown-it-emoji";
+import { configureDocumentSyntax } from "./markdownExtensions.ts";
 import type { Token } from "markdown-it";
 export interface Block {
   fromLine: number;
@@ -14,6 +19,7 @@ export interface Heading {
   line: number;
   level: number;
   text: string;
+  id: string;
 }
 const md = new MarkdownIt({
   html: false,
@@ -26,7 +32,13 @@ const md = new MarkdownIt({
   },
 })
   .use(taskLists, { enabled: false })
-  .use(configureMath);
+  .use(configureMath)
+  .use(mark).use(sub).use(sup).use(emoji, { shortcuts: {} })
+  .use(configureDocumentSyntax);
+export function setMarkdownOptions(options: { highlight: boolean; subscript: boolean; superscript: boolean; emoji: boolean; inlineMath: boolean }) {
+  for (const [rule, enabled] of [["mark", options.highlight], ["sub", options.subscript], ["sup", options.superscript], ["emoji", options.emoji], ["math_inline", options.inlineMath]] as const)
+    enabled ? md.enable(rule, true) : md.disable(rule, true);
+}
 const defaultFence = md.renderer.rules.fence!;
 md.renderer.rules.fence = (tokens, index, options, env, self) =>
   tokens[index].info.trim() === "mermaid"
@@ -102,7 +114,7 @@ export function inlineTokens(
   source: string,
   environment: Record<string, unknown> = {},
 ) {
-  return md.parseInline(source, environment)[0].children || [];
+  return md.parseInline(source, { ...environment, fragment: true })[0].children || [];
 }
 export function decodeMarkdownText(source: string) {
   return md.utils.unescapeAll(source);
@@ -124,8 +136,8 @@ export function editableHtml(
     ...md.renderer.rules,
     fence: (tokens, index) => fence(tokens[index]),
   };
-  const tokens = md.parse(source, environment),
-    env = { ...environment, documentId };
+  const env = { ...environment, documentId, fragment: true },
+    tokens = md.parse(source, env);
   const html = tokens
     .map((token, index) => {
       if (token.type === "inline") return inline(token);
@@ -160,14 +172,7 @@ export function editableHtml(
   });
 }
 export function extractHeadings(source: string): Heading[] {
-  const result: Heading[] = [],
-    tokens = md.parse(source.replace(/\r\n/g, "\n"), {});
-  for (let i = 0; i < tokens.length; i++)
-    if (tokens[i].type === "heading_open" && tokens[i].map)
-      result.push({
-        line: tokens[i].map![0] + 1,
-        level: Number(tokens[i].tag.slice(1)),
-        text: tokens[i + 1]?.content || "",
-      });
-  return result;
+  const env: { headings?: Heading[] } = {};
+  md.parse(source.replace(/\r\n/g, "\n"), env);
+  return env.headings || [];
 }

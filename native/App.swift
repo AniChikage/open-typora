@@ -12,33 +12,30 @@ final class Resources: NSObject, WKURLSchemeHandler {
     self.root = root
     self.store = store
   }
+  func read(_ url: URL) throws -> (Data, String) {
+    let file: URL
+    if url.scheme == "open-typora-asset", url.host == "local" {
+      let segments = (URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedPath.split(separator: "/") ?? []).compactMap { String($0).removingPercentEncoding }
+      guard segments.count == 2 else { throw NativeFailure("图片引用无效。") }
+      file = try store.asset(segments[0], relative: segments[1])
+    } else {
+      guard url.scheme == "opentypora", url.host == "app" else { throw NativeFailure("资源来源无效。") }
+      file = root.appendingPathComponent(String(url.path.dropFirst())).resolvingSymlinksInPath()
+      guard contained(root, file) else { throw NativeFailure("资源路径无效。") }
+    }
+    let size = try file.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? DocumentStore.maxBytes + 1
+    guard size <= DocumentStore.maxBytes else { throw NativeFailure("资源大小超出支持范围。") }
+    let mime = ["js":"application/javascript","css":"text/css","html":"text/html","woff2":"font/woff2","woff":"font/woff","ttf":"font/ttf","json":"application/json","svg":"image/svg+xml","png":"image/png","jpg":"image/jpeg","jpeg":"image/jpeg","webp":"image/webp","gif":"image/gif","avif":"image/avif"][file.pathExtension.lowercased()] ?? "application/octet-stream"
+    return (try Data(contentsOf: file), mime)
+  }
   func webView(_ webView: WKWebView, start task: WKURLSchemeTask) {
     guard let url = task.request.url else { return }
     do {
-      let file: URL
-      if url.scheme == "open-typora-asset", url.host == "local" {
-        let segments =
-          (URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedPath.split(
-            separator: "/") ?? []).compactMap { String($0).removingPercentEncoding }
-        guard segments.count == 2 else { throw NativeFailure("图片引用无效。") }
-        file = try store.asset(segments[0], relative: segments[1])
-      } else {
-        guard url.scheme == "opentypora", url.host == "app" else { throw NativeFailure("资源来源无效。") }
-        file = root.appendingPathComponent(String(url.path.dropFirst())).resolvingSymlinksInPath()
-        guard contained(root, file) else { throw NativeFailure("资源路径无效。") }
-      }
-      let data = try Data(contentsOf: file)
-      let mime =
-        [
-          "js": "application/javascript", "css": "text/css", "html": "text/html",
-          "woff2": "font/woff2", "woff": "font/woff", "ttf": "font/ttf", "json": "application/json",
-          "svg": "image/svg+xml", "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
-          "webp": "image/webp", "gif": "image/gif", "avif": "image/avif",
-        ][file.pathExtension] ?? "application/octet-stream"
+      let (data, mime) = try read(url)
       task.didReceive(
         URLResponse(
           url: url, mimeType: mime, expectedContentLength: data.count,
-          textEncodingName: ["js", "css", "html", "json"].contains(file.pathExtension)
+          textEncodingName: mime.hasPrefix("text/") || ["application/javascript", "application/json"].contains(mime)
             ? "utf-8" : nil))
       task.didReceive(data)
       task.didFinish()
@@ -46,6 +43,14 @@ final class Resources: NSObject, WKURLSchemeHandler {
   }
   func webView(_ webView: WKWebView, stop task: WKURLSchemeTask) {}
 }
+struct EditorCommand: Decodable {
+  let label: String
+  let action: String
+  let key: String?
+  let context: String?
+  let selector: String?
+}
+struct CommandGroup: Decodable { let title: String; let items: [EditorCommand] }
 final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler,
   WKNavigationDelegate, WKUIDelegate
 {
@@ -65,6 +70,11 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
   var undoAvailable = false
   var redoAvailable = false
   var richMode = false
+  var editorContext = ""
+  var focusMode = false
+  var typewriterMode = false
+  var sidebarVisible = true
+  var tabGroupID: String?
   var titleObservation: NSKeyValueObservation?
   func show(hidden: Bool = false) {
     let configuration = WKWebViewConfiguration()
@@ -87,6 +97,7 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
       backing: .buffered, defer: false)
     window.title = "Open Typora"
+    window.tabbingIdentifier = "OpenTypora"
     window.titleVisibility = .hidden
     window.titlebarAppearsTransparent = true
     window.isReleasedWhenClosed = false
@@ -258,6 +269,48 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       let token = try arg(args, 0, String.self)
       guard let file = store.tokens[token] else { throw NativeFailure("目录已更新，请刷新后重试。") }
       return try jsonValue(store.open(file))
+    case "reopen": return try jsonValue(store.reopen(arg(args, 0, String.self)))
+    case "readResource":
+      guard let url = URL(string: try arg(args, 0, String.self)) else { throw NativeFailure("资源引用无效。") }
+      let (data, mime) = try Resources(Bundle.main.resourceURL!.appendingPathComponent("dist"), store: store).read(url)
+      return ["base64": data.base64EncodedString(), "mime": mime]
+    case "windowAction":
+      let action = try arg(args, 0, String.self)
+      if ["new", "newWindow", "newTab"].contains(action) { owner.newWindow(tab: action == "newTab") }
+      else if action == "open" { if let file = chooseFile(false) { owner.openWindow(file) } }
+      else if action == "reopen" {
+        guard let recent = owner.recentClosedFiles.popLast() else { return false }
+        owner.openWindow(recent.url, tabGroupID: recent.group); return true
+      }
+      else { throw NativeFailure("窗口操作不支持。") }
+      return nil
+    case "chooseImage":
+      let id = try arg(args, 0, String.self)
+      _ = try store.require(id)
+      let panel = NSOpenPanel()
+      panel.allowedContentTypes = [.png, .jpeg, .gif, UTType(filenameExtension: "webp") ?? .image]
+      panel.canChooseDirectories = false
+      guard panel.runModal() == .OK, let file = panel.url else { return nil }
+      let bytes = try Data(contentsOf: file)
+      return ["path": try store.importImage(id, bytes: bytes, name: file.lastPathComponent), "alt": file.lastPathComponent]
+    case "writeClipboard":
+      let text = try arg(args, 0, String.self)
+      NSPasteboard.general.clearContents(); NSPasteboard.general.setString(text, forType: .string)
+      return nil
+    case "readClipboard": return NSPasteboard.general.string(forType: .string) ?? ""
+    case "exportHtml":
+      let name = try arg(args, 0, String.self), html = try arg(args, 1, String.self)
+      guard html.utf8.count <= 100 * 1024 * 1024 else { throw NativeFailure("导出内容过大。") }
+      #if WEBTEST
+        let destination = store.dataDirectory.appendingPathComponent("native-test.html")
+      #else
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.html]
+        panel.nameFieldStringValue = URL(fileURLWithPath: name).deletingPathExtension().lastPathComponent + ".html"
+        guard panel.runModal() == .OK, let destination = panel.url else { return nil }
+      #endif
+      try atomicWrite(destination, Data(html.utf8))
+      return destination.path
     case "save":
       let id = try arg(args, 0, String.self)
       let text = try arg(args, 1, String.self)
@@ -309,6 +362,13 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       else { throw NativeFailure("链接类型不支持。") }
       if confirm("打开外部链接？", detail: address, yes: "打开") { NSWorkspace.shared.open(url) }
       return nil
+    case "openDocumentLink":
+      let record = try store.require(arg(args, 0, String.self)), address = try arg(args, 1, String.self)
+      guard let path = record.path, let relative = address.split(separator: "#", maxSplits: 1).first.map(String.init)?.removingPercentEncoding,
+        !relative.hasPrefix("/"), !relative.contains(":"), !relative.contains("\\") else { throw NativeFailure("请先保存文档，并使用相对 Markdown 文件路径。") }
+      let base = URL(fileURLWithPath: path).deletingLastPathComponent().resolvingSymlinksInPath(), target = base.appendingPathComponent(relative).resolvingSymlinksInPath()
+      guard contained(base, target) else { throw NativeFailure("链接位于当前文档目录之外，请用“打开文件”选择目标。") }
+      owner.openWindow(target); return nil
     case "confirmClose":
       #if WEBTEST
         return "cancel"
@@ -329,6 +389,10 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       undoAvailable = try arg(args, 0, Bool.self)
       redoAvailable = try arg(args, 1, Bool.self)
       richMode = args.count > 2 ? (args[2] as? Bool ?? false) : false
+      editorContext = args.count > 3 ? (args[3] as? String ?? "") : ""
+      return nil
+    case "viewState":
+      focusMode = try arg(args, 0, Bool.self); typewriterMode = try arg(args, 1, Bool.self); sidebarVisible = try arg(args, 2, Bool.self)
       return nil
     case "setDirty":
       window.isDocumentEdited = try arg(args, 0, Bool.self)
@@ -373,47 +437,47 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
   func buildMenu() {
     let main = NSMenu()
     NSApp.mainMenu = main
-    func group(_ title: String, _ items: [(String, String, String)]) {
+    func group(_ title: String) -> NSMenu {
       let root = NSMenuItem(title: title, action: nil, keyEquivalent: "")
       let menu = NSMenu(title: title)
       root.submenu = menu
       main.addItem(root)
-      for (label, action, key) in items {
-        if label.isEmpty {
-          menu.addItem(.separator())
-          continue
-        }
+      return menu
+    }
+    func add(_ command: EditorCommand, to menu: NSMenu) {
+        let raw = command.key ?? ""
+        var key = raw
+        for modifier in ["Mod-", "Shift-", "Alt-", "Ctrl-"] { key = key.replacingOccurrences(of: modifier, with: "") }
+        if key.hasPrefix("F"), let number = Int(key.dropFirst()), (1...20).contains(number) { key = String(UnicodeScalar(0xF703 + number)!) }
+        if key == "Backspace" { key = "\u{8}" }
         let item = NSMenuItem(
-          title: label, action: #selector(NativeApplication.command(_:)),
-          keyEquivalent: key.replacingOccurrences(of: "⇧", with: ""))
-        item.target = owner
-        item.representedObject = action
-        item.keyEquivalentModifierMask = key.hasPrefix("⇧") ? [.command, .shift] : [.command]
+          title: command.label, action: command.selector.map { NSSelectorFromString($0) } ?? #selector(NativeApplication.command(_:)), keyEquivalent: key.lowercased())
+        if command.selector == nil { item.target = owner }
+        item.representedObject = command.action
+        item.keyEquivalentModifierMask = []
+        if raw.contains("Mod-") { item.keyEquivalentModifierMask.insert(.command) }
+        if raw.contains("Shift-") { item.keyEquivalentModifierMask.insert(.shift) }
+        if raw.contains("Alt-") { item.keyEquivalentModifierMask.insert(.option) }
+        if raw.contains("Ctrl-") { item.keyEquivalentModifierMask.insert(.control) }
         menu.addItem(item)
+    }
+    let appMenu = group("Open Typora")
+    add(EditorCommand(label: "关于 Open Typora", action: "about", key: nil, context: nil, selector: nil), to: appMenu)
+    add(EditorCommand(label: "偏好设置…", action: "preferences", key: "Mod-,", context: nil, selector: nil), to: appMenu)
+    appMenu.addItem(.separator())
+    appMenu.addItem(NSMenuItem(title: "隐藏 Open Typora", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h"))
+    add(EditorCommand(label: "退出 Open Typora", action: "quit", key: "Mod-Q", context: nil, selector: nil), to: appMenu)
+    for definition in owner.commandGroups where definition.title != "表格" {
+      let menu = group(definition.title)
+      for command in definition.items where command.action != "preferences" {
+        if command.action == "table" {
+          let tableRoot = NSMenuItem(title: "表格", action: nil, keyEquivalent: ""), table = NSMenu(title: "表格")
+          add(command, to: table)
+          for operation in owner.commandGroups.first(where: { $0.title == "表格" })?.items ?? [] { add(operation, to: table) }
+          tableRoot.submenu = table; menu.addItem(tableRoot)
+        } else { add(command, to: menu) }
       }
     }
-    group(
-      "Open Typora",
-      [("关于 Open Typora", "about", ""), ("", "", ""), ("退出 Open Typora", "quit", "q")])
-    group(
-      "文件",
-      [
-        ("新建", "new", "n"), ("打开文件…", "open", "o"), ("打开文件夹…", "folder", ""), ("", "", ""),
-        ("保存", "save", "s"), ("另存为…", "saveAs", "⇧s"), ("导出 PDF…", "pdf", ""), ("", "", ""),
-        ("关闭窗口", "close-window", "w"),
-      ])
-    group("编辑", [("撤销", "undo", "z"), ("重做", "redo", "⇧z"), ("", "", ""), ("查找", "find", "f")])
-    let edit = main.items[2].submenu!
-    for (title, selector, key) in [
-      ("剪切", "cut:", "x"), ("复制", "copy:", "c"), ("粘贴", "paste:", "v"), ("全选", "selectAll:", "a"),
-    ] { edit.addItem(NSMenuItem(title: title, action: Selector(selector), keyEquivalent: key)) }
-    group("格式", [("粗体", "bold", "b"), ("斜体", "italic", "i"), ("代码块", "code", "")])
-    group(
-      "显示",
-      [
-        ("源码模式", "source", "/"), ("专注模式", "focus", "⇧f"), ("显示／隐藏侧栏", "sidebar", "\\"),
-        ("大纲", "outline", ""), ("文件列表", "files", ""), ("切换明暗主题", "theme", ""),
-      ])
     let windows = NSMenuItem(title: "窗口", action: nil, keyEquivalent: "")
     let menu = NSMenu(title: "窗口")
     menu.addItem(
@@ -427,6 +491,11 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
   }
 }
 final class NativeApplication: NSObject, NSApplicationDelegate, NSMenuItemValidation {
+  var recentClosedFiles: [(url: URL, group: String?)] = []
+  lazy var commandGroups: [CommandGroup] = {
+    let bytes = try! Data(contentsOf: Bundle.main.resourceURL!.appendingPathComponent("commands.json"))
+    return try! JSONDecoder().decode([CommandGroup].self, from: bytes)
+  }()
   var hosts = [NativeWindowHost]()
   var terminating = false
   var launched = false
@@ -442,12 +511,26 @@ final class NativeApplication: NSObject, NSApplicationDelegate, NSMenuItemValida
       $0.window === NSApp.mainWindow
     }) ?? hosts.last
   }
-  func makeWindow(directory location: URL, seed: SessionRecord? = nil) {
+  @discardableResult func makeWindow(directory location: URL, seed: SessionRecord? = nil) -> NativeWindowHost {
     let host = NativeWindowHost(owner: self, directory: location, seed: seed)
+    if let group = try? String(contentsOf: location.appendingPathComponent("tab-group"), encoding: .utf8), UUID(uuidString: group) != nil { host.tabGroupID = group }
     hosts.append(host)
     host.show()
+    if let group = host.tabGroupID {
+      // AppKit finishes ordering newly created windows after the launch callback.
+      // Join tabs on the next main-loop turn so later window creation cannot undo it.
+      DispatchQueue.main.async { [weak self, weak host] in
+        guard let self, let host, self.hosts.contains(where: { $0 === host }),
+          let other = self.hosts.first(where: { $0 !== host && $0.tabGroupID == group }) else { return }
+        if other.window.tabbedWindows?.contains(host.window) != true {
+          other.window.addTabbedWindow(host.window, ordered: .above)
+        }
+      }
+    }
+    return host
   }
   func applicationDidFinishLaunching(_ notification: Notification) {
+    NSWindow.allowsAutomaticWindowTabbing = false
     launched = true
     makeWindow(directory: directory)
     let secondary = directory.appendingPathComponent("windows")
@@ -481,14 +564,23 @@ final class NativeApplication: NSObject, NSApplicationDelegate, NSMenuItemValida
     for host in hosts { host.send("quit") }
     return .terminateLater
   }
-  func newWindow() {
+  func newWindow(tab: Bool = false) {
+    let previous = tab ? current : nil
     let id = UUID().uuidString
     let location = directory.appendingPathComponent("windows/" + id)
     let draft = DocumentRecord(
       id: id, name: "未命名.md", content: "", savedContent: "", lineEnding: "\n")
-    makeWindow(directory: location, seed: SessionRecord(documents: [draft], activeId: id))
+    let host = makeWindow(directory: location, seed: SessionRecord(documents: [draft], activeId: id))
+    if let previous {
+      let group = previous.tabGroupID ?? UUID().uuidString
+      previous.tabGroupID = group; host.tabGroupID = group
+      try? atomicWrite(previous.store.dataDirectory.appendingPathComponent("tab-group"), Data(group.utf8))
+      try? atomicWrite(host.store.dataDirectory.appendingPathComponent("tab-group"), Data(group.utf8))
+      previous.window.addTabbedWindow(host.window, ordered: .above)
+      host.window.makeKeyAndOrderFront(nil)
+    }
   }
-  func openWindow(_ file: URL) {
+  func openWindow(_ file: URL, tabGroupID: String? = nil) {
     let resolved = file.resolvingSymlinksInPath().path
     if let existing = hosts.first(where: { host in
       host.store.records.values.contains { $0.path == resolved }
@@ -502,6 +594,7 @@ final class NativeApplication: NSObject, NSApplicationDelegate, NSMenuItemValida
     let location = directory.appendingPathComponent("windows/" + UUID().uuidString)
     do {
       let record = try DocumentStore(location).open(file)
+      if let tabGroupID { try atomicWrite(location.appendingPathComponent("tab-group"), Data(tabGroupID.utf8)) }
       makeWindow(directory: location, seed: SessionRecord(documents: [record], activeId: record.id))
     } catch {
       let alert = NSAlert()
@@ -510,6 +603,17 @@ final class NativeApplication: NSObject, NSApplicationDelegate, NSMenuItemValida
     }
   }
   func windowClosed(_ host: NativeWindowHost) {
+    if !terminating {
+      let activePath = host.store.records[host.store.activeId ?? ""]?.path
+      let records = host.store.records.values.sorted { a,b in a.path == activePath ? false : b.path == activePath ? true : a.name < b.name }
+      for record in records {
+        if let path = record.path {
+          recentClosedFiles.removeAll { $0.url.path == path }
+          recentClosedFiles.append((URL(fileURLWithPath: path), host.tabGroupID))
+        }
+      }
+      recentClosedFiles = Array(recentClosedFiles.suffix(20))
+    }
     if !terminating, host.store.dataDirectory != directory {
       try? atomicWrite(host.store.dataDirectory.appendingPathComponent("closed"), Data())
     }
@@ -528,8 +632,15 @@ final class NativeApplication: NSObject, NSApplicationDelegate, NSMenuItemValida
     }
   }
   func validateMenuItem(_ item: NSMenuItem) -> Bool {
-    if ["bold", "italic", "code"].contains(item.representedObject as? String ?? "") {
-      return current?.richMode == true
+    let action = item.representedObject as? String ?? ""
+    if action == "source" { item.state = current?.richMode == false ? .on : .off }
+    if action == "focus" { item.state = current?.focusMode == true ? .on : .off }
+    if action == "typewriter" { item.state = current?.typewriterMode == true ? .on : .off }
+    if action == "sidebar" { item.state = current?.sidebarVisible == true ? .on : .off }
+    if let definition = commandGroups.flatMap({ $0.items }).first(where: { $0.action == action }), let context = definition.context {
+      if current?.store.records.isEmpty != false { return false }
+      if context == "rich" { return current?.richMode == true }
+      if context == "table" { return current?.richMode == true && current?.editorContext == "table_open" }
     }
     if item.representedObject as? String == "undo" { return current?.undoAvailable == true }
     if item.representedObject as? String == "redo" { return current?.redoAvailable == true }
@@ -537,14 +648,16 @@ final class NativeApplication: NSObject, NSApplicationDelegate, NSMenuItemValida
   }
   @objc func command(_ sender: NSMenuItem) {
     guard let action = sender.representedObject as? String else { return }
-    if action == "new" {
-      newWindow()
+    if ["new", "newWindow", "newTab"].contains(action) {
+      newWindow(tab: action == "newTab")
     } else if action == "open" {
       if let file = current?.chooseFile(false) { openWindow(file) }
     } else if action == "quit" {
       NSApp.terminate(nil)
     } else if action == "close-window" {
       current?.send("close-window")
+    } else if action == "reopen", let recent = recentClosedFiles.popLast() {
+      openWindow(recent.url, tabGroupID: recent.group)
     } else {
       current?.send(action)
     }

@@ -418,4 +418,122 @@ test("quoted task toggle addresses its marker while literal tasks in code stay u
   assert.equal(f.model.text, original);
   f.close();
 });
+test("paragraph commands preserve quote/list containers, caret and one-step undo", () => {
+  const f = fixture("> - 原文\n");
+  point(f.editor, f.model.text.indexOf("原文") + 1);
+  f.editor.command("heading-2");
+  assert.equal(f.model.text, "> - ## 原文\n");
+  assert.equal(f.model.text[f.editor.bookmark().head], "文");
+  f.editor.undo(); assert.equal(f.model.text, "> - 原文\n");
+  f.editor.command("ordered-list"); assert.equal(f.model.text, "> 1. 原文\n");
+  f.editor.undo(); f.close();
+});
+test("empty-caret formatting starts on input rather than turning delimiter placeholders into a horizontal rule", () => {
+  const f = fixture(""); point(f.editor, 0);
+  f.editor.wrap("**", "**"); assert.equal(f.model.text, "");
+  input(f.root, "insertText", "文字");
+  assert.equal(f.model.text, "**文字**"); assert.equal(f.root.querySelector("strong").textContent, "文字");
+  f.editor.undo(); assert.equal(f.model.text, ""); f.close();
+});
+test("TOC and heading anchors update across edits including duplicate formatted headings", () => {
+  const f = fixture("[toc]\n\n# **标题**\n\n## 标题\n");
+  assert.equal(f.root.querySelectorAll(".markdown-toc a").length, 2);
+  assert.equal(f.root.querySelector("h1").id, "标题");
+  assert.equal(f.root.querySelector("h2").id, "标题-1");
+  point(f.editor, f.model.text.indexOf("标题") + 1); input(f.root, "insertText", "新");
+  assert.equal(f.root.querySelector(".markdown-toc a").textContent, "标新题");
+  f.root.querySelectorAll(".markdown-toc a")[1].click();
+  assert.equal(f.model.selection.head, f.model.text.indexOf("## 标题"));
+  f.close();
+});
+test("footnote references render, definitions remain directly editable, and code literals do not affect numbering", () => {
+  const source = "`[^a]` and [^b]\n\n[^a]: unused\n\n[^b]: **note**\n";
+  const f = fixture(source);
+  assert.equal(f.model.toMarkdown(), source);
+  assert.equal(f.root.querySelector(".footnote-reference a").textContent, "1");
+  assert.equal(f.root.querySelectorAll(".md-footnote-definition").length, 2);
+  point(f.editor, source.indexOf("note") + 2); input(f.root, "insertText", "X");
+  assert.equal(f.model.text, source.replace("note", "noXte"));
+  f.editor.undo(); assert.equal(f.model.text, source); f.close();
+});
+test("highlight, subscript, superscript, emoji and safe underline keep original source and editable offsets", () => {
+  const source = "==高亮== H~2~O X^2^ :smile: <u>下划线</u> <span style=\"color:red\">颜色</span>";
+  const f = fixture(source);
+  assert.equal(f.model.toMarkdown(), source);
+  assert.equal(f.root.querySelector("mark").textContent, "高亮");
+  assert.equal(f.root.querySelector("sub").textContent, "2");
+  assert.equal(f.root.querySelector("sup").textContent, "2");
+  assert.ok(f.root.querySelector('[data-mark="emoji"]'));
+  assert.equal(f.root.querySelector("u").textContent, "下划线");
+  point(f.editor, source.indexOf("高亮") + 1); input(f.root, "insertText", "新");
+  assert.equal(f.model.text, source.replace("高亮", "高新亮"));
+  f.editor.undo(); f.close();
+});
+test("HTML clipboard paste converts formatted paragraphs and tables to editable Markdown", () => {
+  const f = fixture(""); point(f.editor, 0);
+  const event = new window.Event("paste", { bubbles: true, cancelable: true });
+  Object.defineProperty(event, "clipboardData", { value: { files: [], getData(type) { return type === "text/html" ? '<h2>Title</h2><p><strong>Bold</strong> <a href="https://example.com">Link</a></p><script>alert(1)</script><table><thead><tr><th>A</th><th>B</th></tr></thead><tbody><tr><td>X</td><td>Y</td></tr></tbody></table>' : ""; } } });
+  f.root.dispatchEvent(event);
+  assert.match(f.model.text, /^## Title/); assert.match(f.model.text, /\*\*Bold\*\*/); assert.match(f.model.text, /\[Link\]\(https:\/\/example.com\)/);
+  assert.ok(f.root.querySelector("table")); assert.ok(!f.model.text.includes("alert(1)"));
+  f.editor.undo(); assert.equal(f.model.text, ""); f.close();
+});
+test("table movement carries alignment and escaped cell content and remains undoable", () => {
+  const source = "| A | B |\n| :--- | ---: |\n| x\\|y | z |\n| one | two |\n";
+  const f = fixture(source); point(f.editor, source.indexOf("z"));
+  f.editor.command("table-moveColumnLeft");
+  assert.match(f.model.text, /^\| B \| A \|\n\| ---: \| :--- \|\n\| z \| x\\\|y \|/);
+  f.editor.undo(); assert.equal(f.model.text, source);
+  point(f.editor, source.indexOf("one")); f.editor.command("table-moveRowUp");
+  assert.ok(f.model.text.indexOf("one") < f.model.text.indexOf("x\\|y"));
+  f.editor.undo(); assert.equal(f.model.text, source); f.close();
+});
+test("auto pair skips an existing closing bracket and deletes a complete empty pair", () => {
+  const f = fixture(""); f.editor.setOptions({ spellcheck: false, tabSize: 2, typewriter: false, autoPair: true }); point(f.editor, 0);
+  input(f.root, "insertText", "("); assert.equal(f.model.text, "()");
+  input(f.root, "insertText", "x"); input(f.root, "insertText", ")");
+  assert.equal(f.model.text, "(x)"); assert.equal(f.model.selection.head, 3);
+  f.close();
+  const empty = fixture(""); empty.editor.setOptions({ spellcheck: false, tabSize: 2, typewriter: false, autoPair: true }); point(empty.editor, 0);
+  input(empty.root, "insertText", "["); input(empty.root, "deleteContentBackward"); assert.equal(empty.model.text, ""); empty.close();
+  const emoji = fixture("👨‍👩‍👧‍👦"); emoji.editor.setOptions({ spellcheck: false, tabSize: 2, typewriter: false, autoPair: true }); point(emoji.editor, emoji.model.text.length);
+  input(emoji.root, "deleteContentBackward"); assert.equal(emoji.model.text, ""); emoji.close();
+});
+test("formatting across paragraphs and list items formats each editable body without corrupting block markers", () => {
+  const source = "first\n\n- second\n- third\n";
+  const f = fixture(source); f.model.selection = { anchor: 0, head: source.length - 1 }; f.editor.restore();
+  f.editor.wrap("**", "**");
+  assert.equal(f.model.text, "**first**\n\n- **second**\n- **third**\n");
+  assert.equal(f.root.querySelectorAll("strong").length, 3);
+  f.editor.undo(); assert.equal(f.model.text, source); f.close();
+});
+test("inline-code wrapping chooses a delimiter longer than the contained backticks and toggles it correctly", () => {
+  const source = "use `value` now";
+  const f = fixture(source); f.model.selection = { anchor: 0, head: source.length }; f.editor.restore();
+  f.editor.wrap("`", "`"); assert.equal(f.model.text, "``use `value` now``");
+  point(f.editor, 5); f.editor.wrap("`", "`"); assert.equal(f.model.text, source); f.close();
+});
+test("front matter is editable in rich mode but excluded from heading navigation and exported text", async () => {
+  const { extractHeadings, renderMarkdown } = await import("../src/editor/markdown.ts");
+  const source = "---\ntitle: 元数据\n---\n\n# 正文\n\n文字\n";
+  const f = fixture(source);
+  assert.equal(f.model.toMarkdown(), source);
+  assert.equal(extractHeadings(source).length, 1);
+  assert.ok(!renderMarkdown(source).includes("元数据"));
+  assert.ok(f.root.querySelector(".md-frontmatter").textContent.includes("元数据"));
+  f.close();
+});
+test("comments preserve editable source and remain absent from HTML export", async () => {
+  const { renderMarkdown } = await import("../src/editor/markdown.ts");
+  const source = "文字 <!-- 注释内容 --> 继续";
+  const f = fixture(source); assert.equal(f.model.toMarkdown(), source);
+  assert.ok(f.root.querySelector(".md-comment-view").textContent.includes("注释内容"));
+  assert.ok(!renderMarkdown(source).includes("注释内容")); f.close();
+});
+test("word statistics exclude Markdown syntax and count each Han character as one word", async () => {
+  const { documentStatistics } = await import("../src/editor/statistics.ts");
+  const source = "## 中文 text **bold**\n\n- item";
+  const stats = documentStatistics(source);
+  assert.equal(stats.words, 5); assert.equal(stats.characters, Array.from(source).length); assert.equal(stats.lines, 3);
+});
 test.after(() => dom.window.close());

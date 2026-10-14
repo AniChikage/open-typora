@@ -5,7 +5,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { EditorState } from "@codemirror/state";
+import { EditorState, Compartment } from "@codemirror/state";
 import {
   EditorView,
   keymap,
@@ -18,12 +18,16 @@ import {
   syntaxHighlighting,
   defaultHighlightStyle,
   bracketMatching,
+  indentUnit,
 } from "@codemirror/language";
-import { search, searchKeymap, openSearchPanel } from "@codemirror/search";
+import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
+import { search, searchKeymap, openSearchPanel, findNext as cmFindNext, findPrevious as cmFindPrevious } from "@codemirror/search";
 import { MarkdownDocument } from "./model.ts";
 import { RichEditor } from "./RichEditor.ts";
 import { host } from "../host";
 import type { DocumentRecord } from "../types";
+import type { Preferences } from "../preferences";
+import type { BlockArguments } from "./blockCommands.ts";
 export interface EditorHandle {
   view(): EditorView | null;
   find(): void;
@@ -34,17 +38,26 @@ export interface EditorHandle {
   redo(): void;
   focus(): void;
   richMode(): boolean;
+  command(action: string, args?: BlockArguments): void;
+  insert(text: string): void;
+  selectionText(markdown?: boolean): string;
+  clearFormat(): void;
+  findNext(back?: boolean): void;
+  context(): string;
 }
 interface Props {
   document: DocumentRecord;
   rendered: boolean;
+  preferences?: Preferences;
+  typewriter?: boolean;
   onChange(content: string): void;
   onError(error: string): void;
   onCursor(line: number, column: number): void;
+  onSelection?(text: string): void;
 }
 export const MarkdownEditor = forwardRef<EditorHandle, Props>(
   function MarkdownEditor(
-    { document: record, rendered, onChange, onError, onCursor },
+    { document: record, rendered, preferences, typewriter = false, onChange, onError, onCursor, onSelection },
     ref,
   ) {
     const root = useRef<HTMLDivElement>(null),
@@ -52,8 +65,8 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
     const model = useRef<MarkdownDocument | null>(null),
       rich = useRef<RichEditor | null>(null),
       source = useRef<EditorView | null>(null);
-    const callbacks = useRef({ onChange, onError, onCursor });
-    callbacks.current = { onChange, onError, onCursor };
+    const callbacks = useRef({ onChange, onError, onCursor, onSelection });
+    callbacks.current = { onChange, onError, onCursor, onSelection };
     const initial = useRef(record),
       requested = useRef(rendered),
       activeMode = useRef(rendered);
@@ -65,7 +78,12 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
       [replacement, setReplacement] = useState("");
     const [searchStatus, setSearchStatus] = useState("");
     const searchField = useRef<HTMLInputElement>(null);
+    const searchTerms = useRef({ query, replacement }); searchTerms.current = { query, replacement };
     const syncing = useRef(false);
+    const sourceBehavior = useRef(new Compartment());
+    const sourceOptions = () => [indentUnit.of(" ".repeat(viewOptions.current.preferences?.tabSize || 2)), ...(viewOptions.current.preferences?.autoPair ? [closeBrackets(), keymap.of(closeBracketsKeymap)] : [])];
+    const viewOptions = useRef({ preferences, typewriter });
+    viewOptions.current = { preferences, typewriter };
     function historyState() {
       if (root.current?.closest(".document-editor")?.hasAttribute("hidden"))
         return;
@@ -75,6 +93,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
             model.current.canUndo,
             model.current.canRedo,
             activeMode.current,
+            model.current.nodeAt(model.current.selection.head)?.kind || "",
           )
           .catch(() => {});
     }
@@ -88,6 +107,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
     };
     function findNext(back = false) {
       const doc = model.current;
+      const query = searchTerms.current.query;
       if (!doc || !query) return;
       const start = back
         ? Math.min(doc.selection.anchor, doc.selection.head) - 1
@@ -225,6 +245,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
             markdown({ base: markdownLanguage }),
             syntaxHighlighting(defaultHighlightStyle),
             bracketMatching(),
+            sourceBehavior.current.of(sourceOptions()),
             search({ top: true }),
             keymap.of([
               {
@@ -283,6 +304,10 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
                   line.number,
                   selected.head - line.from + 1,
                 );
+                callbacks.current.onSelection?.(update.state.sliceDoc(selected.from, selected.to));
+                if (viewOptions.current.typewriter) requestAnimationFrame(() => {
+                  if (source.current === update.view) update.view.dispatch({ effects: EditorView.scrollIntoView(selected.head, { y: "center" }) });
+                });
               }
             }),
             EditorView.domEventHandlers({
@@ -315,6 +340,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
           ],
         }),
       });
+      source.current.contentDOM.spellcheck = viewOptions.current.preferences?.spellcheck ?? false;
     }
     function setMode(value: boolean) {
       const doc = model.current;
@@ -403,10 +429,20 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
         codeBlock: () => {
           if (activeMode.current) rich.current?.codeBlock();
         },
+        command: (action, args) => { if (activeMode.current) rich.current?.command(action, args); },
+        insert: (text) => insert(text),
+        selectionText: (markdown = false) => {
+          if (activeMode.current) { const value = rich.current?.clipboard(); return (markdown ? value?.markdown : value?.plain) || ""; }
+          const selected = source.current?.state.selection.main;
+          return selected ? source.current!.state.sliceDoc(selected.from, selected.to) : "";
+        },
+        clearFormat: () => { if (activeMode.current) rich.current?.clearFormat(); },
+        findNext: (back = false) => { if (activeMode.current) findNext(back); else if (source.current) (back ? cmFindPrevious : cmFindNext)(source.current); },
         undo: () => history(),
         redo: () => history(true),
         focus: focusEditor,
         richMode: () => activeMode.current,
+        context: () => activeMode.current ? model.current?.nodeAt(model.current.selection.head)?.kind || "" : "source",
       }),
       [],
     );
@@ -418,11 +454,10 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
       );
       rich.current = new RichEditor(root.current!, model.current, original.id, {
         change: publish,
-        cursor: (line, column) => callbacks.current.onCursor(line, column),
+        cursor: (line, column) => { callbacks.current.onCursor(line, column); callbacks.current.onSelection?.(rich.current?.clipboard().plain || ""); historyState(); },
         image: (file) => void insertImage(file),
         link: (url) =>
-          void host
-            .openLink(url)
+          void (/^(?:https?:|mailto:)/i.test(url) ? host.openLink(url) : host.openDocumentLink(original.id, url))
             .catch((error) => callbacks.current.onError(error.message)),
         compositionFinished: () => setMode(requested.current),
       });
@@ -456,6 +491,15 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
     useEffect(() => {
       historyState();
     });
+    useEffect(() => {
+      if (rich.current) {
+        rich.current.setOptions({ spellcheck: preferences?.spellcheck ?? false, tabSize: preferences?.tabSize || 2, typewriter, autoPair: preferences?.autoPair ?? false });
+        model.current?.refreshCaret(); rich.current.render(false);
+      }
+      if (source.current) source.current.contentDOM.spellcheck = preferences?.spellcheck ?? false;
+      source.current?.dispatch({ effects: sourceBehavior.current.reconfigure(sourceOptions()) });
+      if (typewriter && source.current && !activeMode.current) source.current.dispatch({ effects: EditorView.scrollIntoView(source.current.state.selection.main.head, { y: "center" }) });
+    }, [preferences, typewriter]);
     useEffect(() => {
       if (!root.current?.closest(".document-editor")?.hasAttribute("hidden"))
         focusEditor();

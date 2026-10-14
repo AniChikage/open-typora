@@ -175,6 +175,12 @@ try {
     true,
     "native PDF export completes asynchronously without blocking the editor",
   );
+  const marginPdf = await window.desktop.exportPdf('<!doctype html><html><head><style>html,body{margin:0;padding:0}.print-document{display:flow-root}p{margin:0 0 800px;font:16px/24px sans-serif}</style></head><body><article class="print-document"><p>Trailing margin regression</p></article></body></html>');
+  if (!marginPdf.ok) throw new Error(marginPdf.error);
+  check(true, "native PDF ignores an unpainted trailing block margin");
+  window.__openTypora.command({ action: "html" });
+  await wait(() => document.querySelector(".toast")?.textContent.includes("HTML 已导出"));
+  check(true, "native HTML export embeds local fonts and images without live app links");
   await sourceMode(false);
   pointText("粗测新体", 2);
   input("insertText", "保留");

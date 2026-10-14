@@ -16,6 +16,7 @@ export function useDocuments() {
   current.current = { documents, activeId };
   const inFlight = useRef(new Map<string, Promise<unknown>>());
   const closing = useRef(false);
+  const closed = useRef<{ id: string; name: string }[]>([]);
   const update = (id: string, patch: Partial<DocumentRecord>) =>
     setDocuments((records) =>
       records.map((record) =>
@@ -241,22 +242,35 @@ export function useDocuments() {
     }
   }
   async function close(id = current.current.activeId) {
+    if (closing.current) return;
+    closing.current = true;
+    try {
+    await inFlight.current.get(id);
     const record = current.current.documents.find((item) => item.id === id);
     if (!record) return;
-    if (
-      record.content !== record.savedContent &&
-      !(await host.confirmDiscard(record.name))
-    )
-      return;
+    if (record.content !== record.savedContent) {
+      const answer = await host.confirmClose(record.name);
+      if (answer === "cancel") return;
+      if (answer === "save") { const saved = await host.save(id, record.content); if (!saved) return; update(id, saved); }
+      else if (record.path) await host.reload(id);
+    }
     const remaining = current.current.documents.filter(
       (item) => item.id !== id,
     );
-    setDocuments(remaining);
-    if (current.current.activeId === id) setActiveId(remaining[0]?.id || "");
+    const nextId = current.current.activeId === id ? remaining[0]?.id || "" : current.current.activeId;
     await host.persist({
       documents: remaining,
-      activeId: remaining[0]?.id || "",
+      activeId: nextId,
     });
+    setDocuments(remaining); setActiveId(nextId);
+    closed.current = [...closed.current.filter(item => item.id !== id), { id, name: record.name }].slice(-20);
+    } catch (error) { notify(error); }
+    finally { closing.current = false; setDocuments(records => [...records]); }
+  }
+  async function reopen() {
+    const item = closed.current.at(-1);
+    if (!item) { setMessage("没有最近关闭的文档。"); return; }
+    try { await add(await host.reopen(item.id)); closed.current.pop(); } catch (error) { notify(error); }
   }
   async function reload() {
     const record = current.current.documents.find(
@@ -354,6 +368,7 @@ export function useDocuments() {
     openToken,
     refresh,
     close,
+    reopen,
     reload,
     quit,
     closeWindow,

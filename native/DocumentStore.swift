@@ -73,6 +73,8 @@ final class DocumentStore {
   var tokens = [String: URL]()
   var folder: URL?
   var activeId: String?
+  private var closedRecords = [String: DocumentRecord]()
+  private var closedOrder = [String]()
   static let maxBytes = 20 * 1024 * 1024
   init(_ directory: URL) { dataDirectory = directory }
   func require(_ id: String) throws -> DocumentRecord {
@@ -112,6 +114,12 @@ final class DocumentStore {
     else { throw NativeFailure("草稿格式无效。") }
     records[record.id] = record
     return record
+  }
+  func reopen(_ id: String) throws -> DocumentRecord {
+    guard let record = closedRecords[id] else { throw NativeFailure("最近关闭的文档已不可用。") }
+    let reopened = try record.path.map { try open(URL(fileURLWithPath: $0), id: id) } ?? draft(record)
+    closedRecords.removeValue(forKey: id); closedOrder.removeAll { $0 == id }
+    return reopened
   }
   func save(_ id: String, text: String, destination: URL? = nil, force: Bool = false) throws
     -> DocumentRecord
@@ -229,6 +237,14 @@ final class DocumentStore {
       documents: documents, activeId: incoming.activeId, folder: folder?.path)
     try atomicWrite(
       dataDirectory.appendingPathComponent("session.json"), JSONEncoder().encode(session))
+    let openIDs = Set(documents.map { $0.id })
+    for (id, record) in records where !openIDs.contains(id) {
+      var clean = record
+      clean.content = record.savedContent
+      if clean.path != nil { clean.content = ""; clean.savedContent = "" }
+      closedRecords[id] = clean; closedOrder.removeAll { $0 == id }; closedOrder.append(id)
+    }
+    while closedOrder.count > 20 { closedRecords.removeValue(forKey: closedOrder.removeFirst()) }
     records = Dictionary(uniqueKeysWithValues: documents.map { ($0.id, $0) })
   }
   func restore() throws -> SessionRecord? {

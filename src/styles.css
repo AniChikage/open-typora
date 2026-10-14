@@ -832,7 +832,7 @@ svg {
   padding: 28px 30px 100px;
   outline: none;
   font:
-    16px/1.6 "Open Sans",
+    var(--editor-font-size, 16px)/1.6 "Open Sans",
     "Helvetica Neue",
     Helvetica,
     "PingFang SC",

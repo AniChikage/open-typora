@@ -73,6 +73,11 @@ func runStoreTests() throws {
   try expect(
     try Data(contentsOf: store.asset(record.id, relative: relative)) == png,
     "native image import and scoped read retain bytes")
+  try store.persist(SessionRecord(documents: [], activeId: nil))
+  let reopened = try store.reopen(record.id)
+  try expect(reopened.id == record.id && reopened.content == "外部修改", "reopen reads the current disk content with the same owned id")
+  do { _ = try store.reopen("unknown"); throw NativeFailure("unowned reopen") }
+  catch let error as NativeFailure { try expect(error.message.contains("不可用"), "reopen refuses an unknown document id") }
   try atomicWrite(store.dataDirectory.appendingPathComponent("session.json"), Data("invalid".utf8))
   let corrupt = try DocumentStore(store.dataDirectory).restore()!
   let backups = try fm.contentsOfDirectory(atPath: store.dataDirectory.path)

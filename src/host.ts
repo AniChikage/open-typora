@@ -13,9 +13,9 @@ function draft(name: string, content: string): DocumentRecord {
     lineEnding: content.includes("\r\n") ? "\r\n" : "\n",
   };
 }
-function download(name: string, text: string) {
+function download(name: string, text: string, type = "text/markdown;charset=utf-8") {
   const url = URL.createObjectURL(
-    new Blob([text], { type: "text/markdown;charset=utf-8" }),
+    new Blob([text], { type }),
   );
   const anchor = document.createElement("a");
   anchor.href = url;
@@ -67,6 +67,12 @@ const browser: Host = {
   async openToken() {
     throw new Error("浏览器预览不支持文件夹。");
   },
+  async reopen(id) { const record = browserRecords.get(id); if (!record) throw new Error("文档已不可用。"); return record; },
+  chooseImage: (id) => new Promise(resolve => {
+    const input = document.createElement("input"); input.type = "file"; input.accept = "image/png,image/jpeg,image/gif,image/webp";
+    input.onchange = async () => { const file = input.files?.[0]; resolve(file ? { path: await browser.importImage(id, new Uint8Array(await file.arrayBuffer()), file.name), alt: file.name } : null); };
+    input.addEventListener("cancel", () => resolve(null)); input.click();
+  }),
   async save(id, text) {
     const record = browserRecords.get(id)!;
     download(record.name, text);
@@ -98,10 +104,14 @@ const browser: Host = {
     window.print();
     return null;
   },
+  async exportHtml(name, html) { download(name.replace(/\.(?:md|markdown|mdown)$/i, "") + ".html", html, "text/html;charset=utf-8"); return null; },
+  writeClipboard: text => navigator.clipboard.writeText(text),
+  readClipboard: () => navigator.clipboard.readText(),
   async openLink(url) {
     if (/^https?:\/\//.test(url))
       window.open(url, "_blank", "noopener,noreferrer");
   },
+  async openDocumentLink() { throw new Error("打开本地 Markdown 链接请使用桌面应用。"); },
   async confirmDiscard(name) {
     return window.confirm(`关闭「${name}」并移除未保存的修改？`);
   },

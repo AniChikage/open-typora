@@ -48,6 +48,8 @@ export interface Host {
   openFolder(): Promise<FolderResult | null>;
   scan(): Promise<FolderResult>;
   openToken(token: string): Promise<DocumentRecord>;
+  reopen(id: string): Promise<DocumentRecord>;
+  chooseImage(id: string): Promise<{ path: string; alt: string } | null>;
   save(
     id: string,
     text: string,
@@ -64,7 +66,11 @@ export interface Host {
   ): Promise<DocumentRecord>;
   importImage(id: string, bytes: Uint8Array, name: string): Promise<string>;
   exportPdf(html?: string): Promise<string | null>;
+  exportHtml(name: string, html: string): Promise<string | null>;
+  writeClipboard(text: string): Promise<unknown>;
+  readClipboard(): Promise<string>;
   openLink(url: string): Promise<unknown>;
+  openDocumentLink(id: string, url: string): Promise<unknown>;
   confirmDiscard(name: string): Promise<boolean>;
   confirmClose(name: string): Promise<"save" | "discard" | "cancel">;
   setDirty(dirty: boolean): Promise<unknown>;

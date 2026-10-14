@@ -188,6 +188,14 @@ export function renderNode(
   } else if (node.kind === "frontmatter") {
     const id = leaf(node.source, null, "code");
     holder.innerHTML = `<pre class="md-frontmatter"><code data-leaf="${id}">${escapeHtml(node.source)}</code></pre>`;
+  } else if (node.kind === "footnote_definition") {
+    const definition = /^(\[\^([^\]]+)\]:[ \t]*)([\s\S]*)$/.exec(node.source)!;
+    pointer = definition[1].length;
+    const id = leaf(definition[3]), number = (environment.footnoteNumbers as Record<string, number>)?.[definition[2]] || definition[2];
+    holder.innerHTML = `<aside class="md-footnote-definition" id="fn-${encodeURIComponent(definition[2])}"><span class="footnote-label md-ui" contenteditable="false">${escapeHtml(String(number))}.</span><span data-leaf="${id}">${tokenInlineHtml(definition[3], documentId, environment) || "<br />"}</span></aside>`;
+  } else if (node.kind === "toc") {
+    const id = leaf(node.source);
+    holder.innerHTML = `<div class="md-toc"><span data-leaf="${id}" class="md-toc-source">${escapeHtml(node.source)}</span><div contenteditable="false" class="md-ui">${renderMarkdown(node.source, documentId, { ...environment, fragment: true })}</div></div>`;
   } else if (/^\$\$/.test(node.source)) {
     const { id, raw } = fenceLeaf();
     holder.innerHTML = `<div class="md-fence md-math" contenteditable="false" data-fence="${id}"><div class="fence-preview">${renderMarkdown(node.source, documentId)}</div><pre class="fence-body"><code>${escapeHtml(raw)}</code></pre></div>`;
@@ -228,7 +236,7 @@ export function renderNode(
           return `<div class="md-fence" contenteditable="false" data-fence="${id}"><div class="fence-preview">${renderMarkdown(node.source, documentId)}</div><pre class="fence-body"><code>${escapeHtml(token.content)}</code></pre><span class="fence-language">mermaid</span></div>`;
         return `<div class="md-fence" contenteditable="false" data-fence="${id}"><pre class="fence-body"><code data-leaf="${id}">${highlightCode(raw, token.info.trim().split(/\s/)[0])}</code></pre><span class="fence-language">${escapeHtml(token.info)}</span></div>`;
       },
-      environment,
+      { ...environment, lineOffset: node.line - 1 },
     );
   }
   const element =
@@ -296,6 +304,7 @@ function tokenInlineHtml(
     mark: string;
     html: string;
     href?: string;
+    style?: string;
   };
   const stack: Frame[] = [{ from: 0, before: "", tag: "", mark: "", html: "" }];
   let cursor = 0;
@@ -363,6 +372,17 @@ function tokenInlineHtml(
     return raw.slice(at, end);
   };
   for (const token of inlineTokens(raw, environment)) {
+    if (token.type === "comment") {
+      append(object(token.markup, `<span class="md-comment-view">${escapeHtml(token.content.trim()) || "注释"}</span>`, "comment", cursor)); cursor += token.markup.length; continue;
+    }
+    if (["sup", "sub", "emoji", "footnote_ref"].includes(token.type)) {
+      const from = cursor;
+      const source = token.type === "emoji" ? `:${token.markup}:` : token.type === "footnote_ref" ? token.markup : raw.slice(cursor, raw.indexOf(token.type === "sup" ? "^" : "~", cursor + 1) + 1);
+      if (source && raw.startsWith(source, cursor)) {
+        const view = renderMarkdown(source, documentId, { ...environment, fragment: true }).replace(/^<p>|<\/p>\n?$/g, "");
+        append(object(source, view, token.type, from)); cursor += source.length; continue;
+      }
+    }
     if (token.type === "text" || token.type === "text_special") {
       append(text(token.content));
       continue;
@@ -452,6 +472,7 @@ function tokenInlineHtml(
           token.type === "link_open"
             ? String(token.attrGet("href") || "")
             : undefined,
+        style: token.attrGet("style") ? String(token.attrGet("style")) : undefined,
       };
       stack.push(frame);
       cursor += before.length;
@@ -468,8 +489,9 @@ function tokenInlineHtml(
       cursor += after.length;
       const href =
         frame.href !== undefined ? ` href="${escapeHtml(frame.href)}"` : "";
+      const style = frame.style ? ` style="${escapeHtml(frame.style)}"` : "";
       append(
-        `<span class="md-inline" data-mark="${frame.mark === "a" ? "link" : frame.mark}" data-inline-from="${frame.from}" data-inline-to="${cursor}">${meta(frame.before)}<${frame.tag}${href}>${frame.html}</${frame.tag}>${meta(after)}</span>`,
+        `<span class="md-inline" data-mark="${frame.mark === "a" ? "link" : frame.mark}" data-inline-from="${frame.from}" data-inline-to="${cursor}">${meta(frame.before)}<${frame.tag}${href}${style}>${frame.html}</${frame.tag}>${meta(after)}</span>`,
       );
       continue;
     }

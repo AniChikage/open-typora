@@ -34,6 +34,7 @@ try {
   await cp("dist", path.join(resources, "dist"), { recursive: true });
   await cp("native/bridge.js", path.join(resources, "bridge.js"));
   await cp("shared/samples.json", path.join(resources, "samples.json"));
+  await cp("shared/commands.json", path.join(resources, "commands.json"));
   await cp("tests/webkit.js", path.join(resources, "web-tests.js"));
   await writeFile(
     path.join(contents, "Info.plist"),

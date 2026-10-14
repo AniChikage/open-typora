@@ -11,14 +11,15 @@ import {
 import { useEffect, useRef, useState } from "react";
 import type { DocumentRecord, FileEntry } from "../types";
 import type { Heading } from "../editor/markdown";
+import { FileTree } from "./FileTree";
 interface Props {
   documents: DocumentRecord[];
   activeId: string;
   files: FileEntry[];
   folder: string | null;
   headings: Heading[];
-  tab: "files" | "outline";
-  setTab(tab: "files" | "outline"): void;
+  tab: "files" | "outline" | "tree";
+  setTab(tab: "files" | "outline" | "tree"): void;
   select(id: string): void;
   openToken(token: string): void;
   openFolder(): void;
@@ -57,12 +58,12 @@ export function Sidebar(props: Props) {
           aria-haspopup="menu"
           onClick={() => setSwitcher(!switcher)}
         >
-          {props.tab === "files" ? "文件" : "大纲"}
+          {props.tab === "files" ? "文件" : props.tab === "tree" ? "文件树" : "大纲"}
           <ChevronDown size={12} />
         </button>
         {switcher && (
           <div className="sidebar-menu" role="menu">
-            {(["files", "outline"] as const).map((tab) => (
+            {(["files", "tree", "outline"] as const).map((tab) => (
               <button
                 role="menuitemradio"
                 aria-checked={tab === props.tab}
@@ -72,14 +73,14 @@ export function Sidebar(props: Props) {
                   setSwitcher(false);
                 }}
               >
-                {tab === "files" ? "文件" : "大纲"}
+                {tab === "files" ? "文件" : tab === "tree" ? "文件树" : "大纲"}
               </button>
             ))}
           </div>
         )}
       </div>
       <div className="sidebar-body">
-        {props.tab === "files" ? (
+        {props.tab !== "outline" ? (
           <>
             <div className="sidebar-section-label">
               <span>
@@ -106,7 +107,7 @@ export function Sidebar(props: Props) {
               </div>
             </div>
             <nav aria-label="文件列表">
-              {props.documents.map((record) => (
+              {props.documents.filter(record => props.tab !== "tree" || !props.files.some(file => file.path === record.path)).map((record) => (
                 <div
                   className={`file-row ${props.activeId === record.id ? "selected" : ""}`}
                   key={record.id}
@@ -131,7 +132,7 @@ export function Sidebar(props: Props) {
                   </button>
                 </div>
               ))}
-              {props.files
+              {props.tab === "tree" ? <FileTree files={props.files} activePath={props.documents.find(record => record.id === props.activeId)?.path} open={props.openToken} /> : props.files
                 .filter(
                   (file) =>
                     !props.documents.some(

@@ -8,11 +8,12 @@ import {
   net,
   shell,
   session,
+  clipboard,
 } from "electron";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { atomicWrite, DocumentStore } from "./store.mjs";
-import { readFile } from "node:fs/promises";
+import { readFile, realpath } from "node:fs/promises";
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const development = process.env.OPEN_TYPORA_DEV_URL;
 if (process.env.OPEN_TYPORA_DATA_DIR)
@@ -84,6 +85,25 @@ const handlers = {
   },
   scan: () => store.scan(),
   token: (_, token) => store.openToken(token),
+  reopen: (_, id) => store.reload(id),
+  writeClipboard: (_, text) => clipboard.writeText(String(text)),
+  readClipboard: () => clipboard.readText(),
+  chooseImage: async (_, id) => {
+    store.require(id);
+    const result = await dialog.showOpenDialog(window, { title: "插入图片", properties: ["openFile"], filters: [{ name: "图片", extensions: ["png", "jpg", "jpeg", "gif", "webp"] }] });
+    if (result.canceled) return null;
+    const file = result.filePaths[0];
+    return { path: await store.importImage(id, new Uint8Array(await readFile(file)), path.basename(file)), alt: path.basename(file) };
+  },
+  html: async (_, name, html) => {
+    const result = await dialog.showSaveDialog(window, { title: "导出 HTML", defaultPath: String(name).replace(/\.(?:md|markdown|mdown)$/i, "") + ".html", filters: [{ name: "HTML", extensions: ["html"] }] });
+    if (result.canceled) return null;
+    await atomicWrite(result.filePath, String(html)); return result.filePath;
+  },
+  confirmClose: async (_, name) => {
+    const result = await dialog.showMessageBox(window, { type: "question", message: `保存对“${String(name).slice(0,150)}”所做的修改？`, buttons: ["保存", "取消", "不保存"], defaultId: 0, cancelId: 1 });
+    return ["save", "cancel", "discard"][result.response];
+  },
   save: async (_, id, text, saveAs, force) => {
     const record = store.require(id);
     let destination;
@@ -146,6 +166,13 @@ const handlers = {
       cancelId: 0,
     });
     if (result.response === 1) await shell.openExternal(parsed.href);
+  },
+  documentLink: async (_, id, address) => {
+    const record = store.require(id), relative = decodeURIComponent(String(address).split("#")[0]);
+    if (!record.path || path.isAbsolute(relative) || relative.includes(":") || relative.includes("\\")) throw new Error("请先保存文档，并使用相对 Markdown 文件路径。");
+    const base = await realpath(path.dirname(record.path)), target = await realpath(path.resolve(base, relative));
+    if (!target.startsWith(base + path.sep)) throw new Error("链接位于当前文档目录之外，请用“打开文件”选择目标。");
+    send({ action: "opened", document: await store.open(target) });
   },
   discard: async (_, name) => {
     const result = await dialog.showMessageBox(window, {

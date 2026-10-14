@@ -44,10 +44,13 @@ final class WebKitTests: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             throw NativeFailure("Native saved bytes differ from the editor document.")
           }
           let pdfURL = self.owner.directory.appendingPathComponent("native-test.pdf")
-          guard let pdf = CGPDFDocument(pdfURL as CFURL), pdf.numberOfPages >= 1,
-            pdf.numberOfPages <= 3, try Data(contentsOf: pdfURL).count < 1_000_000
+          guard let pdf = CGPDFDocument(pdfURL as CFURL), pdf.numberOfPages == 1,
+            try Data(contentsOf: pdfURL).count < 1_000_000
           else { throw NativeFailure("Native PDF pagination or size is invalid.") }
           print("PASS: native PDF is valid A4 with \(pdf.numberOfPages) pages and bounded size")
+          let html = try String(contentsOf: self.owner.directory.appendingPathComponent("native-test.html"), encoding: .utf8)
+          guard html.contains("data:image/"), html.contains("data:font/"), !html.contains("<link rel=\"stylesheet\"") else { throw NativeFailure("HTML export retained live app assets.") }
+          print("PASS: HTML export contains embedded fonts and the owned local image")
           let data = try JSONSerialization.data(
             withJSONObject: output, options: [.prettyPrinted, .sortedKeys])
           print(String(data: data, encoding: .utf8)!)

@@ -1,4 +1,6 @@
-import { EditorState } from "@codemirror/state";
+import { EditorState, Compartment } from "@codemirror/state";
+import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
+import { indentUnit } from "@codemirror/language";
 import { EditorView, keymap, drawSelection } from "@codemirror/view";
 import { defaultKeymap } from "@codemirror/commands";
 import { MarkdownDocument } from "./model.ts";
@@ -15,6 +17,10 @@ import type { Leaf } from "./richRender.ts";
 import { renderDiagrams } from "./diagrams.ts";
 import { renderMath } from "./math.ts";
 import { fenceLanguage } from "./fenceLanguage.ts";
+import { applyBlockCommand } from "./blockCommands.ts";
+import type { BlockArguments } from "./blockCommands.ts";
+import { htmlToMarkdown } from "./clipboard.ts";
+import { inlineTokens } from "./markdown.ts";
 export interface RichCallbacks {
   change(): void;
   cursor(line: number, column: number): void;
@@ -31,6 +37,13 @@ export class RichEditor {
   private html = new Map<string, string>();
   private fence: { id: string; leaf: Leaf; view: EditorView } | null = null;
   private tableToolbar: HTMLDivElement;
+  private pendingFormat = new Map<string, string>();
+  private tabSize = 2;
+  private typewriter = false;
+  private autoPair = false;
+  private scrollFrame = 0;
+  private fenceBehavior = new Compartment();
+  private fenceOptions() { return [indentUnit.of(" ".repeat(this.tabSize)), ...(this.autoPair ? [closeBrackets(), keymap.of(closeBracketsKeymap)] : [])]; }
   readonly root: HTMLElement;
   readonly model: MarkdownDocument;
   readonly documentId: string;
@@ -87,6 +100,7 @@ export class RichEditor {
     this.render(false);
   }
   destroy() {
+    cancelAnimationFrame(this.scrollFrame);
     this.fence?.view.destroy();
     this.tableToolbar.remove();
     document.removeEventListener("selectionchange", this.selectionChange);
@@ -287,6 +301,28 @@ export class RichEditor {
     const before = this.model.text.slice(0, this.model.selection.head),
       lines = before.split("\n");
     this.callbacks.cursor(lines.length, lines.at(-1)!.length + 1);
+    this.updateWritingMode();
+  }
+  setOptions(options: { spellcheck: boolean; tabSize: number; typewriter: boolean; autoPair?: boolean }) {
+    this.root.spellcheck = options.spellcheck;
+    this.tabSize = options.tabSize;
+    this.typewriter = options.typewriter;
+    this.autoPair = options.autoPair ?? false;
+    this.fence?.view.dispatch({ effects: this.fenceBehavior.reconfigure(this.fenceOptions()) });
+    this.updateWritingMode();
+  }
+  private updateWritingMode() {
+    const active = this.model.nodeAt(this.model.selection.head);
+    for (const block of this.root.children) block.classList.toggle("is-active", block.getAttribute("data-cid") === active?.id);
+    if (!this.typewriter || this.composing || !this.root.contains(window.getSelection()?.anchorNode || null)) return;
+    cancelAnimationFrame(this.scrollFrame);
+    this.scrollFrame = requestAnimationFrame(() => {
+      const selection = window.getSelection();
+      if (!selection?.rangeCount) return;
+      const range = selection.getRangeAt(0), rect = range.getBoundingClientRect();
+      const scroller = this.root.parentElement!, bounds = scroller.getBoundingClientRect();
+      if (rect.height && Math.abs(rect.top - bounds.top - bounds.height / 2) > 2) scroller.scrollTop += rect.top - bounds.top - bounds.height / 2;
+    });
   }
   private expandInline() {
     const selection = window.getSelection(),
@@ -323,8 +359,10 @@ export class RichEditor {
     if (
       selection.anchor !== this.model.selection.anchor ||
       selection.head !== this.model.selection.head
-    )
+    ) {
+      this.pendingFormat.clear();
       this.model.closeGroup();
+    }
     this.model.selection = selection;
     if (!this.pointing) this.expandInline();
     this.reportCursor();
@@ -378,6 +416,10 @@ export class RichEditor {
         return;
       case "deleteContentBackward":
         if (from === to) {
+          const pairs: Record<string, string> = { "(": ")", "[": "]", "{": "}", '"': '"', "'": "'" };
+          if (this.autoPair && pairs[this.model.text[from - 1]] && pairs[this.model.text[from - 1]] === this.model.text[to]) {
+            from--; to++; insert = ""; break;
+          }
           const node = this.model.nodeAt(from),
             previous = this.model.nodes[this.model.nodes.indexOf(node!) - 1];
           const lineStart = this.model.text.lastIndexOf("\n", from - 1) + 1,
@@ -429,6 +471,26 @@ export class RichEditor {
         break;
       case "insertText":
       case "insertReplacementText":
+        if (this.autoPair && event.inputType === "insertText" && insert.length === 1) {
+          const pairs: Record<string, string> = { "(": ")", "[": "]", "{": "}", '"': '"', "'": "'" };
+          if (from === to && ")]}'\"".includes(insert) && this.model.text[from] === insert) {
+            event.preventDefault(); this.model.selection = { anchor: from + 1, head: from + 1 }; this.restore(); this.reportCursor(); return;
+          }
+          const close = pairs[insert];
+          if (close && !(insert === "'" && /[\p{L}\p{N}]/u.test(this.model.text[from - 1] || ""))) {
+            const body = this.model.text.slice(from, to), at = from + 1;
+            event.preventDefault();
+            if (this.model.replace(from, to, insert + body + close, kind, { anchor: at, head: at + body.length })) this.publish();
+            return;
+          }
+        }
+        if (from === to && this.pendingFormat.size && insert) {
+          const before = [...this.pendingFormat.keys()].join(""), after = [...this.pendingFormat.values()].reverse().join("");
+          const at = from + before.length + insert.length;
+          this.pendingFormat.clear(); event.preventDefault();
+          if (this.model.replace(from, to, before + insert + after, kind, { anchor: at, head: at })) this.publish();
+          return;
+        }
         break;
       default:
         return;
@@ -533,26 +595,20 @@ export class RichEditor {
       this.callbacks.image(image);
       return;
     }
-    const text =
-      event.clipboardData?.getData("text/x-open-typora-markdown") ||
-      event.clipboardData?.getData("text/plain");
+    const html = event.clipboardData?.getData("text/html");
+    const text = event.clipboardData?.getData("text/x-open-typora-markdown") || (html ? htmlToMarkdown(html) : event.clipboardData?.getData("text/plain"));
     if (text !== undefined) {
       event.preventDefault();
       this.insert(text, "paste");
     }
   };
-  private copy = (event: ClipboardEvent) => {
-    if (
-      (event.target as HTMLElement).closest(".cm-editor") ||
-      !event.clipboardData
-    )
-      return;
+  clipboard() {
     const selection = this.bookmark(),
       from = Math.min(selection.anchor, selection.head),
       to = Math.max(selection.anchor, selection.head);
-    if (from === to) return;
-    event.preventDefault();
+    if (from === to) return { markdown: "", plain: "", html: "" };
     let markdown = this.model.text.slice(from, to);
+    let plain = markdown, html = "";
     const range = window.getSelection()?.rangeCount
       ? window.getSelection()!.getRangeAt(0)
       : null;
@@ -599,10 +655,10 @@ export class RichEditor {
       container
         .querySelectorAll(".md-meta,.md-object-source,.md-ui")
         .forEach((e) => e.remove());
-      event.clipboardData.setData(
-        "text/plain",
-        container.textContent || this.model.text.slice(from, to),
-      );
+      const plainCopy = container.cloneNode(true) as HTMLElement;
+      plainCopy.querySelectorAll("td,th").forEach(cell => cell.append("\t"));
+      plainCopy.querySelectorAll("p,li,h1,h2,h3,h4,h5,h6,tr,br").forEach(block => block.append("\n"));
+      plain = plainCopy.textContent?.replace(/\t\n/g, "\n").trimEnd() || this.model.text.slice(from, to);
       let ancestor =
         range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
           ? (range.commonAncestorContainer as HTMLElement)
@@ -617,9 +673,17 @@ export class RichEditor {
         }
         ancestor = ancestor.parentElement;
       }
-      event.clipboardData.setData("text/html", container.innerHTML);
+      html = container.innerHTML;
     }
-    event.clipboardData.setData("text/x-open-typora-markdown", markdown);
+    return { markdown, plain, html };
+  }
+  private copy = (event: ClipboardEvent) => {
+    if ((event.target as HTMLElement).closest(".cm-editor") || !event.clipboardData || window.getSelection()?.isCollapsed) return;
+    event.preventDefault();
+    const copied = this.clipboard();
+    event.clipboardData.setData("text/plain", copied.plain);
+    event.clipboardData.setData("text/html", copied.html);
+    event.clipboardData.setData("text/x-open-typora-markdown", copied.markdown);
   };
   private cut = (event: ClipboardEvent) => {
     if ((event.target as HTMLElement).closest(".cm-editor")) return;
@@ -667,13 +731,22 @@ export class RichEditor {
     const link = target.closest<HTMLAnchorElement>("a");
     if (link) {
       event.preventDefault();
-      if (event.metaKey || event.ctrlKey)
-        this.callbacks.link(link.getAttribute("href") || "");
+      const address = link.getAttribute("href") || "";
+      if (link.dataset.headingLine) this.jump(Number(link.dataset.headingLine));
+      else if (link.dataset.footnote) {
+        const definition = (this.model.environment.footnoteDefinitions as Record<string, { line: number }>)?.[link.dataset.footnote];
+        if (definition) this.jump(definition.line);
+      } else if (event.metaKey || event.ctrlKey) {
+        if (address.startsWith("#")) {
+          const id = decodeURIComponent(address.slice(1)), heading = (this.model.environment.headings as { id: string; line: number }[])?.find(item => item.id === id);
+          if (heading) this.jump(heading.line);
+        } else this.callbacks.link(address);
+      }
     }
     const fence = target.closest<HTMLElement>("[data-fence]");
     if (fence && !target.closest(".cm-editor")) this.activateFence(fence);
-    const math = target.closest<HTMLElement>('.md-inline[data-mark="math"]');
-    if (math) { const leaf = this.leaves.get(math.closest<HTMLElement>("[data-leaf]")!.dataset.leaf!)!; const at = leaf.positions[Number(math.dataset.inlineFrom)] + 1; this.model.selection = { anchor: at, head: at }; this.restore(); }
+    const object = target.closest<HTMLElement>('.md-inline[data-mark="math"],.md-inline[data-mark="sub"],.md-inline[data-mark="sup"],.md-inline[data-mark="emoji"],.md-inline[data-mark="image"]');
+    if (object && target.closest(".md-view")) { const leaf = this.leaves.get(object.closest<HTMLElement>("[data-leaf]")!.dataset.leaf!)!; const at = leaf.positions[Number(object.dataset.inlineFrom)] + (object.dataset.mark === "image" ? 2 : 1); this.model.selection = { anchor: at, head: at }; this.restore(); }
   };
   private keydown = (event: KeyboardEvent) => {
     if (
@@ -791,13 +864,13 @@ export class RichEditor {
       start = this.model.text.lastIndexOf("\n", selection.head - 1) + 1;
     if (/^\s*(?:[-+*]|\d+[.)])\s/.test(this.model.text.slice(start))) {
       const count = back
-        ? /^ {1,2}/.exec(this.model.text.slice(start))?.[0].length || 0
+        ? new RegExp(`^ {1,${this.tabSize}}`).exec(this.model.text.slice(start))?.[0].length || 0
         : 0;
       this.model.selection = selection;
       if (
-        this.model.replace(start, start + count, back ? "" : "  ", "indent", {
-          anchor: selection.anchor + (back ? -count : 2),
-          head: selection.head + (back ? -count : 2),
+        this.model.replace(start, start + count, back ? "" : " ".repeat(this.tabSize), "indent", {
+          anchor: selection.anchor + (back ? -count : this.tabSize),
+          head: selection.head + (back ? -count : this.tabSize),
         })
       )
         this.publish();
@@ -847,36 +920,59 @@ export class RichEditor {
     const currentCell = window
         .getSelection()
         ?.anchorNode?.parentElement?.closest<HTMLTableCellElement>("td,th"),
-      column = currentCell?.cellIndex || 0,
       row = currentCell?.parentElement as HTMLTableRowElement | null;
-    const rowIndex = row?.rowIndex || 0,
-      sourceRow = rowIndex === 0 ? 0 : rowIndex + 1;
+    let local = selection.head - node.from, sourceRow = 0;
+    while (sourceRow < lines.length - 1 && local > lines[sourceRow].length) { local -= lines[sourceRow].length + 1; sourceRow++; }
+    if (sourceRow === 1) sourceRow = 0;
+    let column = currentCell && this.root.querySelector(`[data-cid="${node.id}"]`)?.contains(currentCell) ? currentCell.cellIndex : Math.max(0, tableRowCells(lines[sourceRow]).findIndex(cell => local >= cell.start && local <= cell.end));
+    let targetRow = sourceRow, targetColumn = column;
     const oldCell = tableRowCells(lines[sourceRow])[column];
     const oldStart =
       node.from +
       lines.slice(0, sourceRow).reduce((n, line) => n + line.length + 1, 0) +
       (oldCell?.start || 0);
-    if (action === "row")
+    if (action === "deleteTable" || (action === "removeColumn" && rows[0].length === 1)) {
+      this.model.selection = selection;
+      if (this.model.replace(node.from, node.to, "", "table", { anchor: node.from, head: node.from })) this.publish();
+      return;
+    }
+    if (action === "row" || action === "rowBefore") {
+      const at = Math.max(2, sourceRow + (action === "row" ? 1 : 0));
       rows.splice(
-        Math.max(2, sourceRow + 1),
+        at,
         0,
         rows[0].map(() => ""),
       );
-    else if (action === "removeRow" && sourceRow > 1 && rows.length > 3)
+      targetRow = at;
+    }
+    else if (action === "removeRow" && sourceRow > 1 && rows.length > 2)
       rows.splice(sourceRow, 1);
-    else if (action === "column")
+    else if (action === "column" || action === "columnBefore") {
+      const at = column + (action === "column" ? 1 : 0);
       rows.forEach((cells, i) =>
-        cells.splice(column + 1, 0, i === 1 ? "---" : ""),
+        cells.splice(at, 0, i === 1 ? "---" : ""),
       );
+      targetColumn = at;
+    }
     else if (action === "removeColumn" && rows[0].length > 1)
       rows.forEach((cells) => cells.splice(column, 1));
     else if (["left", "center", "right"].includes(action))
       rows[1][column] =
         action === "left" ? ":---" : action === "right" ? "---:" : ":---:";
+    else if (["moveRowUp", "moveRowDown"].includes(action)) {
+      const other = sourceRow + (action === "moveRowUp" ? -1 : 1);
+      if (sourceRow < 2 || other < 2 || other >= rows.length) return;
+      [rows[sourceRow], rows[other]] = [rows[other], rows[sourceRow]]; targetRow = other;
+    } else if (["moveColumnLeft", "moveColumnRight"].includes(action)) {
+      const other = column + (action === "moveColumnLeft" ? -1 : 1);
+      if (other < 0 || other >= rows[0].length) return;
+      for (const cells of rows) [cells[column], cells[other]] = [cells[other], cells[column]];
+      targetColumn = other;
+    } else if (action === "format") { /* Normalize the table in the same transaction. */ }
     else return;
     const output = rows.map((cells) => `| ${cells.join(" | ")} |`);
-    const targetRow = Math.min(sourceRow, rows.length - 1),
-      targetColumn = Math.min(column, rows[0].length - 1);
+    targetRow = Math.min(targetRow, rows.length - 1);
+    targetColumn = Math.min(targetColumn, rows[0].length - 1);
     const cell = tableRowCells(output[targetRow])[targetColumn];
     const start =
       node.from +
@@ -907,36 +1003,62 @@ export class RichEditor {
     this.model.selection = this.bookmark();
     let from = Math.min(this.model.selection.anchor, this.model.selection.head),
       to = Math.max(this.model.selection.anchor, this.model.selection.head);
-    const mark = before === "**" ? "strong" : before === "*" ? "em" : "";
+    const selectedLeaves = [...this.leaves.values()].filter(leaf => !leaf.kind && leaf.positions[0] < to && leaf.positions.at(-1)! > from);
+    if (from !== to && selectedLeaves.length > 1) {
+      const edits = selectedLeaves.map(leaf => ({ from: Math.max(from, leaf.positions[0]), to: Math.min(to, leaf.positions.at(-1)!) })).filter(edit => edit.from < edit.to).sort((a,b) => a.from - b.from);
+      let text = this.model.text;
+      for (const edit of edits.toReversed()) text = text.slice(0, edit.from) + before + text.slice(edit.from, edit.to) + after + text.slice(edit.to);
+      const mapped = (position: number) => {
+        let delta = 0;
+        for (const edit of edits) {
+          if (position < edit.from) break;
+          if (position <= edit.to) return position + delta + before.length;
+          delta += before.length + after.length;
+        }
+        return position + delta;
+      };
+      const selection = this.model.selection;
+      if (this.model.replace(0, this.model.text.length, text, "format", { anchor: mapped(selection.anchor), head: mapped(selection.head) })) this.publish();
+      return;
+    }
+    const mark = ({ "**": "strong", "*": "em", "~~": "s", "==": "mark", "`": "code", "<u>": "u", "~": "sub", "^": "sup" } as Record<string, string>)[before] || "";
     const inline = window
       .getSelection()
       ?.anchorNode?.parentElement?.closest<HTMLElement>(
         mark ? `.md-inline[data-mark="${mark}"]` : ".md-inline",
       );
     if (
-      before === after &&
       inline &&
-      ((before === "**" && inline.dataset.mark === "strong") ||
-        (before === "*" && inline.dataset.mark === "em"))
+      mark && inline.dataset.mark === mark
     ) {
       const leafElement = inline.closest<HTMLElement>("[data-leaf]")!,
         leaf = this.leaves.get(leafElement.dataset.leaf!)!;
       const start = leaf.positions[Number(inline.dataset.inlineFrom)],
         end = leaf.positions[Number(inline.dataset.inlineTo)];
+      const open = inline.firstElementChild?.classList.contains("md-meta") ? inline.firstElementChild.textContent || before : before;
+      const close = inline.lastElementChild?.classList.contains("md-meta") ? inline.lastElementChild.textContent || after : after;
       this.model.replace(
         start,
         end,
-        this.model.text.slice(start + before.length, end - after.length),
+        this.model.text.slice(start + open.length, end - close.length),
         "format",
         {
-          anchor: Math.max(start, from - before.length),
-          head: Math.max(start, to - before.length),
+          anchor: Math.max(start, from - open.length),
+          head: Math.max(start, to - open.length),
         },
       );
       this.publish();
       return;
     }
+    if (from === to) {
+      if (this.pendingFormat.has(before)) this.pendingFormat.delete(before); else this.pendingFormat.set(before, after);
+      this.restore(); return;
+    }
     const text = this.model.text.slice(from, to);
+    if (before === "`" && text.includes("`")) {
+      const size = Math.max(...[...text.matchAll(/`+/g)].map(match => match[0].length)) + 1;
+      before = after = "`".repeat(size);
+    }
     if (
       this.model.replace(from, to, before + text + after, "format", {
         anchor: from + before.length,
@@ -944,6 +1066,23 @@ export class RichEditor {
       })
     )
       this.publish();
+  }
+  command(action: string, args: BlockArguments = {}) {
+    if (this.composing) return;
+    this.model.selection = this.bookmark();
+    this.pendingFormat.clear();
+    if (action.startsWith("table-")) { this.tableAction(action.slice(6)); return; }
+    if (applyBlockCommand(this.model, action, args, this.tabSize)) this.publish();
+  }
+  clearFormat() {
+    const selection = this.bookmark(), node = this.model.nodeAt(selection.head);
+    if (!node || ["fence", "table_open", "frontmatter"].includes(node.kind)) return;
+    this.model.selection = selection;
+    let from = Math.min(selection.anchor, selection.head), to = Math.max(selection.anchor, selection.head);
+    if (from === to) { from = node.from; to = node.to; }
+    const raw = this.model.text.slice(from, to);
+    const plain = inlineTokens(raw, this.model.environment).map(token => token.nesting ? "" : token.type.endsWith("break") ? "\n" : token.content).join("");
+    if (this.model.replace(from, to, plain, "clear-format", { anchor: from, head: from + plain.length })) this.publish();
   }
   codeBlock() {
     if (this.fence?.view.hasFocus) return;
@@ -1033,6 +1172,7 @@ export class RichEditor {
           head: Math.max(0, leaf.positions.findLastIndex(position => position <= this.model.selection.head)),
         },
         extensions: [
+          this.fenceBehavior.of(this.fenceOptions()),
           fenceLanguage(
             element.classList.contains("md-math")
               ? "math"
@@ -1058,7 +1198,7 @@ export class RichEditor {
             {
               key: "Tab",
               run: (cm) => {
-                cm.dispatch(cm.state.replaceSelection("  "));
+                cm.dispatch(cm.state.replaceSelection(" ".repeat(this.tabSize)));
                 return true;
               },
             },

@@ -137,5 +137,21 @@
       "coverage": "unknown",
       "resourceConstraints": 0
     }
+  },
+  "formattingFollowup": {
+    "date": "2026-10-14",
+    "evidenceID": "ev_3cbe5b0d3d4fc3c5978597665c86a61d895c015f59608677d3754a4fe90162c3",
+    "module": "60",
+    "rootContainerSHA256": "c5e4bbd7af1839244031da69dacba0c4e9ff1e7e41562565cb137429cedc61f2",
+    "moduleSHA256": "850f30663ce4c0ce85ba9fd5d0436b25b25258725fa44160de8d1c2c19078cd9",
+    "visitedASTNodes": 5307,
+    "semanticNodes": 2817,
+    "semanticRelations": 2279,
+    "unknowns": 1217,
+    "coverage": "unknown",
+    "truncated": false,
+    "omittedNodes": 0,
+    "omittedRelations": 0,
+    "limits": []
   }
 }

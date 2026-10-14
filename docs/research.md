@@ -57,7 +57,7 @@ npx --yes rea-agents@6.4.0 analyze-javascript-application \
 
 ## 仍有差异和 unknown
 
-本项目使用 source-backed 块节点树与保存原始间隔的序列化；官方节点类、内部增量解析和规范化规则没有全部还原。撤销使用有界的文档快照事务，官方存在自己的命令对象和 DOM 操作集合。成熟的表格菜单、复杂选区、全部 TeX 扩展、HTML、脚注、跨块输入法、拖选/键盘边界和所有快捷键并未全部获得逐项官方回放证据。
+本项目使用 source-backed 块节点树与保存原始间隔的序列化；官方节点类、内部增量解析和规范化规则没有全部还原。撤销使用有界的文档快照事务，官方存在自己的命令对象和 DOM 操作集合。表格命令与脚注在 0.3.0 已有独立实现，但复杂选区、全部 TeX 扩展、完整 HTML、跨块输入法、拖选/键盘边界和全部快捷键仍未获得逐项官方回放证据。
 
 当前结论是：独立实现已按可确认的 macOS 原生宿主、DOM 正文、节点模型、选区/事务、独立源码和代码块的分层重构。不能声称内部代码或全部编辑行为与官方 100% 一致。
 
@@ -68,3 +68,9 @@ PDF 导出使用 Apple 的 [WKPDFConfiguration](https://developer.apple.com/docu
 0.2.0 已替换本机安装版，并在真窗口验证正文格式内输入、自动保存、源码模式的撤销菜单禁用、⌘/ 双向切换和重启恢复。实际导出的 PDF 经 PDFKit 检查为一页 A4，并渲染核对正文、表格、代码和公式。旧会话三份文件的字节哈希与编辑内容保留。预览版关闭流程的保存／取消／不保存也已逐项回放，见 [verification.md](verification.md)。
 
 源码返回正文时合并为一次事务是本项目的设计选择；官方 hide 函数中可静态观察到 renderedHTML/syncChange、reloadContent 和 tryEnterBusyMode 等路径，其全部历史粒度仍有 unknown。刚进入源码的空历史已通过官方真窗口确认。
+
+## 0.3.0 功能研究
+
+再次用 REA 6.4.0 单独分析模块 `60`，Evidence ID 为 `ev_3cbe5b0d3d4fc3c5978597665c86a61d895c015f59608677d3754a4fe90162c3`。输入共 23,381 字节，解析一份 JS、访问 5,307 个 AST 节点，保留 2,817 个语义节点、2,279 条关系和 1,217 个 unknown；未截断，未报告省略节点/关系或 limits，但总体 coverage 仍为 unknown。这是静态格式工具线索，不是功能等价证明。根容器摘要哈希不同于单份模块哈希，模块源区间和片段哈希仍按 provenance 记录核对。
+
+在官方用户窗口只读查看段落与格式菜单，确认标题、表格工具、列表/任务、脚注、目录、YAML、注释及图片工具入口；没有修改其中的用户草稿。功能优先级同时参考官方 [快捷键](https://support.typora.io/Shortcut-Keys/)、[文件管理](https://support.typora.io/File-Management/)、[专注/打字机](https://support.typora.io/Focus-and-Typewriter-Mode/) 和 [统计说明](https://support.typora.io/Word-Count/)。菜单存在、文档承诺、独立实现通过测试和官方行为一致是四种不同证据；当前 [功能清单](feature-parity.md) 保留这些边界。
