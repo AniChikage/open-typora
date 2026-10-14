@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
   <title id="title">Open Typora</title>
-  <desc id="desc">Two open pages form a custom ink-blue T on a porcelain-white tile.</desc>
+  <desc id="desc">A custom ink-blue M on a porcelain-white tile.</desc>
   <defs>
     <linearGradient id="paper" x1="0" y1="0" x2="0.75" y2="1">
       <stop offset="0" stop-color="#ffffff"/>
@@ -16,8 +16,6 @@
   </defs>
   <rect x="64" y="64" width="896" height="896" rx="207" fill="url(#paper)" filter="url(#tile-shadow)"/>
   <rect x="65.5" y="65.5" width="893" height="893" rx="205.5" fill="none" stroke="#ffffff" stroke-width="3"/>
-  <path d="M465 419H557V640C557 685 573 708 619 718V749H405V718C451 708 465 685 465 640Z" fill="url(#ink)"/>
-  <path d="M274 307C350 284 428 288 503 322V432C427 405 354 405 283 432Z" fill="url(#ink)"/>
-  <path d="M522 322C597 288 676 284 752 307L743 432C672 405 599 405 522 432Z" fill="url(#ink)"/>
-  <path d="M522 322C597 288 676 284 752 307L750 332C674 310 598 315 522 348Z" fill="#6d8cae"/>
+  <path d="M252 300H392L512 555L632 300H772V331C744 336 730 349 730 380V670C730 701 744 714 776 718V750H578V718C610 714 626 701 626 670V414L522 649H494L374 414V657C374 691 392 711 430 718V750H248V718C280 711 294 691 294 657V380C294 349 280 336 252 331Z" fill="url(#ink)"/>
+  <path d="M632 300H772V322H642Z" fill="#6d8cae"/>
 </svg>
