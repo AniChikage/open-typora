@@ -105,6 +105,11 @@ const browser: Host = {
   async confirmDiscard(name) {
     return window.confirm(`关闭「${name}」并移除未保存的修改？`);
   },
+  async confirmClose(name) {
+    return window.confirm(`不保存「${name}」的修改并关闭？`)
+      ? "discard"
+      : "cancel";
+  },
   async setDirty() {},
   async closeWindow() {
     window.close();

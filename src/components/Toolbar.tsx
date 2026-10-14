@@ -96,6 +96,10 @@ export function Toolbar(props: Props) {
                 <button
                   role="menuitem"
                   aria-label={label}
+                  disabled={
+                    !props.rendered &&
+                    ["bold", "italic", "code"].includes(action)
+                  }
                   key={action}
                   onClick={() => {
                     setOpen(false);
@@ -137,7 +141,7 @@ export function Toolbar(props: Props) {
               >
                 <span className="menu-check" />
                 <span>关于 Open Typora</span>
-                <kbd>0.1.1</kbd>
+                <kbd>0.2.0</kbd>
               </button>
             </div>
           )}

@@ -1,52 +1,53 @@
 # Open Typora
 
-一个本地 Markdown 写作空间。即时渲染、源码编辑和文件保存都以同一份 Markdown 原文为基础。
+本地 Markdown 编辑器。0.2.0 重构了 macOS 宿主和正文内核：原生 AppKit/WebKit 窗口、直接编辑排版正文、独立源码视图，以及文档模型、光标书签和分模式撤销历史。
 
 ## 使用
 
-macOS 首版安装后打开 `~/Applications/Open Typora.app`。默认显示三份原创示例笔记，存放在应用自己的数据目录中。
+- 直接在排版后的正文输入；光标进入粗体、链接等行内格式时展开对应符号。
+- Enter 创建段落或继续列表，Shift-Enter 换行；表格单元格可以直接输入和用 Tab 导航。
+- 键入代码围栏或 `$$` 后回车进入局部编辑器。⌘/ 切换完整源码，正文与代码块共用历史；源码模式独立撤销，返回正文时作为一次事务提交。
+- ⌘F 查找替换，⌘S 保存，⌘N/⌘O 原生菜单创建或打开独立窗口。
+- 已有文件停止输入 1.2 秒后自动保存；草稿先选择保存位置。外部修改触发冲突并保留草稿。
+- 支持任务列表、代码高亮、MathJax 4 SVG、Mermaid、粘贴/拖入图片、大纲、主题、专注模式与 PDF。
 
-- 点击排版后的段落，编辑该段的 Markdown 原文；离开段落后重新渲染。
-- 使用 ⌘/ 或左下角源码图标切换编辑模式，切换不会改写文件。
-- 打开文件或文件夹，已有文件默认在停止输入 1.2 秒后自动保存。
-- 新草稿需要先选择保存位置。草稿和打开的文档会保存在恢复会话中。
-- 外部修改触发冲突提示，可以另存副本、重新载入或明确确认覆盖。
-- 支持列表、任务列表、表格、代码高亮、公式、Mermaid、图片粘贴与拖入、查找替换、大纲、主题、专注模式及 PDF 导出。
+保留 0.1.1 按本机 Typora GitHub 主题观察实现的 Open Sans、正文/标题尺寸、灰白侧栏与底部小图标入口。界面基准见 [design/spec.md](design/spec.md)。
 
-## 界面基准
+## 构建与安装
 
-0.1.1 按本机 Typora 1.14.10 的 GitHub 主题实屏重新实现：Open Sans 与系统中文无衬线字体、16 px 正文、36/28 px 标题、270 px 灰白侧栏、28 px 标题栏。取消顶部模式按钮、保存按钮、品牌栏和完整状态栏，保留底部的小图标入口与字数。
-
-侧栏标题可以切换文件列表和大纲。保存用 ⌘S 或菜单，明暗主题可从「视图」菜单、左下角「更多」菜单或侧栏下方切换。设计基准见 [design/spec.md](design/spec.md)。
-
-## 开发
-
-Node.js 22.12+（本次使用 26.7），npm。
+macOS 14+ arm64，Node.js 22.12+，npm 和 Xcode Command Line Tools（Swift）；此次验证使用 Node 26.7 和 Swift 6.2。
 
 ```sh
 npm ci
-npm run dev:app
 npm test
-npm run build
+npm run test:native
+npm run test:webkit
+npm run test:desktop
+npm run test:kernel-desktop
+npm run package:mac
 npm run install:app
 ```
 
-`npm run dev` 只启动浏览器预览。浏览器预览的保存会下载文件；真实磁盘保存、文件夹、冲突检测与恢复应在桌面应用中验证。
+原生包输出到 `release/native/Open Typora.app`；安装脚本备份现有应用后替换 `~/Applications/Open Typora.app`，不改动 Application Support 文档数据。安装前应正常退出旧应用。`npm run package:preview` 使用独立应用标识和 `Open Typora Preview` 数据目录。
 
-## 技术与研究
+`npm run dev:app` 与 `npm start` 使用 Electron 开发/回归宿主；`npm run dev` 是浏览器预览，其保存会下载文件。它们不代表 macOS 原生包已经通过窗口验收。
 
-React + Vite + Electron；CodeMirror 6 保存和编辑 Markdown 原文，markdown-it 负责非活动块显示，KaTeX 和 Mermaid 提供公式及图表。编辑显示不会通过富文本模型重新序列化整个文档。
+## 实现与研究
 
-Typora 的资源包只作为行为与架构研究对象。REA 返回了部分静态证据，遇到内存上限，未完成编辑内核的完整语义还原。应用使用自行编写的代码与公开开源依赖，不包含 Typora 的代码或素材。Open Sans 从公开的 Fontsource 包获得，保留 OFL 字体许可。研究边界见 [docs/research.md](docs/research.md)。
+[架构](docs/architecture.md)说明原生桥、文档树、DOM 正文、源码/代码块视图与事务层。[REA 研究](docs/research.md)和[来源元数据](docs/rea-provenance.json)保留官方静态证据、运行观察与 unknown。
 
-## 首版边界
+[0.2.0 验收记录](docs/verification.md)区分自动化检查、官方行为观察与安装版真窗口结果。
 
-- 当前交付和验收平台是 macOS arm64；Windows/Linux 尚未打包验收。
-- 活动块显示 Markdown 原文，交互与 Typora 的成熟富文本编辑仍有差异。
-- 文件限制 20 MB；超过 300,000 个字符的文档使用源码显示，避免昂贵的全文渲染。
-- 本地图片限于文档所在目录及其子目录；远程图片显示链接，默认不联网加载。
-- 另存到其他文件夹时不会自动复制文档旁的图片文件，需同时携带相对路径所引用的图片。
-- 通用原始 HTML 以文本显示。UTF-8、BOM、LF/CRLF 保留；不支持其他文件编码。
-- 未完成系统公证或正式分发；当前是本机构建的开发版。
+实现使用独立代码及开源依赖，没有包含 Typora 的代码或素材。已按确认的架构分层重做，尚不能宣称内部实现或全部交互与官方完全一致。
 
-项目代码采用 MIT 许可证，第三方依赖保留各自许可证。
+## 当前边界
+
+- macOS arm64 是当前构建目标；Windows/Linux 没有原生发布验收。
+- 实体中文输入法、复杂跨块选区、全部快捷键和官方完整编辑行为仍需逐项对照。
+- 20 MB 文件上限；超过 300,000 字符使用源码模式，正文解析仍有优化空间。
+- 本地图片限文档目录及子目录；远程图片默认显示引用。另存到其他目录不自动搬移相对路径图片。
+- 原始 HTML 作为文字；支持 UTF-8、BOM、LF/CRLF，不支持其他编码。
+- 源码保留规则、块解析器、快照式历史与官方内部节点/命令实现有差异。
+- 本机构建为 ad hoc 签名开发版，没有完成 Apple 公证。
+
+项目采用 MIT；Open Sans 保留 OFL，MathJax 与字体保留 Apache-2.0 声明。

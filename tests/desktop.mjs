@@ -71,7 +71,7 @@ try {
   await waitForFile(welcome, (text) =>
     text.includes("中文输入验收：你好，世界。"),
   );
-  passed.push("Chinese text input persists through real native automatic save");
+  passed.push("Chinese text input persists through Electron-host automatic save");
   await editor.press("ControlOrMeta+z");
   await waitForFile(welcome, (text) => !text.includes("中文输入验收"));
   await editor.press("ControlOrMeta+Shift+z");
@@ -80,7 +80,7 @@ try {
   await page.getByRole("button", { name: "写作示例.md", exact: true }).click();
   await mode(page, true);
   await expect(
-    page.locator(".document-editor:not([hidden]) .katex"),
+    page.locator(".document-editor:not([hidden]) .mathjax-node svg"),
   ).toBeVisible();
   await expect(
     page.locator(".document-editor:not([hidden]) .mermaid-block svg"),
@@ -89,7 +89,7 @@ try {
     page.locator(".document-editor:not([hidden]) .mermaid-block svg"),
   ).toContainText("观察");
   passed.push(
-    "Math, highlighted code, tasks and Mermaid with visible labels render",
+    "Math, code, tasks and Mermaid with visible labels render",
   );
   const pdf = path.join(dataDir, "example.pdf");
   await application.evaluate(({ dialog }, file) => {
@@ -98,7 +98,7 @@ try {
   await menu(page, "导出 PDF");
   await waitForFile(pdf, (text) => text.startsWith("%PDF-"));
   assert.ok((await readFile(pdf)).length > 10_000);
-  passed.push("Native PDF export produces a PDF file");
+  passed.push("Electron-host PDF export produces a PDF file");
   const crlfFile = path.join(dataDir, "CRLF.md"),
     crlfOriginal =
       "\uFEFF---\r\ntitle: 中文\r\n---\r\n\r\n# 标题\r\n\r\n保留两个空格  \r\n";
@@ -200,6 +200,7 @@ try {
   );
   await application.close();
   page = await launch();
+  await mode(page, false);
   await expect(
     page.locator(".document-editor:not([hidden]) .cm-content"),
   ).toContainText("未保存的修改");

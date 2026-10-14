@@ -63,9 +63,10 @@ export interface Host {
     hash: string,
   ): Promise<DocumentRecord>;
   importImage(id: string, bytes: Uint8Array, name: string): Promise<string>;
-  exportPdf(): Promise<string | null>;
+  exportPdf(html?: string): Promise<string | null>;
   openLink(url: string): Promise<unknown>;
   confirmDiscard(name: string): Promise<boolean>;
+  confirmClose(name: string): Promise<"save" | "discard" | "cancel">;
   setDirty(dirty: boolean): Promise<unknown>;
   closeWindow(): Promise<unknown>;
   onCommand(callback: (command: Command) => void): () => void;

@@ -1,27 +1,27 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 import { EditorState } from "@codemirror/state";
 import {
   EditorView,
   keymap,
   drawSelection,
-  dropCursor,
   highlightActiveLine,
 } from "@codemirror/view";
-import {
-  history,
-  historyKeymap,
-  defaultKeymap,
-  indentWithTab,
-} from "@codemirror/commands";
+import { defaultKeymap, indentWithTab } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import {
   syntaxHighlighting,
   defaultHighlightStyle,
   bracketMatching,
-  indentOnInput,
 } from "@codemirror/language";
 import { search, searchKeymap, openSearchPanel } from "@codemirror/search";
-import { livePreview, setRendered } from "./livePreview";
+import { MarkdownDocument } from "./model.ts";
+import { RichEditor } from "./RichEditor.ts";
 import { host } from "../host";
 import type { DocumentRecord } from "../types";
 export interface EditorHandle {
@@ -29,6 +29,11 @@ export interface EditorHandle {
   find(): void;
   jump(line: number): void;
   wrap(before: string, after?: string): void;
+  codeBlock(): void;
+  undo(): void;
+  redo(): void;
+  focus(): void;
+  richMode(): boolean;
 }
 interface Props {
   document: DocumentRecord;
@@ -42,169 +47,490 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
     { document: record, rendered, onChange, onError, onCursor },
     ref,
   ) {
-    const parent = useRef<HTMLDivElement>(null),
-      view = useRef<EditorView | null>(null);
+    const root = useRef<HTMLDivElement>(null),
+      sourceParent = useRef<HTMLDivElement>(null);
+    const model = useRef<MarkdownDocument | null>(null),
+      rich = useRef<RichEditor | null>(null),
+      source = useRef<EditorView | null>(null);
     const callbacks = useRef({ onChange, onError, onCursor });
     callbacks.current = { onChange, onError, onCursor };
-    const initial = useRef(record);
-    useImperativeHandle(
-      ref,
-      () => ({
-        view: () => view.current,
-        find: () => {
-          if (view.current) {
-            openSearchPanel(view.current);
-          }
-        },
-        jump: (line) => {
-          const editor = view.current;
-          if (!editor) return;
-          const target = editor.state.doc.line(
-            Math.min(line, editor.state.doc.lines),
-          );
-          editor.dispatch({
-            selection: { anchor: target.from },
-            effects: EditorView.scrollIntoView(target.from, {
-              y: "start",
-              yMargin: 30,
-            }),
-          });
-          editor.focus();
-        },
-        wrap: (before, after = "") => {
-          const editor = view.current;
-          if (!editor) return;
-          const { from, to } = editor.state.selection.main;
-          const selected = editor.state.sliceDoc(from, to);
-          editor.dispatch({
-            changes: { from, to, insert: before + selected + after },
-            selection: {
-              anchor: from + before.length,
-              head: from + before.length + selected.length,
-            },
-          });
-          editor.focus();
-        },
-      }),
-      [],
+    const initial = useRef(record),
+      requested = useRef(rendered),
+      activeMode = useRef(rendered);
+    const [visibleMode, setVisibleMode] = useState(
+      rendered && record.content.length <= 300_000,
     );
-    useEffect(() => {
-      const doc = initial.current;
-      const editor = new EditorView({
-        parent: parent.current!,
+    const [searchOpen, setSearchOpen] = useState(false),
+      [query, setQuery] = useState(""),
+      [replacement, setReplacement] = useState("");
+    const [searchStatus, setSearchStatus] = useState("");
+    const searchField = useRef<HTMLInputElement>(null);
+    const syncing = useRef(false);
+    function historyState() {
+      if (root.current?.closest(".document-editor")?.hasAttribute("hidden"))
+        return;
+      if (model.current && window.desktop?.historyState)
+        void window.desktop
+          .historyState(
+            model.current.canUndo,
+            model.current.canRedo,
+            activeMode.current,
+          )
+          .catch(() => {});
+    }
+    function focusEditor() {
+      if (activeMode.current) rich.current?.restore();
+      else source.current?.focus();
+    }
+    const publish = () => {
+      callbacks.current.onChange(model.current!.toMarkdown());
+      historyState();
+    };
+    function findNext(back = false) {
+      const doc = model.current;
+      if (!doc || !query) return;
+      const start = back
+        ? Math.min(doc.selection.anchor, doc.selection.head) - 1
+        : Math.max(doc.selection.anchor, doc.selection.head);
+      let at = back
+        ? doc.text.lastIndexOf(query, start)
+        : doc.text.indexOf(query, start);
+      if (at < 0)
+        at = back ? doc.text.lastIndexOf(query) : doc.text.indexOf(query);
+      if (at < 0) {
+        setSearchStatus("未找到匹配内容");
+        return;
+      }
+      rich.current?.select({ anchor: at, head: at + query.length }, false);
+      setSearchStatus(
+        `${doc.text.slice(0, at).split(query).length} / ${doc.text.split(query).length - 1}`,
+      );
+    }
+    function replaceMatch(all = false) {
+      const doc = model.current;
+      if (!doc || !query) return;
+      rich.current?.releaseFence();
+      if (all) {
+        const count = doc.text.split(query).length - 1;
+        if (!count) {
+          setSearchStatus("未找到匹配内容");
+          return;
+        }
+        doc.closeGroup();
+        doc.replace(
+          0,
+          doc.text.length,
+          doc.text.split(query).join(replacement),
+          "replace-all",
+          { anchor: 0, head: 0 },
+        );
+        rich.current?.render(false);
+        publish();
+        setSearchStatus(`已替换 ${count} 处`);
+        return;
+      }
+      const from = Math.min(doc.selection.anchor, doc.selection.head),
+        to = Math.max(doc.selection.anchor, doc.selection.head);
+      if (doc.text.slice(from, to) !== query) {
+        findNext();
+        return;
+      }
+      doc.replace(from, to, replacement, "replace");
+      rich.current?.render(false);
+      publish();
+      findNext();
+    }
+    function syncSource() {
+      const view = source.current,
+        doc = model.current;
+      if (!view || !doc) return;
+      syncing.current = true;
+      view.dispatch({
+        changes:
+          view.state.doc.toString() === doc.text
+            ? undefined
+            : { from: 0, to: view.state.doc.length, insert: doc.text },
+        selection: { anchor: doc.selection.anchor, head: doc.selection.head },
+      });
+      syncing.current = false;
+    }
+    function history(redo = false) {
+      const doc = model.current;
+      if (!doc) return;
+      if (!activeMode.current && source.current) {
+        const s = source.current.state.selection.main;
+        doc.selection = { anchor: s.anchor, head: s.head };
+      }
+      if (activeMode.current) {
+        redo ? rich.current?.redo() : rich.current?.undo();
+      } else if (redo ? doc.redo() : doc.undo()) {
+        syncSource();
+        publish();
+        source.current?.focus();
+      }
+    }
+    async function insertImage(file: File) {
+      try {
+        const relative = await host.importImage(
+          initial.current.id,
+          new Uint8Array(await file.arrayBuffer()),
+          file.name,
+        );
+        insert(`![${file.name.replace(/[\[\]]/g, "")}](${relative})`, "paste");
+      } catch (error) {
+        callbacks.current.onError((error as Error).message);
+      }
+    }
+    function insert(text: string, kind = "command") {
+      if (activeMode.current) rich.current?.insert(text, kind);
+      else if (source.current && model.current) {
+        const selection = source.current.state.selection.main;
+        model.current.selection = {
+          anchor: selection.anchor,
+          head: selection.head,
+        };
+        model.current.replace(selection.from, selection.to, text, kind);
+        syncSource();
+        publish();
+        source.current.focus();
+      }
+    }
+    function ensureSource() {
+      if (source.current || !sourceParent.current || !model.current) return;
+      const doc = model.current;
+      source.current = new EditorView({
+        parent: sourceParent.current,
         state: EditorState.create({
-          doc: doc.content,
-          selection: { anchor: doc.content.replace(/\r\n/g, "\n").length },
+          doc: doc.text,
+          selection: doc.selection,
           extensions: [
-            EditorState.lineSeparator.of(doc.lineEnding || "\n"),
-            history(),
+            EditorState.phrases.of({
+              Find: "查找",
+              Replace: "替换为",
+              next: "下一个",
+              previous: "上一个",
+              all: "全部匹配",
+              "match case": "区分大小写",
+              regexp: "正则表达式",
+              "by word": "整词匹配",
+              replace: "替换",
+              "replace all": "全部替换",
+              close: "关闭查找",
+              "current match": "当前匹配",
+              "on line": "所在行",
+            }),
             drawSelection(),
-            dropCursor(),
             EditorView.lineWrapping,
+            highlightActiveLine(),
             markdown({ base: markdownLanguage }),
             syntaxHighlighting(defaultHighlightStyle),
             bracketMatching(),
-            indentOnInput(),
+            search({ top: true }),
             keymap.of([
-              ...defaultKeymap,
-              ...historyKeymap,
+              {
+                key: "Mod-z",
+                run: () => {
+                  history();
+                  return true;
+                },
+              },
+              {
+                key: "Mod-Shift-z",
+                run: () => {
+                  history(true);
+                  return true;
+                },
+              },
               ...searchKeymap,
+              ...defaultKeymap,
               indentWithTab,
             ]),
-            search({ top: true }),
-            highlightActiveLine(),
-            livePreview(doc.id),
             EditorView.contentAttributes.of({
-              "aria-label": "Markdown 编辑器",
+              "aria-label": "Markdown 源码编辑器",
               spellcheck: "false",
-              autocapitalize: "off",
             }),
             EditorView.updateListener.of((update) => {
-              if (update.docChanged)
-                callbacks.current.onChange(update.state.sliceDoc());
-              if (update.selectionSet || update.docChanged) {
-                const line = update.state.doc.lineAt(
-                  update.state.selection.main.head,
+              if (syncing.current) return;
+              const selected = update.state.selection.main;
+              if (update.docChanged) {
+                const old = update.startState.selection.main;
+                doc.selection = { anchor: old.anchor, head: old.head };
+                const kind = update.transactions.some((t) =>
+                  t.isUserEvent("input.type.compose"),
+                )
+                  ? "composition"
+                  : update.transactions.some((t) => t.isUserEvent("input.type"))
+                    ? "typing"
+                    : "source-command";
+                doc.replace(
+                  0,
+                  doc.text.length,
+                  update.state.doc.toString(),
+                  kind,
+                  { anchor: selected.anchor, head: selected.head },
                 );
+                publish();
+              } else if (update.selectionSet) {
+                doc.selection = {
+                  anchor: selected.anchor,
+                  head: selected.head,
+                };
+                doc.closeGroup();
+              }
+              if (update.selectionSet || update.docChanged) {
+                const line = update.state.doc.lineAt(selected.head);
                 callbacks.current.onCursor(
                   line.number,
-                  update.state.selection.main.head - line.from + 1,
+                  selected.head - line.from + 1,
                 );
               }
             }),
             EditorView.domEventHandlers({
-              paste(event, current) {
-                const file = [...(event.clipboardData?.files || [])].find(
+              paste(event) {
+                const image = [...(event.clipboardData?.files || [])].find(
                   (file) => file.type.startsWith("image/"),
                 );
-                if (!file) return false;
+                if (!image) return false;
                 event.preventDefault();
-                void insertImage(file, current);
+                void insertImage(image);
                 return true;
               },
-              drop(event, current) {
-                const file = [...(event.dataTransfer?.files || [])].find(
+              drop(event) {
+                const image = [...(event.dataTransfer?.files || [])].find(
                   (file) => file.type.startsWith("image/"),
                 );
-                if (!file) return false;
+                if (!image) return false;
                 event.preventDefault();
-                void insertImage(file, current);
+                void insertImage(image);
                 return true;
+              },
+              compositionend() {
+                queueMicrotask(() => {
+                  doc.closeGroup();
+                  setMode(requested.current);
+                });
+                return false;
               },
             }),
           ],
         }),
       });
-      view.current = editor;
-      if (!rendered) editor.dispatch({ effects: setRendered.of(false) });
-      async function insertImage(file: File, current: EditorView) {
-        try {
-          const relative = await host.importImage(
-            doc.id,
-            new Uint8Array(await file.arrayBuffer()),
-            file.name,
-          );
-          const selection = current.state.selection.main;
-          current.dispatch({
-            changes: {
-              from: selection.from,
-              to: selection.to,
-              insert: `![${file.name.replace(/[\[\]]/g, "")}](${relative})`,
-            },
-          });
-        } catch (error) {
-          callbacks.current.onError((error as Error).message);
+    }
+    function setMode(value: boolean) {
+      const doc = model.current;
+      if (!doc) return;
+      value = value && doc.text.length <= 300_000;
+      if (rich.current?.composing || source.current?.composing) return;
+      doc.closeGroup();
+      if (value) {
+        if (!activeMode.current && source.current) {
+          const s = source.current.state.selection.main;
+          doc.selection = { anchor: s.anchor, head: s.head };
         }
+        doc.endSourceSession();
+        doc.refreshCaret();
+        rich.current?.render(false);
+      } else {
+        if (activeMode.current) {
+          doc.selection = rich.current?.bookmark() || doc.selection;
+          rich.current?.releaseFence();
+        }
+        doc.beginSourceSession();
+        ensureSource();
+        syncSource();
       }
+      const changed = activeMode.current !== value;
+      activeMode.current = value;
+      setVisibleMode(value);
+      historyState();
+      if (changed)
+        requestAnimationFrame(() => {
+          if (value) rich.current?.restore();
+          else source.current?.focus();
+        });
+    }
+    useImperativeHandle(
+      ref,
+      () => ({
+        view: () => source.current,
+        find: () => {
+          if (!activeMode.current) {
+            ensureSource();
+            openSearchPanel(source.current!);
+            return;
+          }
+          setSearchOpen(true);
+          requestAnimationFrame(() => {
+            searchField.current?.focus();
+            searchField.current?.select();
+          });
+        },
+        jump: (line) => {
+          if (activeMode.current) rich.current?.jump(line);
+          else if (source.current) {
+            const target = source.current.state.doc.line(
+              Math.min(line, source.current.state.doc.lines),
+            );
+            source.current.dispatch({
+              selection: { anchor: target.from },
+              effects: EditorView.scrollIntoView(target.from, {
+                y: "start",
+                yMargin: 30,
+              }),
+            });
+            source.current.focus();
+          }
+        },
+        wrap: (before, after = "") => {
+          if (activeMode.current) rich.current?.wrap(before, after);
+          else {
+            const s = source.current?.state.selection.main;
+            if (!s || !model.current) return;
+            const selected = model.current.text.slice(s.from, s.to);
+            model.current.selection = { anchor: s.anchor, head: s.head };
+            model.current.replace(
+              s.from,
+              s.to,
+              before + selected + after,
+              "format",
+              { anchor: s.from + before.length, head: s.to + before.length },
+            );
+            syncSource();
+            publish();
+            source.current?.focus();
+          }
+        },
+        codeBlock: () => {
+          if (activeMode.current) rich.current?.codeBlock();
+        },
+        undo: () => history(),
+        redo: () => history(true),
+        focus: focusEditor,
+        richMode: () => activeMode.current,
+      }),
+      [],
+    );
+    useEffect(() => {
+      const original = initial.current;
+      model.current = new MarkdownDocument(
+        original.content,
+        original.lineEnding || "\n",
+      );
+      rich.current = new RichEditor(root.current!, model.current, original.id, {
+        change: publish,
+        cursor: (line, column) => callbacks.current.onCursor(line, column),
+        image: (file) => void insertImage(file),
+        link: (url) =>
+          void host
+            .openLink(url)
+            .catch((error) => callbacks.current.onError(error.message)),
+        compositionFinished: () => setMode(requested.current),
+      });
+      setMode(requested.current);
       return () => {
-        view.current = null;
-        editor.destroy();
+        rich.current?.destroy();
+        source.current?.destroy();
+        rich.current = null;
+        source.current = null;
       };
     }, []);
     useEffect(() => {
-      const editor = view.current;
-      if (!editor) return;
-      editor.dispatch({
-        effects: setRendered.of(rendered),
-      });
+      requested.current = rendered;
+      setMode(rendered);
     }, [rendered]);
     useEffect(() => {
-      const editor = view.current;
-      if (!editor || editor.state.sliceDoc() === record.content) return;
-      editor.dispatch({
-        changes: {
-          from: 0,
-          to: editor.state.doc.length,
-          insert: record.content,
-        },
-        selection: { anchor: 0 },
-      });
+      if (
+        !model.current ||
+        model.current.toMarkdown() === record.content ||
+        rich.current?.composing
+      )
+        return;
+      model.current.replaceExternal(record.content, record.lineEnding);
+      if (activeMode.current) rich.current?.render(false);
+      else {
+        model.current.beginSourceSession();
+        syncSource();
+      }
+      historyState();
     }, [record.content]);
+    useEffect(() => {
+      historyState();
+    });
+    useEffect(() => {
+      if (!root.current?.closest(".document-editor")?.hasAttribute("hidden"))
+        focusEditor();
+    }, [visibleMode]);
     return (
       <div
-        className={`editor-surface ${rendered ? "live-mode" : "source-mode"}`}
-        ref={parent}
-      />
+        className={`editor-surface ${visibleMode ? "rich-mode" : "source-mode"}`}
+      >
+        {searchOpen && visibleMode && (
+          <div
+            className="rich-search"
+            role="search"
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.stopPropagation();
+                setSearchOpen(false);
+                rich.current?.restore();
+              }
+            }}
+          >
+            <div>
+              <input
+                ref={searchField}
+                aria-label="查找内容"
+                placeholder="查找"
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setSearchStatus("");
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    findNext(event.shiftKey);
+                  }
+                }}
+              />
+              <button onClick={() => findNext(true)} aria-label="上一个匹配">
+                ↑
+              </button>
+              <button onClick={() => findNext()} aria-label="下一个匹配">
+                ↓
+              </button>
+              <span role="status">{searchStatus}</span>
+              <button
+                onClick={() => {
+                  setSearchOpen(false);
+                  rich.current?.restore();
+                }}
+                aria-label="关闭查找"
+              >
+                ×
+              </button>
+            </div>
+            <div>
+              <input
+                aria-label="替换内容"
+                placeholder="替换为"
+                value={replacement}
+                onChange={(event) => setReplacement(event.target.value)}
+              />
+              <button onClick={() => replaceMatch()}>替换</button>
+              <button onClick={() => replaceMatch(true)}>全部替换</button>
+            </div>
+          </div>
+        )}
+        <div className="rich-scroller" hidden={!visibleMode}>
+          <div className="rich-document" ref={root} />
+        </div>
+        <div
+          className="source-surface"
+          hidden={visibleMode}
+          ref={sourceParent}
+        />
+      </div>
     );
   },
 );

@@ -8,6 +8,8 @@ import type { EditorHandle } from "./editor/MarkdownEditor";
 import { extractHeadings, renderMarkdown } from "./editor/markdown";
 import { host } from "./host";
 import { renderDiagrams } from "./editor/diagrams";
+import { renderMath } from "./editor/math";
+import { exportHtml } from "./editor/print";
 import type { Command } from "./types";
 export default function App() {
   const session = useDocuments();
@@ -40,7 +42,16 @@ export default function App() {
   useEffect(() => {
     document.title = active ? `${active.name} — Open Typora` : "Open Typora";
   }, [active?.name]);
+  useEffect(() => {
+    editor()?.focus();
+  }, [session.activeId]);
   commands.current = ({ action, document: opened }) => {
+    if (
+      ["bold", "italic", "code"].includes(action) &&
+      host.native &&
+      !editor()?.richMode()
+    )
+      return;
     if (action === "opened") {
       if (opened) void session.add(opened);
     } else if (action === "new") void session.create();
@@ -50,6 +61,7 @@ export default function App() {
     else if (action === "saveAs") void session.save(true);
     else if (action === "close") void session.close();
     else if (action === "quit") void session.quit();
+    else if (action === "close-window") void session.closeWindow();
     else if (action === "source") setRendered((value) => !value);
     else if (action === "sidebar") setSidebar((value) => !value);
     else if (action === "outline" || action === "files") {
@@ -59,19 +71,28 @@ export default function App() {
       setTheme((value) => (value === "dark" ? "light" : "dark"));
     else if (action === "focus") setFocus((value) => !value);
     else if (action === "find") editor()?.find();
+    else if (action === "undo") editor()?.undo();
+    else if (action === "redo") editor()?.redo();
     else if (action === "bold") editor()?.wrap("**", "**");
     else if (action === "italic") editor()?.wrap("*", "*");
-    else if (action === "code") editor()?.wrap("\n```\n", "\n```\n");
+    else if (action === "code") editor()?.codeBlock();
     else if (action === "autosave") session.setAutosave((value) => !value);
     else if (action === "about") setAbout(true);
     else if (action === "pdf") {
       document.body.classList.add("printing");
-      requestAnimationFrame(() => {
+      queueMicrotask(() => {
         void (async () => {
           if (printDocument.current)
-            await renderDiagrams(printDocument.current);
+            await Promise.all([
+              renderDiagrams(printDocument.current),
+              renderMath(printDocument.current),
+            ]);
           await document.fonts.ready;
-          const result = await host.exportPdf();
+          const result = await host.exportPdf(
+            printDocument.current
+              ? exportHtml(printDocument.current)
+              : undefined,
+          );
           if (result) session.setMessage("PDF 已导出。");
         })()
           .catch((error) => session.setMessage(error.message))
@@ -111,14 +132,17 @@ export default function App() {
                         : key === "\\"
                           ? "sidebar"
                           : null
-              : null;
+              : key === "/"
+                ? "source"
+                : null;
       if (action) {
         event.preventDefault();
+        event.stopPropagation();
         commands.current({ action });
       }
     };
-    document.addEventListener("keydown", shortcut);
-    return () => document.removeEventListener("keydown", shortcut);
+    document.addEventListener("keydown", shortcut, true);
+    return () => document.removeEventListener("keydown", shortcut, true);
   }, []);
   useEffect(() => {
     if (!session.message) return;
@@ -278,7 +302,7 @@ export default function App() {
             <h2>Open Typora</h2>
             <p>让文字，回到文字。</p>
             <p className="about-details">
-              0.1.1 · 本地 Markdown 写作空间
+              0.2.0 · 本地 Markdown 写作空间
               <br />
               MIT 开源 · 独立实现
             </p>

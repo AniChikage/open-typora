@@ -1,0 +1,141 @@
+{
+  "typoraVersion": "1.14.10",
+  "reaVersion": "6.4.0",
+  "source": "/Applications/Typora.app/Contents/Resources/TypeMark/appsrc/main.js",
+  "sourceSHA256": "8e716a084097a976ab9ed8ea06d8f0b505f14a8dc0c022b3dc1a09a741225e16",
+  "offsetUnits": "UTF-16, exclusive source call end; excerpts append an inert semicolon",
+  "modules": [
+    {
+      "name": "10",
+      "start": 20344,
+      "end": 31169,
+      "appendedTerminator": true,
+      "sourceSpanSHA256": "d3985f53ccd2891404d5bd96ebec795945361d7335cd57b4a4c1352058b3ba1d",
+      "sha256": "c09e43f5da0b6e59492317e5a87d9ecd9a18b07646253cc2881cf24c21cd490e",
+      "role": "node map and Markdown serialization"
+    },
+    {
+      "name": "13",
+      "start": 31170,
+      "end": 38856,
+      "appendedTerminator": true,
+      "sourceSpanSHA256": "aafee941d3815ad27ddd55f02aeb8c9fb4ba3eb57146005b4cac3c6b83a3b27a",
+      "sha256": "b7dc46d03a822e5c12551ee520b0054f97b7fd669d200944ee595e092cdb0ed8",
+      "role": "HTML rendering"
+    },
+    {
+      "name": "3f",
+      "start": 301766,
+      "end": 323301,
+      "appendedTerminator": true,
+      "sourceSpanSHA256": "7151a17dc2fa90dfa938dfd1db85c9171c55134882f96dfe745ab9f31f6565c2",
+      "sha256": "538a2db9728996227bb123cb612a650a667e5b2061abba2bbea1d809c33b6a90",
+      "role": "search (initial artifact alias input.js)"
+    },
+    {
+      "name": "48",
+      "start": 395218,
+      "end": 409972,
+      "appendedTerminator": true,
+      "sourceSpanSHA256": "3b9100da725fc25701c55467d9e42bfc85aa111aa1da8af108753563e0736a21",
+      "sha256": "2759856adc2d31fcef0f84892dd950fec0f5a64f7d1f13d93782e96c2b636a21",
+      "role": "separate CodeMirror source view"
+    },
+    {
+      "name": "31",
+      "start": 521231,
+      "end": 575142,
+      "appendedTerminator": true,
+      "sourceSpanSHA256": "7280d303a619caf42bedc7c8022d32c9b51b5cf463d6d2d5c26a7769ee91d5ee",
+      "sha256": "e12227c2268d2d82166bdd2e8b63d56bfa9c6e772ad1e9679afd66ce190d586d",
+      "role": "selection and bookmarks"
+    },
+    {
+      "name": "18",
+      "start": 949739,
+      "end": 998785,
+      "appendedTerminator": true,
+      "sourceSpanSHA256": "22630f69cd47d77fb9ab0124493449f2817e037bc16cb23f0ea60815810c7dda",
+      "sha256": "a5b10fe3ba1c53a6cb28623e558c5357420bc2a267cde9d05ad20e9e108adefd",
+      "role": "document and block parsing"
+    },
+    {
+      "name": "1a",
+      "start": 1209257,
+      "end": 1227948,
+      "appendedTerminator": true,
+      "sourceSpanSHA256": "af210a19cec77c26b1946eff28cfa1334d3b6a1ddcd647604e9ee58a2b8f799a",
+      "sha256": "fcc74aed1b1bc20a5e34291d543d8a5defe8d7a2567c848d98f8909b33768844",
+      "role": "undo command stack"
+    },
+    {
+      "name": "60",
+      "start": 1591204,
+      "end": 1614576,
+      "appendedTerminator": true,
+      "sourceSpanSHA256": "9b2b872507037a9c839c7118768c8aa5b5b30e0134e53e12dcc7076fe8ec32e0",
+      "sha256": "850f30663ce4c0ce85ba9fd5d0436b25b25258725fa44160de8d1c2c19078cd9",
+      "role": "formatting toolbar (initial artifact alias composition.js)"
+    },
+    {
+      "name": "61",
+      "start": 1614577,
+      "end": 1683824,
+      "appendedTerminator": true,
+      "sourceSpanSHA256": "a1983d938e101c26a8f2567ea69f7cda43a98175bdc98f1d22a9b949c9ebd4f0",
+      "sha256": "9f7a89fb6f0eefca3ad29f5d106a8114c0e3f63ea5eceff608ccab63be34b6b1",
+      "role": "central editor and input events"
+    }
+  ],
+  "evidence": {
+    "rea-core": {
+      "evidenceID": "ev_89a665c483b8a2a0371ccadfa02190cf3de1fa9dde70fb8939fda359504dfc54",
+      "semanticNodes": 28666,
+      "semanticRelations": 32074,
+      "coverage": "partial",
+      "resourceConstraints": 7
+    },
+    "rea-input": {
+      "evidenceID": "ev_4abdb3956e791a51c31eb87e9c0a86ccf11982bf35d0f7c5923db5e13a2f326b",
+      "semanticNodes": 3860,
+      "semanticRelations": 3776,
+      "coverage": "unknown",
+      "resourceConstraints": 0
+    },
+    "rea-native": {
+      "evidenceID": "ev_16723575aee3abb5f28ed572fbfc1a76e2fbdc4181f6a2f3f867f2640806ed9b",
+      "semanticNodes": 0,
+      "semanticRelations": 0,
+      "coverage": null,
+      "resourceConstraints": 0
+    },
+    "rea-selection": {
+      "evidenceID": "ev_917f16d991aee251f94c483b4fa7459dfbf1649775616f1842552964edff066b",
+      "semanticNodes": 11004,
+      "semanticRelations": 11791,
+      "coverage": "unknown",
+      "resourceConstraints": 0
+    },
+    "rea-node-map": {
+      "evidenceID": "ev_309eda2df6f204b850857fb8610f44a865710a49b4b77e4954246b9804b1efd8",
+      "semanticNodes": 2816,
+      "semanticRelations": 3128,
+      "coverage": "unknown",
+      "resourceConstraints": 0
+    },
+    "rea-source-view": {
+      "evidenceID": "ev_dfad2046493a40f8a626a63e9670f3e7b425801eb7db36f8826cfef71d611fc3",
+      "semanticNodes": 2970,
+      "semanticRelations": 3275,
+      "coverage": "unknown",
+      "resourceConstraints": 0
+    },
+    "rea-parser": {
+      "evidenceID": "ev_4e8d78cc9949e5abab8a209a065005f9c2429f30993aff325ba73fed56ada68e",
+      "semanticNodes": 972,
+      "semanticRelations": 1021,
+      "coverage": "unknown",
+      "resourceConstraints": 0
+    }
+  }
+}

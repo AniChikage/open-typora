@@ -4,6 +4,5 @@ import "@fontsource/open-sans/latin-400.css";
 import "@fontsource/open-sans/latin-700.css";
 import "@fontsource/open-sans/latin-400-italic.css";
 import "@fontsource/open-sans/latin-700-italic.css";
-import "katex/dist/katex.min.css";
 import "./styles.css";
 ReactDOM.createRoot(document.getElementById("root")!).render(<App />);

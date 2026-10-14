@@ -15,6 +15,7 @@ export function useDocuments() {
   const current = useRef({ documents, activeId });
   current.current = { documents, activeId };
   const inFlight = useRef(new Map<string, Promise<unknown>>());
+  const closing = useRef(false);
   const update = (id: string, patch: Partial<DocumentRecord>) =>
     setDocuments((records) =>
       records.map((record) =>
@@ -57,6 +58,7 @@ export function useDocuments() {
   useEffect(() => {
     if (!ready) return;
     const timer = setTimeout(() => {
+      if (closing.current) return;
       void host.persist({ documents, activeId }).catch(notify);
     }, 500);
     void host.setDirty(
@@ -109,6 +111,7 @@ export function useDocuments() {
   useEffect(() => {
     if (!ready || !autosave || !host.native) return;
     const timer = setTimeout(() => {
+      if (closing.current) return;
       for (const record of documents)
         if (
           record.path &&
@@ -123,7 +126,7 @@ export function useDocuments() {
     if (!ready || !host.native) return;
     let running = false;
     const timer = setInterval(async () => {
-      if (running) return;
+      if (running || closing.current) return;
       running = true;
       try {
         for (const record of current.current.documents) {
@@ -279,6 +282,54 @@ export function useDocuments() {
       await host.closeWindow();
     } catch (error) {
       notify(error);
+      if (window.desktop?.cancelClose) void window.desktop.cancelClose();
+    }
+  }
+  async function closeWindow() {
+    if (closing.current) return;
+    closing.current = true;
+    try {
+      await Promise.allSettled([...inFlight.current.values()]);
+      const remaining = [...current.current.documents];
+      for (const record of [...remaining]) {
+        if (record.content === record.savedContent) continue;
+        const decision = await host.confirmClose(record.name);
+        if (decision === "cancel") {
+          closing.current = false;
+          setDocuments((records) => [...records]);
+          return;
+        }
+        if (decision === "save") {
+          const saved = await host.save(record.id, record.content);
+          if (!saved) {
+            closing.current = false;
+            setDocuments((records) => [...records]);
+            return;
+          }
+          remaining[remaining.findIndex((item) => item.id === record.id)] =
+            saved;
+          update(record.id, saved);
+        } else if (record.path)
+          remaining[remaining.findIndex((item) => item.id === record.id)] =
+            await host.reload(record.id);
+        else
+          remaining.splice(
+            remaining.findIndex((item) => item.id === record.id),
+            1,
+          );
+      }
+      await host.persist({
+        documents: remaining,
+        activeId: remaining.some((item) => item.id === current.current.activeId)
+          ? current.current.activeId
+          : remaining[0]?.id || "",
+      });
+      await host.setDirty(false);
+      await host.closeWindow();
+    } catch (error) {
+      closing.current = false;
+      setDocuments((records) => [...records]);
+      notify(error);
     }
   }
   return {
@@ -305,5 +356,6 @@ export function useDocuments() {
     close,
     reload,
     quit,
+    closeWindow,
   };
 }
