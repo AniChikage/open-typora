@@ -109,7 +109,7 @@ test("untitled documents survive session recovery", async () => {
 test("folder inventory ignores symlinks and only grants Markdown files", async () => {
   const { store, directory } = await setup();
   await writeFile(path.join(directory, "private.txt"), "not markdown");
-  await symlink("/tmp", path.join(directory, "outside"));
+  await symlink(os.tmpdir(), path.join(directory, "outside"), process.platform === "win32" ? "junction" : "dir");
   const result = await store.scan(directory);
   assert.equal(result.files.length, 1);
   assert.equal((await store.openToken(result.files[0].token)).name, "note.md");
@@ -119,9 +119,9 @@ test("image reads reject directory traversal and external symlinks", async () =>
   const { store, directory, record } = await setup();
   const outside = await mkdtemp(path.join(os.tmpdir(), "open-typora-outside-"));
   await writeFile(path.join(outside, "image.png"), "outside");
-  await symlink(outside, path.join(directory, "linked"));
+  await symlink(outside, path.join(directory, "linked"), process.platform === "win32" ? "junction" : "dir");
   await assert.rejects(store.asset(record.id, "linked/image.png"), /之外/);
-  await symlink(outside, path.join(directory, ".assets"));
+  await symlink(outside, path.join(directory, ".assets"), process.platform === "win32" ? "junction" : "dir");
   await assert.rejects(
     store.importImage(
       record.id,

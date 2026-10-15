@@ -14,7 +14,10 @@ const errors = [],
   passed = [];
 let application;
 async function launch() {
-  application = await electron.launch({ args: [root], env, timeout: 25000 });
+  application = await electron.launch({
+    ...(process.env.OPEN_TYPORA_EXECUTABLE ? { executablePath: process.env.OPEN_TYPORA_EXECUTABLE, args: [] } : { args: [root] }),
+    env, timeout: 30000,
+  });
   const page = await application.firstWindow({ timeout: 20000 });
   page.on("pageerror", (error) => errors.push(error.message));
   await page.getByRole("button", { name: "欢迎.md", exact: true }).waitFor();

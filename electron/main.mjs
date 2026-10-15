@@ -17,6 +17,7 @@ import { Workspace } from "./workspace.mjs";
 import { randomUUID } from "node:crypto";
 import { atomicWrite, DocumentStore } from "./store.mjs";
 import { readFile, realpath } from "node:fs/promises";
+import { launchFiles } from "./launch-files.mjs";
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const development = process.env.OPEN_TYPORA_DEV_URL;
 if (process.env.OPEN_TYPORA_DATA_DIR)
@@ -33,14 +34,30 @@ let window,
   dirty = false,
   closing = false;
 const pending = [];
+let rendererReady = false;
+function openFiles(files) {
+  for (const file of files) {
+    if (window && rendererReady) store.open(file)
+      .then(document => send({ action: "opened", document })).catch(showError);
+    else pending.push(file);
+  }
+}
+if (process.platform === "win32") {
+  app.setAppUserModelId("org.opentypora.desktop");
+  if (!app.requestSingleInstanceLock()) app.quit();
+  else {
+    pending.push(...launchFiles(process.argv, app.isPackaged));
+    app.on("second-instance", (_, argv, cwd) => {
+      openFiles(launchFiles(argv, app.isPackaged, cwd));
+      if (window?.isMinimized()) window.restore();
+      window?.show();
+      window?.focus();
+    });
+  }
+}
 app.on("open-file", (event, file) => {
   event.preventDefault();
-  if (window)
-    store
-      .open(file)
-      .then((document) => send({ action: "opened", document }))
-      .catch(showError);
-  else pending.push(file);
+  openFiles([file]);
 });
 const send = (command) =>
   window?.webContents.send(
@@ -59,7 +76,10 @@ const handlers = {
   importDocument: async () => { const result = await dialog.showOpenDialog(window, { title: "导入文档", properties: ["openFile"], filters: [{ name: "文档", extensions: ["docx", "doc", "rtf", "odt", "epub", "tex", "rst", "html", "txt"] }] }); return result.canceled ? null : convertImport(result.filePaths[0]); },
   exportConverted: async (_, id, format, source, html) => { const record = store.require(id), ext = { latex: "tex", revealjs: "html", mediawiki: "wiki" }[format] || format; const result = await dialog.showSaveDialog(window, { defaultPath: record.name.replace(/\.[^.]+$/, "." + ext) }); return result.canceled ? null : convertExport(store.dataDir, format, source, html, result.filePath); },
   imageAction: async (_, id, sources, action, options) => { if (action !== "upload") throw new Error("图片文件管理请使用原生安装版。"); const mapping = {}; for (const source of sources) { const file = await store.asset(id, source); const response = await fetch(options?.imageUploader || "http://127.0.0.1:36677/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ list: [file] }), signal: AbortSignal.timeout(30000) }); const result = await response.json(); if (!response.ok || !result.success || !/^https?:\/\//.test(result.result?.[0] || "")) throw new Error("PicGo 未返回有效图片地址。"); mapping[source] = result.result[0]; } return mapping; },
-  ready: () => true,
+  ready: async () => { rendererReady = true; for (const file of pending.splice(0)) {
+    try { send({ action: "opened", document: await store.open(file) }); }
+    catch (error) { showError(error); }
+  } return true; },
   cancelClose: () => { closing = false; },
   recent: () => workspace.recent(),
   recentAction: async (_, action, file) => { if (action !== "open") return workspace.recentAction(action, file); const item = (await workspace.recent()).find(item => item.path === file); if (!item) throw new Error("最近项目已移除。"); await workspace.remember(file, item.folder); return item.folder ? store.scan(file) : store.open(file); },
@@ -215,12 +235,13 @@ const handlers = {
   },
   dirty: (_, value) => {
     dirty = Boolean(value);
-    window?.setDocumentEdited(dirty);
+    if (process.platform === "darwin") window?.setDocumentEdited(dirty);
   },
 };
 app
   .whenReady()
   .then(async () => {
+    if (process.platform === "win32" && !app.hasSingleInstanceLock()) return;
     store = new DocumentStore(app.getPath("userData"));
     workspace = new Workspace(app.getPath("userData"));
     protocol.handle("open-typora-asset", async (request) => {
@@ -257,8 +278,9 @@ app
         minWidth: 660,
         minHeight: 500,
         title: "Open Typora",
-        titleBarStyle: "hiddenInset",
-        trafficLightPosition: { x: 12, y: 9 },
+        ...(process.platform === "darwin" ? {
+          titleBarStyle: "hiddenInset", trafficLightPosition: { x: 12, y: 9 },
+        } : {}),
         backgroundColor: "#FFFFFF",
         webPreferences: {
           backgroundThrottling: process.env.OPEN_TYPORA_TEST_HIDDEN !== "1",
@@ -275,15 +297,6 @@ app
       window.webContents.on("will-navigate", (event) => event.preventDefault());
       if (development) window.loadURL(development);
       else window.loadFile(path.join(root, "dist/index.html"));
-      window.webContents.on("did-finish-load", async () => {
-        for (const file of pending.splice(0)) {
-          try {
-            send({ action: "opened", document: await store.open(file) });
-          } catch (error) {
-            showError(error);
-          }
-        }
-      });
       window.on("close", (event) => {
         if (!closing && dirty) {
           event.preventDefault();
@@ -292,6 +305,7 @@ app
       });
       window.on("closed", () => {
         window = null;
+        rendererReady = false;
       });
     }
     ipcMain.handle("app:close", (event) => {
@@ -306,7 +320,7 @@ app
     const roles = { "cut:": "cut", "copy:": "copy", "paste:": "paste", "selectAll:": "selectAll" };
     const accelerator = key => key?.replaceAll("Mod-", "CommandOrControl+").replaceAll("Ctrl-", "Control+").replaceAll("Alt-", "Alt+").replaceAll("Shift-", "Shift+");
     Menu.setApplicationMenu(Menu.buildFromTemplate([
-      { label: "Open Typora", submenu: [{ label: "关于 Open Typora", click: command("about") }, { label: "偏好设置…", accelerator: "CommandOrControl+,", click: command("preferences") }, { type: "separator" }, { role: "hide", label: "隐藏 Open Typora" }, { role: "hideOthers", label: "隐藏其他应用" }, { type: "separator" }, { label: "退出 Open Typora", accelerator: "CommandOrControl+Q", click: command("quit") }] },
+      { label: "Open Typora", submenu: [{ label: "关于 Open Typora", click: command("about") }, { label: "偏好设置…", accelerator: "CommandOrControl+,", click: command("preferences") }, ...(process.platform === "darwin" ? [{ type: "separator" }, { role: "hide", label: "隐藏 Open Typora" }, { role: "hideOthers", label: "隐藏其他应用" }] : []), { type: "separator" }, { label: "退出 Open Typora", accelerator: "CommandOrControl+Q", click: command("quit") }] },
       ...groups.map(group => ({ label: group.title, submenu: group.items.filter(item => item.action !== "preferences").map(item => ({ label: item.label, accelerator: accelerator(item.key), ...(item.selector ? { role: roles[item.selector] } : { click: command(item.action) }) })) })),
       { role: "windowMenu", label: "窗口" }
     ]));

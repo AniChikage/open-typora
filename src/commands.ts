@@ -4,6 +4,7 @@ export const commandGroups: { title: string; items: CommandDefinition[] }[] = de
 export const commandDefinitions = commandGroups.flatMap(group => group.items);
 export const commandsByAction = new Map(commandDefinitions.map(item => [item.action, item]));
 export function shortcutLabel(key = "") {
+  if (!/Mac/.test(navigator.platform)) return key.replaceAll("Mod-", "Ctrl+").replaceAll("Ctrl-", "Ctrl+").replaceAll("Alt-", "Alt+").replaceAll("Shift-", "Shift+").replace("Ctrl+Ctrl+", "Ctrl+");
   return key.replaceAll("Mod-", "⌘ ").replaceAll("Ctrl-", "⌃ ").replaceAll("Alt-", "⌥ ").replaceAll("Shift-", "⇧ ").replaceAll("Backspace", "⌫");
 }
 export function commandForKey(event: KeyboardEvent) {

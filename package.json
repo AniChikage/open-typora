@@ -1,6 +1,6 @@
 {
   "name": "open-typora",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "A local Markdown writing space with live rendering and lossless source editing.",
   "private": true,
   "type": "module",
@@ -23,7 +23,9 @@
     "test:alignment": "node tests/alignment-desktop.mjs",
     "test:encoding": "node tests/encoding-desktop.mjs",
     "package:dmg": "npm run package:mac && node scripts/package-dmg.mjs",
-    "package:release": "npm run package:dmg"
+    "package:release": "npm run package:dmg",
+    "package:win": "npm run build && node scripts/icon.mjs && node scripts/package-windows.mjs",
+    "test:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File tests/windows-install.ps1"
   },
   "dependencies": {
     "@codemirror/autocomplete": "6.20.3",

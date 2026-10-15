@@ -27,7 +27,7 @@ test("workspace rename/move/undo preserves a dirty BOM draft and refuses overwri
   assert.equal(await readFile(duplicate.newPath, "utf8"), "\uFEFF# unsaved\r\n");
   await assert.rejects(workspace.execute({ action: "rename", path: file, name: "copy.md" }, store), /已存在/);
   await assert.rejects(workspace.execute({ action: "new-file", path: directory, name: "../escape.md" }, store), /无效/);
-  const outside = await mkdtemp(path.join(os.tmpdir(), "open-typora-outside-")); await symlink(outside, path.join(directory, "link"));
+  const outside = await mkdtemp(path.join(os.tmpdir(), "open-typora-outside-")); await symlink(outside, path.join(directory, "link"), process.platform === "win32" ? "junction" : "dir");
   await assert.rejects(workspace.execute({ action: "new-file", path: path.join(directory, "link"), name: "escape.md" }, store), /符号链接/);
   change = await workspace.execute({ action: "move", path: file, target: path.join(directory, "child") }, store); workspace.apply(change, store);
   assert.equal(store.require(doc.id).path, path.join(directory, "child/original.md"));

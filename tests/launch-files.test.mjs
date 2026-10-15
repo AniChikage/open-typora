@@ -1,0 +1,12 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import path from "node:path";
+import { launchFiles } from "../electron/launch-files.mjs";
+
+test("installed file associations preserve spaces and Unicode without treating switches as files", () => {
+  const folder = path.resolve("notes");
+  assert.deepEqual(launchFiles(["Open Typora.exe", "--inspect.md", "会议 notes.md", "not.txt", "会议 notes.md"], true, folder), [path.join(folder, "会议 notes.md")]);
+});
+test("development launch omits the Electron application directory", () => {
+  assert.deepEqual(launchFiles(["electron", "editor.md", "note.markdown"], false), [path.resolve("note.markdown")]);
+});

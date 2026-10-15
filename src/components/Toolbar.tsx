@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { commandGroups, shortcutLabel } from "../commands";
+import { version } from "../../package.json";
 interface Props {
   name: string;
   edited: boolean;
@@ -45,13 +46,13 @@ export function Toolbar(props: Props) {
     };
   }, [open]);
   const items = [
-    { action: "new", icon: FilePlus2, label: "新建文档", shortcut: "⌘ N" },
-    { action: "open", icon: FolderOpen, label: "打开文件", shortcut: "⌘ O" },
-    { action: "save", icon: Save, label: "保存", shortcut: "⌘ S" },
-    { action: "saveAs", icon: Copy, label: "另存为…", shortcut: "⇧ ⌘ S" },
-    { action: "find", icon: Search, label: "查找与替换", shortcut: "⌘ F" },
-    { action: "bold", icon: Bold, label: "粗体", shortcut: "⌘ B" },
-    { action: "italic", icon: Italic, label: "斜体", shortcut: "⌘ I" },
+    { action: "new", icon: FilePlus2, label: "新建文档", shortcut: shortcutLabel("Mod-N") },
+    { action: "open", icon: FolderOpen, label: "打开文件", shortcut: shortcutLabel("Mod-O") },
+    { action: "save", icon: Save, label: "保存", shortcut: shortcutLabel("Mod-S") },
+    { action: "saveAs", icon: Copy, label: "另存为…", shortcut: shortcutLabel("Mod-Shift-S") },
+    { action: "find", icon: Search, label: "查找与替换", shortcut: shortcutLabel("Mod-F") },
+    { action: "bold", icon: Bold, label: "粗体", shortcut: shortcutLabel("Mod-B") },
+    { action: "italic", icon: Italic, label: "斜体", shortcut: shortcutLabel("Mod-I") },
     { action: "code", icon: Code2, label: "代码块", shortcut: "" },
     { action: "focus", icon: ScanLine, label: "专注模式", shortcut: "F8" },
     { action: "pdf", icon: FileOutput, label: "导出 PDF", shortcut: "" },
@@ -76,7 +77,7 @@ export function Toolbar(props: Props) {
         <button
           className="icon-button source-toggle"
           aria-label={props.rendered ? "源码" : "即时渲染"}
-          title="切换源码模式 ⌘/"
+          title={`切换源码模式 ${shortcutLabel("Mod-/")}`}
           aria-pressed={!props.rendered}
           disabled={props.disabled}
           onClick={() => props.setRendered(!props.rendered)}
@@ -155,7 +156,7 @@ export function Toolbar(props: Props) {
               >
                 <span className="menu-check" />
                 <span>关于 Open Typora</span>
-                <kbd>0.3.0</kbd>
+                <kbd>{version}</kbd>
               </button>
             </div>
           )}
