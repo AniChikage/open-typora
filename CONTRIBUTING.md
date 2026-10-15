@@ -62,7 +62,7 @@ Automated desktop suites use isolated temporary application data. To keep screen
 npm run package:mac
 ```
 
-This creates `release/native/Open Typora.app` and a ZIP archive. To install it locally, quit the running application and run:
+This creates `release/native/Open Typora.app` and a ZIP archive. Run `npm run package:release` to additionally create a drag-to-install DMG and `SHA256SUMS.txt`; the DMG wraps the same native application. To install it locally, quit the running application and run:
 
 ```sh
 node scripts/install.mjs

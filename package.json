@@ -21,7 +21,9 @@
     "test:kernel-desktop": "node tests/kernel-desktop.mjs",
     "test:features": "node tests/features-desktop.mjs",
     "test:alignment": "node tests/alignment-desktop.mjs",
-    "test:encoding": "node tests/encoding-desktop.mjs"
+    "test:encoding": "node tests/encoding-desktop.mjs",
+    "package:dmg": "npm run package:mac && node scripts/package-dmg.mjs",
+    "package:release": "npm run package:dmg"
   },
   "dependencies": {
     "@codemirror/autocomplete": "6.20.3",
@@ -101,5 +103,17 @@
   },
   "allowScripts": {
     "electron": true
+  },
+  "author": {
+    "name": "AniChikage",
+    "url": "https://github.com/AniChikage"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AniChikage/open-typora.git"
+  },
+  "homepage": "https://github.com/AniChikage/open-typora#readme",
+  "bugs": {
+    "url": "https://github.com/AniChikage/open-typora/issues"
   }
 }

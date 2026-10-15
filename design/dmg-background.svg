@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="420" viewBox="0 0 700 420">
+<rect width="700" height="420" fill="#f5f6f8"/>
+<text x="350" y="65" text-anchor="middle" font-family="Helvetica Neue,Arial,sans-serif" font-size="27" font-weight="600" fill="#243247">Open Typora</text>
+<text x="350" y="98" text-anchor="middle" font-family="Helvetica Neue,Arial,sans-serif" font-size="15" fill="#687585">Drag to Applications to install</text>
+<path d="M322 220h54m-12-12 12 12-12 12" fill="none" stroke="#8995a5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M120 332h460" stroke="#dce1e7"/>
+<text x="350" y="370" text-anchor="middle" font-family="Helvetica Neue,Arial,sans-serif" font-size="13" fill="#687585">macOS 14+  ·  Apple Silicon</text>
+</svg>

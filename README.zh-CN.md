@@ -8,10 +8,10 @@
 
 <p align="center">
   <a href="README.md">English</a> · 简体中文<br>
-  <a href="#功能">功能</a> · <a href="#开始使用">开始使用</a> · <a href="CONTRIBUTING.md">参与贡献</a> · <a href="LICENSE">MIT 许可证</a>
+  <a href="https://github.com/AniChikage/open-typora/releases/latest">下载 macOS 安装包</a> · <a href="#功能">功能</a> · <a href="#开始使用">开始使用</a> · <a href="CONTRIBUTING.md">参与贡献</a> · <a href="LICENSE">MIT 许可证</a>
 </p>
 
-![Open Typora 的 macOS 窗口，展示 Markdown 正文、表格和代码块](docs/images/editor.png)
+![Open Typora 产品展示：macOS 原生窗口中的 Markdown 编辑界面](docs/images/hero.zh-CN.png)
 
 Open Typora 是一款开源 Markdown 编辑器，受 Typora 的行内编辑体验启发。直接修改排版后的正文，需要时切换源码，文档以普通 `.md` 文件保存在自己的文件夹中。
 
@@ -30,6 +30,18 @@ Open Typora 是一款开源 Markdown 编辑器，受 Typora 的行内编辑体�
 
 ## 开始使用
 
+### 安装 macOS 版
+
+1. 从 [Releases](https://github.com/AniChikage/open-typora/releases/latest) 下载 **[Open-Typora-0.5.1-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.5.1/Open-Typora-0.5.1-arm64.dmg)**。
+2. 打开 DMG，把 **Open Typora** 拖入 **Applications（应用程序）**。
+3. 从应用程序中启动 Open Typora。
+
+需要 **macOS 14 或更高版本、Apple Silicon 芯片**。Release 同时提供 ZIP 和 SHA-256 校验文件；使用应用不需要安装 Node.js、Xcode 或 Typora。
+
+应用采用本地签名，**尚未经过 Apple 公证**。macOS 可能要求在 **系统设置 → 隐私与安全性** 中批准打开，具体操作见 [Apple 官方说明](https://support.apple.com/zh-cn/102445)。请勿为安装而关闭 Gatekeeper。
+
+### 从源码构建
+
 从源码构建 macOS 应用。需要 **Node.js 26**、npm 和 **Xcode Command Line Tools**（`xcode-select --install`），无需安装 Typora。
 
 ```sh
@@ -45,7 +57,7 @@ npm run package:mac
 node scripts/install.mjs
 ```
 
-替换前请先退出正在运行的 Open Typora。安装器保留应用数据，验证新应用后删除旧应用；构建同时在 `release/native/` 生成 ZIP 包。
+替换前请先退出正在运行的 Open Typora。安装器保留应用数据，验证新应用后删除旧应用；构建同时在 `release/native/` 生成 ZIP 包；`npm run package:release` 另外生成 DMG 和校验文件。
 
 当前构建采用本地 ad hoc 签名，**尚未经过 Apple 公证**。Intel Mac、Windows 和 Linux 暂无经过验收的发布构建。
 

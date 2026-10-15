@@ -8,10 +8,10 @@
 
 <p align="center">
   English · <a href="README.zh-CN.md">简体中文</a><br>
-  <a href="#features">Features</a> · <a href="#getting-started">Getting started</a> · <a href="CONTRIBUTING.md">Contributing</a> · <a href="LICENSE">MIT License</a>
+  <a href="https://github.com/AniChikage/open-typora/releases/latest">Download for macOS</a> · <a href="#features">Features</a> · <a href="#getting-started">Getting started</a> · <a href="CONTRIBUTING.md">Contributing</a> · <a href="LICENSE">MIT License</a>
 </p>
 
-![Open Typora running on macOS with a Markdown document, table, and code block](docs/images/editor.png)
+![Open Typora — live Markdown editing in the native macOS app](docs/images/hero.png)
 
 Open Typora is an open-source Markdown editor inspired by Typora's inline editing experience. Write directly in the rendered document, switch to source when you need it, and save ordinary `.md` files in your own folders.
 
@@ -30,6 +30,18 @@ See the [feature checklist](docs/feature-parity.md) for coverage and known diffe
 
 ## Getting started
 
+### Install on macOS
+
+1. Download **[Open-Typora-0.5.1-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.5.1/Open-Typora-0.5.1-arm64.dmg)** from [Releases](https://github.com/AniChikage/open-typora/releases/latest).
+2. Open the DMG and drag **Open Typora** into **Applications**.
+3. Launch Open Typora from Applications.
+
+Requires **macOS 14 or later on Apple Silicon**. A ZIP alternative and SHA-256 checksums are included in the release. No Node.js, Xcode, or Typora installation is needed to use the app.
+
+The application is locally signed and **not Apple-notarized**. macOS may ask you to approve opening it in **System Settings → Privacy & Security**. See [Apple's instructions](https://support.apple.com/en-us/102445). Never disable Gatekeeper to install it.
+
+### Build from source
+
 Build the macOS application from source. You need **Node.js 26**, npm, and the **Xcode Command Line Tools** (`xcode-select --install`). A Typora installation is not required.
 
 ```sh
@@ -45,7 +57,7 @@ Open `release/native/Open Typora.app`, or install it in `~/Applications`:
 node scripts/install.mjs
 ```
 
-Quit a running Open Typora before replacing it. The installer preserves application data and removes the previous application after verifying the replacement. The build also produces a ZIP in `release/native/`.
+Quit a running Open Typora before replacing it. The installer preserves application data and removes the previous application after verifying the replacement. The build also produces a ZIP in `release/native/`; `npm run package:release` builds the DMG and checksum file too.
 
 Builds use a local ad hoc signature and are **not Apple-notarized**. Intel Macs, Windows, and Linux do not yet have verified release builds.
 
