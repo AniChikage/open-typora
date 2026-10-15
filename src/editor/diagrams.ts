@@ -14,7 +14,7 @@ export async function renderDiagrams(container: HTMLElement) {
       securityLevel: "strict",
       htmlLabels: false,
       theme:
-        document.documentElement.dataset.theme === "dark" ? "dark" : "neutral",
+        document.documentElement.dataset.appearance === "dark" ? "dark" : "neutral",
       flowchart: { htmlLabels: false },
     });
     for (const element of targets) {

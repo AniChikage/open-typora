@@ -2,13 +2,15 @@ import { useEffect, useState } from "react";
 import { host } from "../host";
 import { Dialog } from "./Dialog";
 import type { Preferences } from "../preferences";
-export function PreferencesDialog({ value, change, theme, changeTheme, themes, installTheme, close }: { value: Preferences; change(next: Preferences): void; theme: string; changeTheme(theme: string): void; themes: { id: string; name: string }[]; installTheme(): Promise<void>; close(): void }) {
+import { ThemePicker } from "./ThemePicker";
+export function PreferencesDialog({ value, change, theme, changeTheme, themes, installTheme, plugins, close }: { value: Preferences; change(next: Preferences): void; theme: string; changeTheme(theme: string): void; themes: { id: string; name: string }[]; installTheme(): Promise<void>; plugins(): void; close(): void }) {
   const [conversion, setConversion] = useState({ pandoc: "", word: false }), [error, setError] = useState("");
   useEffect(() => { void host.conversionSettings().then(setConversion).catch(e => setError(e.message)); }, []);
   const options = [["imageAutoUpload", "插入后通过 PicGo 自动上传"], ["remoteImages", "显示远程图片"], ["imagePrefix", "相对图片路径使用 ./ 前缀"], ["imageEscape", "自动转义图片路径"], ["spellcheck", "拼写检查"], ["autoPair", "自动配对括号与引号"], ["highlight", "高亮：==文字=="], ["subscript", "下标：H~2~O"], ["superscript", "上标：X^2^"], ["emoji", "Emoji：:smile:"], ["inlineMath", "行内公式：$x^2$"]] as const;
   return <Dialog title="偏好设置" close={close}>
+    <ThemePicker value={theme} change={changeTheme} custom={themes} install={async () => { try { await installTheme(); } catch (error) { setError((error as Error).message); } }} />
+    <fieldset><legend>插件</legend><p className="dialog-note">无图阅读、只读模式、段落聚焦与常显语法标记等社区插件。</p><button onClick={plugins}>管理插件…</button></fieldset>
     <fieldset><legend>编辑器</legend><div className="form-grid">
-      <label>主题<select aria-label="主题" value={theme} onChange={e => changeTheme(e.target.value)}><option value="light">明亮</option><option value="dark">深色</option>{themes.map(item => <option key={item.id} value={"custom:" + item.id}>{item.name}</option>)}</select><button onClick={() => void installTheme().catch(e => setError(e.message))}>安装 CSS 主题…</button></label>
       <label>正文字号<input type="number" min={12} max={28} value={value.fontSize} onChange={e => { const n = Number(e.target.value); if (n >= 12 && n <= 28) change({ ...value, fontSize: n }); }} /></label>
       <label>阅读速度（词/分钟）<input type="number" min={50} max={1000} value={value.readingSpeed} onChange={e => { const n = Number(e.target.value); if (n >= 50 && n <= 1000) change({ ...value, readingSpeed: n }); }} /></label>
       <label>缩进宽度<select aria-label="缩进宽度" value={value.tabSize} onChange={e => change({ ...value, tabSize: Number(e.target.value) })}><option value={2}>2 个空格</option><option value={4}>4 个空格</option></select></label>

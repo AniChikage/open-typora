@@ -5,7 +5,7 @@ export function Dialog({ title, close, children }: { title: string; close(): voi
   closing.current = close;
   useLayoutEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
-    const first = root.current?.querySelector<HTMLElement>('input:not([type="checkbox"]),textarea,select') || root.current?.querySelector<HTMLElement>("button");
+    const first = [...root.current!.querySelectorAll<HTMLElement>('input:not([type="checkbox"]),textarea,select,button,summary')].find(control => control.getClientRects().length > 0 && !control.matches(":disabled"));
     first?.focus();
     return () => { if (previous?.isConnected) previous.focus({ preventScroll: true }); };
   }, []);
@@ -13,7 +13,7 @@ export function Dialog({ title, close, children }: { title: string; close(): voi
     <section ref={root} className="utility-dialog" role="dialog" aria-modal="true" aria-label={title} onKeyDown={event => {
       if (event.key === "Escape") { event.stopPropagation(); closing.current(); }
       if (event.key !== "Tab") return;
-      const controls = [...root.current!.querySelectorAll<HTMLElement>('input:not([disabled]),select:not([disabled]),button:not([disabled]),a[href]')].filter(control => !control.hidden);
+      const controls = [...root.current!.querySelectorAll<HTMLElement>('input:not([disabled]),textarea:not([disabled]),select:not([disabled]),button:not([disabled]),summary,a[href]')].filter(control => control.getClientRects().length > 0);
       const first = controls[0], last = controls.at(-1);
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
       if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }

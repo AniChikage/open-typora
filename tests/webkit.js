@@ -81,6 +81,38 @@ try {
     !root().querySelector(".math-error,[data-mjx-error]"),
     "offline MathJax SVG renders document macros and extended fonts",
   );
+  const openPlugins = async () => { window.__openTypora.command({action:"plugins"}); await wait(() => document.querySelector('[role="dialog"][aria-label="插件管理"]')); };
+  const pluginCard = name => [...document.querySelectorAll('.plugin-card')].find(card => card.querySelector('h3')?.textContent === name);
+  const closePlugins = () => document.querySelector('[aria-label="关闭插件管理"]').click();
+  pointText("粗体", 1);
+  await openPlugins();
+  await wait(() => pluginCard('Native-plugin-fixture'));
+  pluginCard('Native-plugin-fixture').querySelector('input[type="checkbox"]').click();
+  await wait(() => getComputedStyle(root()).getPropertyValue('--plugin-fixture').trim() === 'loaded');
+  check(true, 'installed CommonJS plugin is dynamically imported by native WebKit under the existing CSP');
+  pluginCard('Native-plugin-fixture').querySelector('.plugin-actions button').click();
+  closePlugins(); await wait(() => root().textContent.includes('粗插件体'));
+  check(true, 'installed original plugin calls the document adapter and creates a real undoable edit');
+  window.__openTypora.command({action:'undo'}); check(!root().textContent.includes('插件'), 'plugin edits undo without changing surrounding Markdown');
+  await openPlugins(); pluginCard('Native-plugin-fixture').querySelector('input[type="checkbox"]').click(); await wait(() => !document.querySelector('style[data-plugin^="local-"]'));
+  check(true, 'disabling an installed plugin removes its styles');
+  for (const [name, id] of [['只读模式','read_only'],['无图阅读','no_image'],['段落聚焦','blur'],['常显语法标记','static_markers'],['反色夜间模式','dark']]) {
+    pluginCard(name).querySelector('input[type="checkbox"]').click();
+    await wait(() => !pluginCard(name).querySelector('.plugin-actions button').disabled);
+    check(!pluginCard(name).querySelector('[role="alert"]'), 'upstream ' + id + ' plugin runs in native WebKit');
+    if (id === 'read_only') {
+      closePlugins(); pointText('粗体', 1); input('insertText','BLOCKED');
+      check(!root().textContent.includes('BLOCKED') && root().getAttribute('aria-readonly') === 'true', 'read-only plugin blocks real editor input events');
+      await sourceMode(true); check(document.querySelector('.document-editor:not([hidden]) .cm-content').getAttribute('contenteditable') === 'false', 'read-only plugin also locks source mode');
+      await sourceMode(false); await openPlugins();
+    }
+    if (id === 'static_markers') check(getComputedStyle(root().querySelector('[data-mark="em"] .md-meta')).display === 'inline', 'static markers plugin changes rendered inline metadata');
+    if (id === 'dark') check(document.documentElement.classList.contains('plugin-dark'), 'dark plugin applies its original root class');
+    pluginCard(name).querySelector('input[type="checkbox"]').click();
+    await wait(() => !document.querySelector('style[data-plugin="'+id+'"]'));
+  }
+  check(!document.documentElement.classList.contains('plugin-dark') && root().getAttribute('aria-readonly') === 'false', 'plugin teardown restores editing and removes presentation effects');
+  closePlugins();
   pointText("。", 1);
   input("insertParagraph");
   const emptyLeaf = [...root().querySelectorAll("[data-leaf]")].find(element => !element.textContent);

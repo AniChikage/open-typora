@@ -4,18 +4,21 @@ Open Typora for macOS and Windows.
 
 | Platform | Download | Requirements |
 | --- | --- | --- |
-| macOS | `Open-Typora-0.5.2-arm64.dmg` | macOS 14+, Apple Silicon |
-| Windows | `Open-Typora-0.5.2-windows-x64-Setup.exe` | Windows 10/11, x64 |
+| macOS | `Open-Typora-0.6.0-arm64.dmg` | macOS 14+, Apple Silicon |
+| Windows | `Open-Typora-0.6.0-windows-x64-Setup.exe` | Windows 10/11, x64 |
 
 ZIP alternatives and `SHA256SUMS.txt` are included. No Node.js, Xcode, or Typora installation is required to use the application.
 
 ### What's new
 
-- Windows installer with an installation-directory chooser, Start menu and desktop shortcuts, and Markdown file associations.
-- Windows title bar, Ctrl shortcuts, document opening from Explorer, and single-instance handling.
-- Pandoc discovery on Windows, including PATH and common installation locations; HTML and text imports work without Pandoc.
-- English product presentation with an actual editor capture and a quieter layout.
-- Release checks now install the Windows application, exercise editing, saving, undo/redo, images, PDF, conflict recovery, and file opening, then uninstall it. Both platform builds must pass before publication.
+- Six built-in themes: clear white, warm paper, mist, graphite, midnight, and forest. Preferences includes previews and selection is saved locally.
+- A plugin manager with five adapted, unmodified community plugin sources: read-only, no images, paragraph focus, static markers, and dark inversion.
+- Local single-file CommonJS installation, configuration, shortcuts, unloading, and removal to Trash. Compatibility is limited to the documented API subset; this is not full Typora plugin-pack support.
+- Read-only mode protects live text, source mode, local code editors, undo and editing commands. Disabling it restores normal editing.
+- Windows CSS theme installation now embeds local imports, fonts, and images, matching the macOS resource handling.
+- Native WebKit acceptance executes the upstream plugins and dynamically imports an installed module under the existing script policy, including a real undoable document edit.
+
+[Plugin and theme compatibility](https://github.com/AniChikage/open-typora/blob/main/docs/plugins.md)
 
 ### Before installing
 

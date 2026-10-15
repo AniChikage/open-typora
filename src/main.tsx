@@ -6,4 +6,5 @@ import "@fontsource/open-sans/latin-400-italic.css";
 import "@fontsource/open-sans/latin-700-italic.css";
 import "./styles.css";
 import "./features.css";
+import "./extensions.css";
 ReactDOM.createRoot(document.getElementById("root")!).render(<App />);

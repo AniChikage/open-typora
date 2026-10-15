@@ -15,6 +15,9 @@ final class WebKitTests: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         "# WebKit 验收\n\n普通 **粗体** 与 *斜体*。\n\n- [ ] 任务\n\n| 名称 | 内容 |\n| --- | --- |\n| A | B |\n\n```javascript\nconst count = 1;\n```\n\n$$\n\\newcommand{\\myvalue}{x+1}\n$$\n\n$$\n\\myvalue + \\mathbb{R}\n$$\n"
       try atomicWrite(file, Data(source.utf8))
       let store = DocumentStore(directory)
+      let plugin = directory.appendingPathComponent("Native-plugin-fixture.js")
+      try atomicWrite(plugin, Data("class NativePlugin extends BasePlugin { style() { return '#write { --plugin-fixture: loaded; }' }; call() { this.utils.insertText('插件') } }; module.exports = {plugin: NativePlugin};".utf8))
+      _ = try Interchange.installPlugin(plugin, directory: directory)
       let record = try store.open(file, id: "webkit-fixture")
       host = NativeWindowHost(
         owner: owner, directory: directory,

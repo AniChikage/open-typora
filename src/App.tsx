@@ -26,13 +26,23 @@ import type { FileOperation } from "./types";
 import type { Command } from "./types";
 import appIcon from "../design/icon.svg";
 import { version as appVersion } from "../package.json";
+import { applyTheme } from "./themes";
+import { PluginRuntime } from "./plugins/runtime";
+import { bundledPlugins, loadPluginPreferences, pluginPreferenceKey } from "./plugins/catalog";
+import type { PluginDefinition, PluginState } from "./plugins/types";
+import { PluginsDialog } from "./components/PluginsDialog";
 export default function App() {
   const editors = useRef(new Map<string, EditorHandle>());
   const session = useDocuments(() => ![...editors.current.values()].some(editor => editor.composing()));
   const [preferences, setPreferences] = useState(() => { const initial = loadPreferences(); setMarkdownOptions(initial); return initial; });
   const [themes, setThemes] = useState<{ id: string; name: string; css: string }[]>([]);
+  const [installedPlugins, setInstalledPlugins] = useState<PluginDefinition[]>([]);
+  const [pluginPreferences, setPluginPreferences] = useState(loadPluginPreferences);
+  const [pluginStates, setPluginStates] = useState<Record<string, PluginState>>({});
+  const [readOnly, setReadOnly] = useState(false);
+  const pluginRuntime = useRef<PluginRuntime | null>(null);
   const [typewriter, setTypewriter] = useState(false);
-  const [dialog, setDialog] = useState<"preferences" | "quick-open" | "statistics" | "recent" | "global-search" | "encoding" | InsertKind | null>(null);
+  const [dialog, setDialog] = useState<"preferences" | "plugins" | "quick-open" | "statistics" | "recent" | "global-search" | "encoding" | InsertKind | null>(null);
   const [fileOperation, setFileOperation] = useState<FileOperation | null>(null);
   const [selectedText, setSelectedText] = useState("");
   const [selection, setSelection] = useState("");
@@ -52,6 +62,38 @@ export default function App() {
   const printDocument = useRef<HTMLElement>(null);
   const commands = useRef<(command: Command) => void>(() => {});
   const active = session.active;
+  const pluginContext = useRef({ active, editor, notify: session.setMessage });
+  pluginContext.current = { active, editor, notify: session.setMessage };
+  const pluginDefinitions = useMemo(() => [...bundledPlugins, ...installedPlugins].map(definition => ({ ...definition, config: { ...definition.config, ...pluginPreferences[definition.id]?.config } })), [installedPlugins, pluginPreferences]);
+  useEffect(() => {
+    const runtime = new PluginRuntime({
+      getMarkdown: () => pluginContext.current.active?.content || "", getPath: () => pluginContext.current.active?.path || null,
+      getSelection: () => pluginContext.current.editor()?.selectionText() || "",
+      insert: text => pluginContext.current.editor()?.insert(text), replace: text => pluginContext.current.editor()?.transform(() => text),
+      setReadOnly, notify: text => pluginContext.current.notify(text), changed: (id, state) => setPluginStates(previous => ({ ...previous, [id]: state })),
+      reservedHotkeys: [...commandsByAction.values()].map(command => command.key || "").filter(Boolean),
+      saveConfig: (id, config) => setPluginPreferences(previous => ({ ...previous, [id]: { ...previous[id], config: { ...previous[id]?.config, ...config } } })),
+    });
+    pluginRuntime.current = runtime;
+    return () => { pluginRuntime.current = null; void runtime.destroy(); };
+  }, []);
+  useEffect(() => {
+    if (!session.ready) return;
+    void host.plugins().then(items => setInstalledPlugins(items.map(item => ({ ...item, description: "本地单文件插件，通过兼容接口运行。", config: {} })))).catch(error => session.setMessage(error.message));
+  }, [session.ready, dialog === "plugins"]);
+  useEffect(() => {
+    localStorage.setItem(pluginPreferenceKey, JSON.stringify(pluginPreferences));
+    if (!session.ready || !active) return;
+    for (const definition of pluginDefinitions) void pluginRuntime.current?.setEnabled(definition, !!pluginPreferences[definition.id]?.enabled);
+  }, [pluginDefinitions, pluginPreferences, session.ready, !!active]);
+  useEffect(() => { pluginRuntime.current?.documentChanged(); }, [active?.id, active?.content]);
+  async function installPlugin() { const installed = await host.installPlugin(); if (installed) setInstalledPlugins(previous => [...previous.filter(item => item.id !== installed.id), { ...installed, description: "本地单文件插件，通过兼容接口运行。", config: {} }]); }
+  async function removePlugin(id: string) {
+    const definition = pluginDefinitions.find(item => item.id === id); if (!definition || definition.builtin) return;
+    await pluginRuntime.current?.setEnabled(definition, false); await host.removePlugin(id);
+    setInstalledPlugins(previous => previous.filter(item => item.id !== id));
+    setPluginPreferences(previous => { const next = { ...previous }; delete next[id]; return next; });
+  }
   const headings = useMemo(
     () => extractHeadings(active?.content || ""),
     [active?.content, preferences],
@@ -71,11 +113,7 @@ export default function App() {
   useEffect(() => { if (window.desktop?.viewState) void window.desktop.viewState(focus, typewriter, sidebar).catch(() => {}); }, [focus, typewriter, sidebar]);
   async function refreshThemes() { const items = await host.themes(); setThemes(items); return items; }
   useEffect(() => { if (session.ready) void refreshThemes().catch(e => session.setMessage(e.message)); }, [session.ready]);
-  useEffect(() => {
-    const selected = themes.find(item => theme === "custom:" + item.id), style = document.createElement("style"); style.dataset.customTheme = "true";
-    if (selected) { style.textContent = selected.css.replace(/#write\b/g, ":is(.rich-document,.print-document)").replace(/#typora-sidebar\b/g, ".sidebar"); document.head.append(style); }
-    return () => style.remove();
-  }, [theme, themes]);
+  useEffect(() => applyTheme(theme, themes), [theme, themes]);
   async function installTheme() { const selected = await host.installTheme(); if (selected) { await refreshThemes(); setTheme("custom:" + selected); } }
   async function importDocument() {
     try { const imported = await host.importDocument(); if (!imported) return; const content = imported.markdown ?? htmlToMarkdown(imported.html || ""), record = { id: crypto.randomUUID(), path: null, name: imported.name, content, savedContent: "", diskHash: null, lineEnding: "\n" }; await host.registerDraft(record); await session.add(record); }
@@ -101,6 +139,13 @@ export default function App() {
     localStorage.setItem("open-typora-theme", theme);
   }, [theme]);
   useEffect(() => {
+    const sync = (event: StorageEvent) => {
+      if (event.key === pluginPreferenceKey) setPluginPreferences(loadPluginPreferences());
+      if (event.key === "open-typora-theme") setTheme(event.newValue || "light");
+    };
+    window.addEventListener("storage", sync); return () => window.removeEventListener("storage", sync);
+  }, []);
+  useEffect(() => {
     document.title = active ? `${active.name} — Open Typora` : "Open Typora";
   }, [active?.name]);
   useEffect(() => {
@@ -109,6 +154,7 @@ export default function App() {
   commands.current = ({ action, document: opened, anchor, line, message }) => {
     if (["new", "newWindow", "newTab", "open"].includes(action) && window.desktop?.windowAction) { void host.windowAction(action).catch((error: Error) => session.setMessage(error.message)); return; }
     const context = commandsByAction.get(action)?.context;
+    if (readOnly && ((context && context !== "document") || ["undo", "redo", "paste-plain", "image", "table", "link", "reference-link", "footnote", "copy-all-images", "move-all-images", "upload-all-images"].includes(action))) { session.setMessage("只读模式已开启，请先在插件管理中关闭或切换只读效果。"); return; }
     if (context && !active) return;
     if (["rich", "table"].includes(context || "") && !editor()?.richMode()) return;
     if (action === "notice") { if (message) session.setMessage(message); }
@@ -140,7 +186,7 @@ export default function App() {
     else if (action === "typewriter") setTypewriter(value => !value);
     else if (action === "new-file" || action === "new-folder") setFileOperation({ action, path: session.folder || undefined, name: action === "new-file" ? "未命名.md" : "新文件夹" });
     else if (action === "undo-file") void session.fileOperation({ action: "undo" }).catch(e => session.setMessage(e.message));
-    else if (["preferences", "quick-open", "statistics", "recent", "global-search", "table", "link", "reference-link", "footnote"].includes(action)) {
+    else if (["preferences", "plugins", "quick-open", "statistics", "recent", "global-search", "table", "link", "reference-link", "footnote"].includes(action)) {
       setSelectedText(editor()?.selectionText() || ""); setDialog(action as typeof dialog);
     }
     else if (action === "find") editor()?.find();
@@ -296,6 +342,7 @@ export default function App() {
                   }}
                   document={record}
                   rendered={rendered}
+                  readOnly={readOnly}
                   preferences={preferences}
                   typewriter={typewriter}
                   onChange={(content) => session.update(record.id, { content })}
@@ -316,7 +363,7 @@ export default function App() {
         )}
       </main>
       <footer className="statusbar">
-        <button onClick={() => setDialog("statistics")}
+        <button id="footer-word-count-label" onClick={() => setDialog("statistics")}
           title={`${status} · 第 ${cursor.line} 行，第 ${cursor.column} 列 · Markdown · ${encodingNames[active?.encoding || "utf-8"]}`}
           aria-label={`${characters} 字，${status}`}
         >
@@ -341,7 +388,8 @@ export default function App() {
       {dialog === "encoding" && active && <EncodingDialog key={active.id} record={active} change={session.changeEncoding} close={closeDialog} />}
       {dialog === "recent" && <RecentDialog entries={session.recent} action={session.recentAction} close={closeDialog} />}
       {dialog === "global-search" && <GlobalSearch folder={session.folder} close={closeDialog} open={async match => { const record = await session.openToken(match.token); if (record) requestAnimationFrame(() => editors.current.get(record.id)?.jump(match.line)); }} />}
-      {dialog === "preferences" && <PreferencesDialog value={preferences} change={changePreferences} theme={theme} changeTheme={setTheme} themes={themes} installTheme={installTheme} close={closeDialog} />}
+      {dialog === "preferences" && <PreferencesDialog value={preferences} change={changePreferences} theme={theme} changeTheme={setTheme} themes={themes} installTheme={installTheme} plugins={() => setDialog("plugins")} close={closeDialog} />}
+      {dialog === "plugins" && <PluginsDialog definitions={pluginDefinitions} preferences={pluginPreferences} states={pluginStates} toggle={(id, enabled) => setPluginPreferences(previous => ({ ...previous, [id]: { ...previous[id], enabled } }))} configure={(id, config) => setPluginPreferences(previous => ({ ...previous, [id]: { ...previous[id], config } }))} invoke={id => void pluginRuntime.current?.invoke(id)} install={installPlugin} remove={removePlugin} close={closeDialog} />}
       {dialog === "quick-open" && <QuickOpen documents={session.documents} files={session.files} recent={session.recent} openRecent={path => session.recentAction("open", path)} select={session.setActiveId} open={session.openToken} close={closeDialog} />}
       {dialog && ["table", "link", "reference-link", "footnote"].includes(dialog) && <InsertDialog kind={dialog as InsertKind} selected={selectedText} close={closeDialog} submit={value => {
         if (dialog === "link") editor()?.insert(`[${(value.label || value.value || "链接").replace(/[\[\]]/g, character => "\\" + character)}](${value.value})`);

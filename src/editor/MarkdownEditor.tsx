@@ -54,6 +54,7 @@ export interface EditorHandle {
 interface Props {
   document: DocumentRecord;
   rendered: boolean;
+  readOnly?: boolean;
   preferences?: Preferences;
   typewriter?: boolean;
   onChange(content: string): void;
@@ -63,7 +64,7 @@ interface Props {
 }
 export const MarkdownEditor = forwardRef<EditorHandle, Props>(
   function MarkdownEditor(
-    { document: record, rendered, preferences, typewriter = false, onChange, onError, onCursor, onSelection },
+    { document: record, rendered, readOnly = false, preferences, typewriter = false, onChange, onError, onCursor, onSelection },
     ref,
   ) {
     const root = useRef<HTMLDivElement>(null),
@@ -90,17 +91,17 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
     const searchTerms = useRef({ query, replacement, searchOptions }); searchTerms.current = { query, replacement, searchOptions };
     const syncing = useRef(false);
     const sourceBehavior = useRef(new Compartment());
-    const sourceOptions = () => [indentUnit.of(" ".repeat(viewOptions.current.preferences?.tabSize || 2)), ...(viewOptions.current.preferences?.autoPair ? [closeBrackets(), keymap.of(closeBracketsKeymap)] : [])];
-    const viewOptions = useRef({ preferences, typewriter });
-    viewOptions.current = { preferences, typewriter };
+    const sourceOptions = () => [EditorState.readOnly.of(viewOptions.current.readOnly), EditorView.editable.of(!viewOptions.current.readOnly), indentUnit.of(" ".repeat(viewOptions.current.preferences?.tabSize || 2)), ...(viewOptions.current.preferences?.autoPair ? [closeBrackets(), keymap.of(closeBracketsKeymap)] : [])];
+    const viewOptions = useRef({ preferences, typewriter, readOnly });
+    viewOptions.current = { preferences, typewriter, readOnly };
     function historyState() {
       if (root.current?.closest(".document-editor")?.hasAttribute("hidden"))
         return;
       if (model.current && window.desktop?.historyState)
         void window.desktop
           .historyState(
-            model.current.canUndo,
-            model.current.canRedo,
+            !viewOptions.current.readOnly && model.current.canUndo,
+            !viewOptions.current.readOnly && model.current.canRedo,
             activeMode.current,
             model.current.nodeAt(model.current.selection.head)?.kind || "",
           )
@@ -128,6 +129,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
       rich.current?.select({ anchor: match.from, head: match.to }, false); setSearchStatus(`${chosen + 1} / ${found.length}`);
     }
     function replaceMatch(all = false) {
+      if (viewOptions.current.readOnly) return;
       const doc = model.current, found = matches(); if (!doc || !found) return;
       if (!found.length) { setSearchStatus("未找到匹配内容"); return; }
       rich.current?.releaseFence(); doc.closeGroup();
@@ -151,6 +153,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
       syncing.current = false;
     }
     function history(redo = false) {
+      if (viewOptions.current.readOnly) return;
       const doc = model.current;
       if (!doc) return;
       if (!activeMode.current && source.current) {
@@ -167,6 +170,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
     }
     function insertImage(file: File) { imageQueue.current = imageQueue.current.then(() => insertImageNow(file)); return imageQueue.current; }
     async function insertImageNow(file: File) {
+      if (viewOptions.current.readOnly) return;
       try {
         let relative = await host.importImage(
           initial.current.id,
@@ -180,6 +184,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
       }
     }
     function insert(text: string, kind = "command") {
+      if (viewOptions.current.readOnly) return;
       if (activeMode.current) rich.current?.insert(text, kind);
       else if (source.current && model.current) {
         const selection = source.current.state.selection.main;
@@ -358,7 +363,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
       () => ({
         view: () => source.current,
         composing: () => !!(rich.current?.composing || source.current?.composing),
-        transform: change => { const doc = model.current; if (!doc) return; doc.closeGroup(); const next = change(doc.text); if (next !== doc.text) { doc.replace(0, doc.text.length, next, "document-command"); if (activeMode.current) rich.current?.render(false); else syncSource(); publish(); } },
+        transform: change => { const doc = model.current; if (!doc || viewOptions.current.readOnly) return; doc.closeGroup(); const next = change(doc.text); if (next !== doc.text) { doc.replace(0, doc.text.length, next, "document-command"); if (activeMode.current) rich.current?.render(false); else syncSource(); publish(); } },
         find: () => {
           if (!activeMode.current) {
             ensureSource();
@@ -388,6 +393,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
           }
         },
         wrap: (before, after = "") => {
+          if (viewOptions.current.readOnly) return;
           if (activeMode.current) rich.current?.wrap(before, after);
           else {
             const s = source.current?.state.selection.main;
@@ -407,16 +413,17 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
           }
         },
         codeBlock: () => {
+          if (viewOptions.current.readOnly) return;
           if (activeMode.current) rich.current?.codeBlock();
         },
-        command: (action, args) => { if (activeMode.current) rich.current?.command(action, args); },
+        command: (action, args) => { if (activeMode.current && !viewOptions.current.readOnly) rich.current?.command(action, args); },
         insert: (text) => insert(text),
         selectionText: (markdown = false) => {
           if (activeMode.current) { const value = rich.current?.clipboard(); return (markdown ? value?.markdown : value?.plain) || ""; }
           const selected = source.current?.state.selection.main;
           return selected ? source.current!.state.sliceDoc(selected.from, selected.to) : "";
         },
-        clearFormat: () => { if (activeMode.current) rich.current?.clearFormat(); },
+        clearFormat: () => { if (activeMode.current && !viewOptions.current.readOnly) rich.current?.clearFormat(); },
         findNext: (back = false) => { if (activeMode.current) findNext(back); else if (source.current) (back ? cmFindPrevious : cmFindNext)(source.current); },
         undo: () => history(),
         redo: () => history(true),
@@ -473,13 +480,13 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
     });
     useEffect(() => {
       if (rich.current) {
-        rich.current.setOptions({ spellcheck: preferences?.spellcheck ?? false, tabSize: preferences?.tabSize || 2, typewriter, autoPair: preferences?.autoPair ?? false, emoji: preferences?.emoji ?? true });
+        rich.current.setOptions({ spellcheck: preferences?.spellcheck ?? false, tabSize: preferences?.tabSize || 2, typewriter, autoPair: preferences?.autoPair ?? false, emoji: preferences?.emoji ?? true, readOnly });
         model.current?.refreshCaret(); rich.current.render(false);
       }
       if (source.current) source.current.contentDOM.spellcheck = preferences?.spellcheck ?? false;
       source.current?.dispatch({ effects: sourceBehavior.current.reconfigure(sourceOptions()) });
       if (typewriter && source.current && !activeMode.current) source.current.dispatch({ effects: EditorView.scrollIntoView(source.current.state.selection.main.head, { y: "center" }) });
-    }, [preferences, typewriter]);
+    }, [preferences, typewriter, readOnly]);
     useEffect(() => {
       if (!root.current?.closest(".document-editor")?.hasAttribute("hidden"))
         focusEditor();
@@ -542,8 +549,8 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
                 value={replacement}
                 onChange={(event) => setReplacement(event.target.value)}
               />
-              <button onClick={() => replaceMatch()}>替换</button>
-              <button onClick={() => replaceMatch(true)}>全部替换</button>
+              <button disabled={readOnly} onClick={() => replaceMatch()}>替换</button>
+              <button disabled={readOnly} onClick={() => replaceMatch(true)}>全部替换</button>
             </div>
           </div>
         )}
@@ -552,7 +559,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
           doc.closeGroup(); doc.replace(editingImage.from, editingImage.to, value, "image-edit"); rich.current?.render(false); publish();
         }} />}
         <div className="rich-scroller" hidden={!visibleMode} onDoubleClick={event => {
-          const image = (event.target as HTMLElement).closest("img"); if (!image) return;
+          const image = (event.target as HTMLElement).closest("img"); if (!image || readOnly) return;
           const object = image.closest<HTMLElement>(".md-inline[data-mark='image']");
           let from: number | undefined;
           if (object) { const leaf = rich.current?.leaves.get(object.closest<HTMLElement>("[data-leaf]")?.dataset.leaf || ""); from = leaf?.positions[Number(object.dataset.inlineFrom)]; }

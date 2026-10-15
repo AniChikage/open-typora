@@ -12,18 +12,21 @@ import {
 } from "electron";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { pandocPath, convertExport, convertImport, themes } from "./interchange.mjs";
+import { pandocPath, convertExport, convertImport, themes, installTheme } from "./interchange.mjs";
 import { Workspace } from "./workspace.mjs";
 import { randomUUID } from "node:crypto";
 import { atomicWrite, DocumentStore } from "./store.mjs";
 import { readFile, realpath } from "node:fs/promises";
 import { launchFiles } from "./launch-files.mjs";
+import { plugins, installPlugin } from "./plugins.mjs";
+import { pluginResource } from "./resources.mjs";
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const development = process.env.OPEN_TYPORA_DEV_URL;
 if (process.env.OPEN_TYPORA_DATA_DIR)
   app.setPath("userData", process.env.OPEN_TYPORA_DATA_DIR);
 app.setName("Open Typora");
 protocol.registerSchemesAsPrivileged([
+  { scheme: "opentypora", privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
   {
     scheme: "open-typora-asset",
     privileges: { standard: true, secure: true, supportFetchAPI: true },
@@ -35,6 +38,8 @@ let window,
   closing = false;
 const pending = [];
 let rendererReady = false;
+const pluginToken = randomUUID();
+const authorizedPlugin = item => item && ({ ...item, url: item.url + "?token=" + pluginToken });
 function openFiles(files) {
   for (const file of files) {
     if (window && rendererReady) store.open(file)
@@ -70,8 +75,11 @@ ipcMain.on("workspace:prepared", (event, id, value) => { if (event.sender !== wi
 function prepareOperation(phase, change) { return new Promise((resolve, reject) => { const id = randomUUID(), timeout = setTimeout(() => { handshakes.delete(id); reject(new Error("文件操作等待超时。")); }, 30000); handshakes.set(id, value => { clearTimeout(timeout); handshakes.delete(id); resolve(value); }); window.webContents.send("workspace:operation", id, phase, change); }); }
 let operationRunning = false;
 const handlers = {
+  plugins: async () => (await plugins(store.dataDir)).map(authorizedPlugin),
+  removePlugin: async (_, id) => { if (!/^local-[a-f0-9]{64}$/.test(id)) throw new Error("插件标识无效。"); const root = await realpath(path.join(store.dataDir, "plugins")); if (path.dirname(root) !== await realpath(store.dataDir)) throw new Error("插件目录无效。"); for (const suffix of [".json", ".mjs"]) { const file = path.join(root, id + suffix); try { if (path.dirname(await realpath(file)) !== root) throw new Error("插件资源路径无效。"); await shell.trashItem(file); } catch (error) { if (error.code !== "ENOENT") throw error; } } return true; },
+  installPlugin: async () => { const result = await dialog.showOpenDialog(window, { filters: [{ name: "JavaScript", extensions: ["js", "cjs"] }], properties: ["openFile"] }); return result.canceled ? null : authorizedPlugin(await installPlugin(result.filePaths[0], store.dataDir)); },
   themes: () => themes(store.dataDir),
-  installTheme: async () => { const result = await dialog.showOpenDialog(window, { filters: [{ name: "CSS", extensions: ["css"] }], properties: ["openFile"] }); if (result.canceled) return null; const name = path.basename(result.filePaths[0]); await atomicWrite(path.join(store.dataDir, "themes", name), await readFile(result.filePaths[0])); return name; },
+  installTheme: async () => { const result = await dialog.showOpenDialog(window, { filters: [{ name: "CSS", extensions: ["css"] }], properties: ["openFile"] }); return result.canceled ? null : installTheme(result.filePaths[0], store.dataDir); },
   conversionSettings: async (_, choose) => { if (choose) { const result = await dialog.showOpenDialog(window, { title: "选择 Pandoc 可执行文件", properties: ["openFile"] }); if (!result.canceled) process.env.OPEN_TYPORA_PANDOC = result.filePaths[0]; } return { word: process.platform === "darwin", pandoc: await pandocPath() }; },
   importDocument: async () => { const result = await dialog.showOpenDialog(window, { title: "导入文档", properties: ["openFile"], filters: [{ name: "文档", extensions: ["docx", "doc", "rtf", "odt", "epub", "tex", "rst", "html", "txt"] }] }); return result.canceled ? null : convertImport(result.filePaths[0]); },
   exportConverted: async (_, id, format, source, html) => { const record = store.require(id), ext = { latex: "tex", revealjs: "html", mediawiki: "wiki" }[format] || format; const result = await dialog.showSaveDialog(window, { defaultPath: record.name.replace(/\.[^.]+$/, "." + ext) }); return result.canceled ? null : convertExport(store.dataDir, format, source, html, result.filePath); },
@@ -244,6 +252,16 @@ app
     if (process.platform === "win32" && !app.hasSingleInstanceLock()) return;
     store = new DocumentStore(app.getPath("userData"));
     workspace = new Workspace(app.getPath("userData"));
+    protocol.handle("opentypora", async request => {
+      try {
+        if (new URL(request.url).searchParams.get("token") !== pluginToken) throw new Error("插件会话无效。");
+        const { bytes, mime } = await pluginResource(request.url, store.dataDir);
+        const headers = { "Content-Type": mime, "X-Content-Type-Options": "nosniff" };
+        const origin = request.headers.get("origin");
+        if (origin === "null" || origin === "file://" || (development && origin === new URL(development).origin)) headers["Access-Control-Allow-Origin"] = origin;
+        return new Response(bytes, { headers });
+      } catch { return new Response("Resource unavailable", { status: 404 }); }
+    });
     protocol.handle("open-typora-asset", async (request) => {
       try {
         const url = new URL(request.url);

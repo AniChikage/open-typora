@@ -16,7 +16,7 @@
   --selection: #b5d6fc;
   --sidebar-width: 270px;
 }
-:root[data-theme="dark"] {
+:root[data-appearance="dark"] {
   color-scheme: dark;
   --paper: #363b40;
   --sidebar: #2e3033;
@@ -96,7 +96,7 @@ svg {
   font-weight: 600;
   color: #666;
 }
-:root[data-theme="dark"] .document-title {
+:root[data-appearance="dark"] .document-title {
   color: #bbb;
 }
 .title-edited {
@@ -432,15 +432,15 @@ svg {
 .hljs-literal {
   color: #0086b3;
 }
-:root[data-theme="dark"] .hljs-keyword {
+:root[data-appearance="dark"] .hljs-keyword {
   color: #cc99cd;
 }
-:root[data-theme="dark"] .hljs-string,
-:root[data-theme="dark"] .hljs-title {
+:root[data-appearance="dark"] .hljs-string,
+:root[data-appearance="dark"] .hljs-title {
   color: #b5bd68;
 }
-:root[data-theme="dark"] .hljs-number,
-:root[data-theme="dark"] .hljs-literal {
+:root[data-appearance="dark"] .hljs-number,
+:root[data-appearance="dark"] .hljs-literal {
   color: #f0c674;
 }
 .statusbar {

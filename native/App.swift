@@ -8,9 +8,11 @@ func jsonValue<T: Encodable>(_ value: T) throws -> Any {
 final class Resources: NSObject, WKURLSchemeHandler {
   let root: URL
   let store: DocumentStore
-  init(_ root: URL, store: DocumentStore) {
+  let pluginDirectory: URL
+  init(_ root: URL, store: DocumentStore, pluginDirectory: URL? = nil) {
     self.root = root
     self.store = store
+    self.pluginDirectory = canonicalFileURL(pluginDirectory ?? store.dataDirectory).appendingPathComponent("plugins")
   }
   func read(_ url: URL) throws -> (Data, String) {
     let file: URL
@@ -18,6 +20,11 @@ final class Resources: NSObject, WKURLSchemeHandler {
       let segments = (URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedPath.split(separator: "/") ?? []).compactMap { String($0).removingPercentEncoding }
       guard segments.count == 2 else { throw NativeFailure("图片引用无效。") }
       file = try store.asset(segments[0], relative: segments[1])
+    } else if url.scheme == "opentypora", url.host == "app", url.path.hasPrefix("/_plugins/") {
+      let name = url.lastPathComponent
+      guard url.path == "/_plugins/" + name, name.range(of: "^local-[a-f0-9]{64}\\.mjs$", options: .regularExpression) != nil else { throw NativeFailure("插件资源路径无效。") }
+      file = pluginDirectory.appendingPathComponent(name)
+      guard contained(pluginDirectory, canonicalFileURL(file)) else { throw NativeFailure("插件资源路径无效。") }
     } else {
       guard url.scheme == "opentypora", url.host == "app" else { throw NativeFailure("资源来源无效。") }
       file = root.appendingPathComponent(String(url.path.dropFirst())).resolvingSymlinksInPath()
@@ -25,7 +32,7 @@ final class Resources: NSObject, WKURLSchemeHandler {
     }
     let size = try file.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? DocumentStore.maxBytes + 1
     guard size <= DocumentStore.maxBytes else { throw NativeFailure("资源大小超出支持范围。") }
-    let mime = ["js":"application/javascript","css":"text/css","html":"text/html","woff2":"font/woff2","woff":"font/woff","ttf":"font/ttf","json":"application/json","svg":"image/svg+xml","png":"image/png","jpg":"image/jpeg","jpeg":"image/jpeg","webp":"image/webp","gif":"image/gif","avif":"image/avif","mp4":"video/mp4","webm":"video/webm","ogg":"audio/ogg","mp3":"audio/mpeg","wav":"audio/wav","m4a":"audio/mp4"][file.pathExtension.lowercased()] ?? "application/octet-stream"
+    let mime = ["mjs":"application/javascript","js":"application/javascript","css":"text/css","html":"text/html","woff2":"font/woff2","woff":"font/woff","ttf":"font/ttf","json":"application/json","svg":"image/svg+xml","png":"image/png","jpg":"image/jpeg","jpeg":"image/jpeg","webp":"image/webp","gif":"image/gif","avif":"image/avif","mp4":"video/mp4","webm":"video/webm","ogg":"audio/ogg","mp3":"audio/mpeg","wav":"audio/wav","m4a":"audio/mp4"][file.pathExtension.lowercased()] ?? "application/octet-stream"
     return (try Data(contentsOf: file), mime)
   }
   func webView(_ webView: WKWebView, start task: WKURLSchemeTask) {
@@ -87,7 +94,7 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
     content.addUserScript(
       WKUserScript(source: script, injectionTime: .atDocumentStart, forMainFrameOnly: true))
     configuration.userContentController = content
-    let resources = Resources(Bundle.main.resourceURL!.appendingPathComponent("dist"), store: store)
+    let resources = Resources(Bundle.main.resourceURL!.appendingPathComponent("dist"), store: store, pluginDirectory: owner.directory)
     configuration.setURLSchemeHandler(resources, forURLScheme: "opentypora")
     configuration.setURLSchemeHandler(resources, forURLScheme: "open-typora-asset")
     webView = WKWebView(
@@ -360,6 +367,21 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
   func handle(_ name: String, _ args: [Any]) throws -> Any? {
     switch name {
     case "themes": return try Interchange.themes(owner.directory)
+    case "plugins": return try Interchange.plugins(owner.directory)
+    case "removePlugin":
+      let id = try arg(args, 0, String.self)
+      guard id.range(of: "^local-[a-f0-9]{64}$", options: .regularExpression) != nil else { throw NativeFailure("插件标识无效。") }
+      let root = canonicalFileURL(owner.directory.appendingPathComponent("plugins"))
+      for suffix in [".json", ".mjs"] {
+        let file = root.appendingPathComponent(id + suffix)
+        guard contained(root, canonicalFileURL(file)) else { throw NativeFailure("插件资源路径无效。") }
+        if FileManager.default.fileExists(atPath: file.path) { try FileManager.default.trashItem(at: file, resultingItemURL: nil) }
+      }
+      return true
+    case "installPlugin":
+      let panel = NSOpenPanel(); panel.title = "安装本地 JavaScript 插件"; panel.allowedContentTypes = [UTType(filenameExtension: "js") ?? .plainText, UTType(filenameExtension: "cjs") ?? .plainText]
+      guard panel.runModal() == .OK, let file = panel.url else { return nil }
+      return try Interchange.installPlugin(file, directory: owner.directory)
     case "installTheme":
       let panel = NSOpenPanel(); panel.allowedContentTypes = [UTType(filenameExtension: "css") ?? .plainText]
       guard panel.runModal() == .OK, let file = panel.url else { return nil }

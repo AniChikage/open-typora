@@ -1,6 +1,6 @@
 # Typora 功能对齐清单
 
-当前交付版本：**0.5.2，macOS arm64 / Windows x64**。基准为本机 Typora 1.14.10 的菜单、实际交互和官方公开文档。功能存在、自动化通过与完整等价是不同结论；未验证的组合不写成已对齐。
+当前交付版本：**0.6.0，macOS arm64 / Windows x64**。基准为本机 Typora 1.14.10 的菜单、实际交互和官方公开文档。功能存在、自动化通过与完整等价是不同结论；未验证的组合不写成已对齐。
 
 公开依据：[Markdown](https://support.typora.io/Markdown-Reference/)、[文件管理](https://support.typora.io/File-Management/)、[图片](https://support.typora.io/Images/)、[导出](https://support.typora.io/Export/)、[HTML](https://support.typora.io/HTML/)、[快捷键](https://support.typora.io/Shortcut-Keys/)。REA 的静态证据及覆盖边界见 [research.md](research.md)。
 
@@ -29,8 +29,9 @@
 | MathJax、Mermaid | 已实现并回归 | 离线公式、宏、字体与 SVG；全部 Typora 图形扩展及复杂图形未穷尽 |
 | HTML 与 PDF 导出 | 已实现并回归 | HTML 内嵌字体/图片/自定义主题；PDF 按文本行/标题/表格行分页、逐页向量生成、A4/Letter、边距及页眉页脚变量；13 页样本逐页检查，段落/行无丢失重复；另检查两页中文复杂样本的公式、图片、图表、表格和脚注。文本检查采用 Unicode 兼容规范化 |
 | Word/RTF/ODT 与 Pandoc | 已实现，有依赖边界 | 本机 Pandoc 3.12.1 实际生成 10 种格式，DOCX/ODT/RTF/EPUB 中文复杂样本重新导入；DOCX 原生公式、表格、脚注、图片结构已检查。导出嵌入图表与图片；文本格式保留同名资源目录。RTF 额外保留表格/脚注/PNG/JPEG/标题/代码；WMF/EMF、脚注内图片拒绝而非静默丢失。其他任意格式组合未穷尽 |
-| CSS 主题安装 | 已实现并回归 | 导入本地 CSS、内嵌引用字体/图片、正文/侧栏选择器映射；不是所有第三方主题内部选择器都与本内核兼容 |
+| 内置主题与 CSS 安装 | 已实现并回归 | 六套原创主题；macOS/Windows 均内嵌本地 CSS 导入、字体、图片，适配常用选择器和颜色变量；第三方主题仍是部分兼容 |
+| 第三方插件兼容 | 部分兼容，已有实际运行 | 五款固定版本 obgnail/typora_plugin 原版源码、单文件 CommonJS 安装、配置、生命周期、快捷键、禁用清理和卸载；原生 WebKit 已验收安装模块动态导入、可撤销文档修改及只读保护。未兼容完整插件包、Node/Electron、外部模块及所有 Typora 私有接口；详见 [plugins.md](plugins.md) |
 | 安装更新与旧版本清理 | 已实现并回归 | M 图标保留；验证新包后替换安装版并删除临时回滚包；只保留当前版本归档。用户文档/草稿不属于版本清理对象 |
 | Windows、其他平台与签名 | 部分交付 | Windows x64 提供 NSIS EXE / ZIP，由 Windows runner 安装后验证编辑、保存、PDF、图片、恢复、单实例与文件关联；Windows 10/11 实体候选交互尚未人工验收。Windows ARM / Linux / Intel Mac 未交付；Windows 无代码签名证书，macOS 未公证 |
 
-剩余项为其他输入法及列表/表格/局部代码的完整候选组合、未覆盖的跨应用剪贴板/复杂跨块编辑、第三方主题与图形扩展，以及 Windows 实体输入法、旧 DOC/RTF 导入和批量图片操作，其他操作系统发布。复杂转换覆盖已列样本和目标格式，无法代表任意格式无损往返。**0.5.2 仍不能标为 Typora 全功能完全等价**；外部图床真实上传仍需独立配置与验收。
+剩余项为其他输入法及列表/表格/局部代码的完整候选组合、未覆盖的跨应用剪贴板/复杂跨块编辑、第三方主题与图形扩展，以及 Windows 实体输入法、旧 DOC/RTF 导入和批量图片操作，其他操作系统发布。复杂转换覆盖已列样本和目标格式，无法代表任意格式无损往返。**0.6.0 仍不能标为 Typora 全功能完全等价**；外部图床真实上传仍需独立配置与验收。

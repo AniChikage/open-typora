@@ -601,3 +601,21 @@ test("image sizing syntax preserves alt text and exact paths", async () => {
   assert.ok(imageMarkdown(images[0].url, images[0].alt, "400").includes('width="400"'));
   assert.ok(updateImageReferences(source, { "old.png": "new.png" }).includes('width="50%"'));
 });
+
+
+test("read-only mode blocks DOM typing, paste, cut and composition while retaining selection and restoring editing", () => {
+  const f = fixture("# Title\n\nOriginal **text**.\n");
+  try {
+    point(f.editor, 12);
+    f.editor.setOptions({spellcheck:false,tabSize:2,typewriter:false,readOnly:true});
+    const original = f.model.toMarkdown();
+    for (const [type, options] of [["beforeinput",{inputType:"insertText",data:"blocked"}],["paste",{}],["cut",{}],["compositionstart",{}]]) {
+      const event = type === "beforeinput" ? new dom.window.InputEvent(type,{bubbles:true,cancelable:true,...options}) : new dom.window.Event(type,{bubbles:true,cancelable:true});
+      f.root.dispatchEvent(event); assert.equal(event.defaultPrevented,true);
+    }
+    assert.equal(f.model.toMarkdown(),original); assert.equal(f.changes(),0);
+    f.editor.setOptions({spellcheck:false,tabSize:2,typewriter:false,readOnly:false});
+    f.root.dispatchEvent(new dom.window.InputEvent("beforeinput",{bubbles:true,cancelable:true,inputType:"insertText",data:"X"}));
+    assert.notEqual(f.model.toMarkdown(),original); f.editor.undo(); assert.equal(f.model.toMarkdown(),original);
+  } finally { f.close(); }
+});

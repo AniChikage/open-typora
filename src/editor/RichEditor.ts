@@ -50,9 +50,18 @@ export class RichEditor {
   private tabSize = 2;
   private typewriter = false;
   private autoPair = false;
+  private readOnly = false;
+  private protectReadOnly = (event: Event) => {
+    if (!this.readOnly) return;
+    if (event.type === "keydown") {
+      const key = event as KeyboardEvent;
+      if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown", "Escape"].includes(key.key) || ((key.metaKey || key.ctrlKey) && ["a", "c", "f"].includes(key.key.toLowerCase()))) return;
+    }
+    event.preventDefault(); event.stopImmediatePropagation();
+  };
   private scrollFrame = 0;
   private fenceBehavior = new Compartment();
-  private fenceOptions() { return [indentUnit.of(" ".repeat(this.tabSize)), ...(this.autoPair ? [closeBrackets(), keymap.of(closeBracketsKeymap)] : [])]; }
+  private fenceOptions() { return [EditorState.readOnly.of(this.readOnly), EditorView.editable.of(!this.readOnly), indentUnit.of(" ".repeat(this.tabSize)), ...(this.autoPair ? [closeBrackets(), keymap.of(closeBracketsKeymap)] : [])]; }
   readonly root: HTMLElement;
   readonly model: MarkdownDocument;
   readonly documentId: string;
@@ -72,6 +81,7 @@ export class RichEditor {
     root.setAttribute("aria-multiline", "true");
     root.setAttribute("aria-label", "Markdown 编辑器");
     root.spellcheck = false;
+    for (const type of ["beforeinput", "keydown", "paste", "cut", "drop", "compositionstart"]) root.addEventListener(type, this.protectReadOnly, true);
     root.addEventListener("beforeinput", this.beforeInput);
     root.addEventListener("input", this.input);
     root.addEventListener("keydown", this.keydown);
@@ -112,6 +122,7 @@ export class RichEditor {
     this.render(false);
   }
   destroy() {
+    for (const type of ["beforeinput", "keydown", "paste", "cut", "drop", "compositionstart"]) this.root.removeEventListener(type, this.protectReadOnly, true);
     cancelAnimationFrame(this.scrollFrame);
     this.fence?.view.destroy();
     this.tableToolbar.remove(); this.emojiPopup.remove();
@@ -323,7 +334,12 @@ export class RichEditor {
     this.callbacks.cursor(lines.length, lines.at(-1)!.length + 1);
     this.updateWritingMode(); this.updateEmoji();
   }
-  setOptions(options: { spellcheck: boolean; tabSize: number; typewriter: boolean; autoPair?: boolean; emoji?: boolean }) {
+  setOptions(options: { spellcheck: boolean; tabSize: number; typewriter: boolean; autoPair?: boolean; emoji?: boolean; readOnly?: boolean }) {
+    this.readOnly = options.readOnly ?? false;
+    this.root.contentEditable = String(!this.readOnly);
+    this.root.setAttribute("aria-readonly", String(this.readOnly));
+    this.tableToolbar.inert = this.readOnly;
+    for (const checkbox of this.root.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')) checkbox.disabled = this.readOnly;
     this.emojiEnabled = options.emoji !== false;
     this.root.spellcheck = options.spellcheck;
     this.tabSize = options.tabSize;

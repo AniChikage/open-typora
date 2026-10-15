@@ -117,6 +117,7 @@
     {"label":"文件树","action":"file-tree","key":"Mod-Ctrl-3"},
     {"label":"字数统计…","action":"statistics","context":"document"},
     {"label":"切换明暗主题","action":"theme"},
-    {"label":"偏好设置…","action":"preferences","key":"Mod-,"}
+    {"label":"偏好设置…","action":"preferences","key":"Mod-,"},
+    {"label":"插件管理…","action":"plugins"}
   ]}
 ]

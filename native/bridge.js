@@ -18,7 +18,7 @@
       }
     });
   const methods = [
-    "restore", "imageAction", "importDocument", "exportConverted", "themes", "installTheme", "conversionSettings", "ready", "fileOperation", "recent", "recentAction", "searchFiles", "reveal",
+    "restore", "imageAction", "importDocument", "exportConverted", "themes", "installTheme", "plugins", "installPlugin", "removePlugin", "conversionSettings", "ready", "fileOperation", "recent", "recentAction", "searchFiles", "reveal",
     "registerDraft",
     "open",
     "openFolder",

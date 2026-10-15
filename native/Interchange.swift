@@ -183,6 +183,35 @@ final class Interchange {
     guard let html = String(data: data, encoding: .utf8) else { throw NativeFailure("导入结果不是 UTF-8。") }
     return ["html": html, "name": file.deletingPathExtension().lastPathComponent + ".md"]
   }
+  static func plugins(_ directory: URL) throws -> [[String: String]] {
+    let root = directory.appendingPathComponent("plugins")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    guard contained(canonicalFileURL(directory), canonicalFileURL(root)) else { throw NativeFailure("插件目录无效。") }
+    return try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil).filter { $0.pathExtension == "json" }.sorted { $0.lastPathComponent < $1.lastPathComponent }.compactMap { file in
+      guard contained(root, canonicalFileURL(file)), let item = try? JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: String], let id = item["id"], id.range(of: "^local-[a-f0-9]{64}$", options: .regularExpression) != nil, file.lastPathComponent == id + ".json", FileManager.default.fileExists(atPath: root.appendingPathComponent(id + ".mjs").path) else { return nil }
+      return ["id": id, "name": item["name"] ?? id, "url": "opentypora://app/_plugins/" + id + ".mjs"]
+    }
+  }
+  static func installPlugin(_ file: URL, directory: URL) throws -> [String: String] {
+    guard ["js", "cjs"].contains(file.pathExtension.lowercased()), (try file.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 1_000_001) <= 1_000_000 else { throw NativeFailure("请选择小于 1 MB 的 JavaScript 插件。") }
+    let bytes = try Data(contentsOf: file)
+    guard let source = String(data: bytes, encoding: .utf8), !source.contains("\0") else { throw NativeFailure("插件必须使用 UTF-8 编码。") }
+    let id = "local-" + hashData(bytes), name = String(file.deletingPathExtension().lastPathComponent.prefix(96))
+    let root = directory.appendingPathComponent("plugins")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    guard contained(canonicalFileURL(directory), canonicalFileURL(root)) else { throw NativeFailure("插件目录无效。") }
+    let module = """
+    export default function(context) {
+    const {BasePlugin,BaseCustomPlugin,utils,File,$,document,window} = context;
+    const require=context.require; const module={exports:{}}; const exports=module.exports;
+    \(source)
+    ;return module.exports.plugin || module.exports.default || module.exports;
+    }
+    """
+    try atomicWrite(root.appendingPathComponent(id + ".mjs"), Data(module.utf8))
+    try atomicWrite(root.appendingPathComponent(id + ".json"), JSONSerialization.data(withJSONObject: ["id": id, "name": name]))
+    return ["id": id, "name": name, "url": "opentypora://app/_plugins/" + id + ".mjs"]
+  }
   static func themes(_ directory: URL) throws -> [[String: String]] {
     let root = directory.appendingPathComponent("themes")
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

@@ -15,12 +15,13 @@
 
 Open Typora 是一款开源 Markdown 编辑器，受 Typora 的行内编辑体验启发。直接修改排版后的正文，需要时切换源码，文档以普通 `.md` 文件保存在自己的文件夹中。
 
-**项目状态：**当前为早期开发版本 **0.5.2**，发布目标为 **macOS 14+、Apple Silicon** 和 **Windows 10/11 x64**，界面目前为简体中文。本项目独立实现，与 Typora 无隶属关系；功能和交互仍在持续完善。
+**项目状态：**当前为早期开发版本 **0.6.0**，发布目标为 **macOS 14+、Apple Silicon** 和 **Windows 10/11 x64**，界面目前为简体中文。本项目独立实现，与 Typora 无隶属关系；功能和交互仍在持续完善。
 
 ## 功能
 
 - **即时渲染编辑**：标题、行内格式、列表、任务、表格、链接、脚注和 YAML 前言；代码与公式支持局部编辑，也可切换完整源码。
-- **专注写作**：大纲导航、专注和打字机模式、字数统计、查找替换，以及本地 CSS 主题。
+- **专注写作**：大纲导航、专注和打字机模式、字数统计、查找替换，六套内置主题与本地 CSS 主题。
+- **社区插件**：内置五款已适配的 typora_plugin 原版插件，支持本地单文件插件安装、设置、快捷键和禁用清理；[查看兼容范围](docs/plugins.md)。
 - **本地文件管理**：文件树、全文搜索、快速打开、最近文件、自动保存、会话恢复和外部修改冲突检测。
 - **图片、公式与图表**：本地图片与粘贴插图、路径和尺寸设置、离线 MathJax、Mermaid；可选配置 PicGo Server 上传图片。
 - **多种文本编码**：UTF-8、UTF-16 LE/BE、GB18030、GBK、Big5、Shift JIS 和 Windows-1252；保留 BOM 与换行，阻止会丢失字符的保存。
@@ -44,10 +45,10 @@ Open Typora 是一款开源 Markdown 编辑器，受 Typora 的行内编辑体�
 
 | 平台 | 安装包 | 其他方式 |
 | --- | --- | --- |
-| Windows 10/11 · x64 | **[下载 Setup.exe](https://github.com/AniChikage/open-typora/releases/download/v0.5.2/Open-Typora-0.5.2-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.5.2/Open-Typora-0.5.2-windows-x64.zip) |
-| macOS 14+ · Apple Silicon | **[下载 DMG](https://github.com/AniChikage/open-typora/releases/download/v0.5.2/Open-Typora-0.5.2-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.5.2/Open-Typora-0.5.2-arm64.zip) |
+| Windows 10/11 · x64 | **[下载 Setup.exe](https://github.com/AniChikage/open-typora/releases/download/v0.6.0/Open-Typora-0.6.0-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.6.0/Open-Typora-0.6.0-windows-x64.zip) |
+| macOS 14+ · Apple Silicon | **[下载 DMG](https://github.com/AniChikage/open-typora/releases/download/v0.6.0/Open-Typora-0.6.0-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.6.0/Open-Typora-0.6.0-arm64.zip) |
 
-[SHA-256 校验文件](https://github.com/AniChikage/open-typora/releases/download/v0.5.2/SHA256SUMS.txt) · [所有版本](https://github.com/AniChikage/open-typora/releases)
+[SHA-256 校验文件](https://github.com/AniChikage/open-typora/releases/download/v0.6.0/SHA256SUMS.txt) · [所有版本](https://github.com/AniChikage/open-typora/releases)
 
 ### 安装 Windows 版
 
@@ -57,7 +58,7 @@ Windows 版目前**没有代码签名证书**，系统可能显示未知发布�
 
 ### 安装 macOS 版
 
-1. 从 [Releases](https://github.com/AniChikage/open-typora/releases/latest) 下载 **[Open-Typora-0.5.2-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.5.2/Open-Typora-0.5.2-arm64.dmg)**。
+1. 从 [Releases](https://github.com/AniChikage/open-typora/releases/latest) 下载 **[Open-Typora-0.6.0-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.6.0/Open-Typora-0.6.0-arm64.dmg)**。
 2. 打开 DMG，把 **Open Typora** 拖入 **Applications（应用程序）**。
 3. 从应用程序中启动 Open Typora。
 

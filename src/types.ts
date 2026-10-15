@@ -59,6 +59,9 @@ export interface Host {
   imageAction(id: string, sources: string[], action: string, options?: Record<string, unknown>): Promise<Record<string, string> | null>;
   themes(): Promise<{ id: string; name: string; css: string }[]>;
   installTheme(): Promise<string | null>;
+  plugins(): Promise<{ id: string; name: string; url: string }[]>;
+  installPlugin(): Promise<{ id: string; name: string; url: string } | null>;
+  removePlugin(id: string): Promise<unknown>;
   conversionSettings(choose?: boolean): Promise<{ pandoc: string; word: boolean }>;
   importDocument(): Promise<{ html?: string; markdown?: string; name: string } | null>;
   exportConverted(id: string, format: string, source: string, html: string): Promise<string | null>;

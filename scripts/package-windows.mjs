@@ -14,6 +14,7 @@ for (const folder of ["dist", "electron", "shared"]) await cp(folder, path.join(
 for (const name of ["iconv-lite", "safer-buffer"]) await cp(`node_modules/${name}`, path.join(application, "node_modules", name), { recursive: true });
 await cp("LICENSE", path.join(application, "LICENSE"));
 await licenseNotices(path.join(application, "ThirdPartyLicenses"));
+await cp("third-party/typora-plugins", path.join(application, "ThirdPartyLicenses/typora-plugins"), { recursive: true });
 await writeFile(path.join(application, "package.json"), JSON.stringify({
   name: pkg.name, version: pkg.version, description: pkg.description,
   main: pkg.main, type: "module", license: pkg.license, author: pkg.author,
