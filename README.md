@@ -28,6 +28,8 @@ Open Typora is an open-source Markdown editor inspired by Typora's inline editin
 
 See the [feature checklist](docs/feature-parity.md) for coverage and known differences.
 
+[Watch the editing demo](docs/images/editing-demo.gif) · [Project introduction and walkthrough (中文)](docs/introducing-open-typora.zh-CN.md)
+
 Trying the preview? [Report a problem](https://github.com/AniChikage/open-typora/issues/new?template=bug_report.yml) or [suggest a feature](https://github.com/AniChikage/open-typora/issues/new?template=feature_request.yml). Include your platform, app version, and a small reproducible example.
 
 ## Getting started
