@@ -149,6 +149,14 @@ export class RichEditor {
       .map((n) => n.data)
       .join("");
   }
+  private leafElement(node: Node | null | undefined) {
+    const element = node?.nodeType === Node.ELEMENT_NODE
+      ? node as HTMLElement
+      : node?.parentElement;
+    return element && this.root.contains(element)
+      ? element.closest<HTMLElement>("[data-leaf]")
+      : null;
+  }
   private point(node: Node, offset: number) {
     const parent =
       node.nodeType === Node.ELEMENT_NODE
@@ -524,11 +532,7 @@ export class RichEditor {
     )
       return;
     // Browser-owned spellcheck/accessibility edits reconcile only their edited leaf.
-    const selection = window.getSelection(),
-      element =
-        selection?.anchorNode?.parentElement?.closest<HTMLElement>(
-          "[data-leaf]",
-        );
+    const element = this.leafElement(window.getSelection()?.anchorNode);
     const leaf = element && this.leaves.get(element.dataset.leaf!);
     if (!leaf || !element) return;
     const raw = this.raw(element);
@@ -570,9 +574,7 @@ export class RichEditor {
     return this.model.replace(from, to, insert, kind, { anchor: head, head });
   }
   private compositionStart = () => {
-    const element = window
-      .getSelection()
-      ?.anchorNode?.parentElement?.closest<HTMLElement>("[data-leaf]");
+    const element = this.leafElement(window.getSelection()?.anchorNode);
     this.model.selection = this.bookmark();
     this.model.closeGroup();
     this.composingLeaf = element

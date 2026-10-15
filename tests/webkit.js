@@ -81,6 +81,27 @@ try {
     !root().querySelector(".math-error,[data-mjx-error]"),
     "offline MathJax SVG renders document macros and extended fonts",
   );
+  pointText("。", 1);
+  input("insertParagraph");
+  const emptyLeaf = [...root().querySelectorAll("[data-leaf]")].find(element => !element.textContent);
+  check(emptyLeaf && getSelection().anchorNode === emptyLeaf, "new paragraph uses an element caret in native WebKit");
+  emptyLeaf.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+  emptyLeaf.textContent = "你好";
+  getSelection().collapse(emptyLeaf.firstChild, 2);
+  emptyLeaf.dispatchEvent(new InputEvent("input", { bubbles: true, isComposing: true, inputType: "insertCompositionText", data: "你好" }));
+  emptyLeaf.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "你好" }));
+  await sourceMode(true);
+  check(readSource() === original.replace("。", "。\n\n你好"), "synthetic composition at an empty element persists exact Chinese in native WebKit");
+  await sourceMode(false);
+  window.__openTypora.command({ action: "undo" });
+  check(!root().textContent.includes("你好"), "empty-paragraph composition undoes as one transaction");
+  window.__openTypora.command({ action: "redo" });
+  check(root().textContent.includes("你好"), "empty-paragraph composition redoes as one transaction");
+  window.__openTypora.command({ action: "undo" });
+  window.__openTypora.command({ action: "undo" });
+  await sourceMode(true);
+  check(readSource() === original, "composition regression restores the original fixture exactly");
+  await sourceMode(false);
   pointText("粗体", 1);
   document.dispatchEvent(new Event("selectionchange"));
   check(

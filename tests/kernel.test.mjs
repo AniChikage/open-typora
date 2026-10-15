@@ -5,6 +5,7 @@ const dom = new JSDOM("<!doctype html><body></body>", {
   pretendToBeVisual: true,
   url: "https://editor.test/",
 });
+dom.window.HTMLElement.prototype.scrollIntoView = () => {};
 for (const key of [
   "window",
   "document",
@@ -169,6 +170,28 @@ test("composition keeps the edited DOM leaf alive, commits once, and undoes as o
   assert.equal(f.changes(), 1);
   f.editor.undo();
   assert.equal(f.model.text, "中文输入\n");
+  f.close();
+});
+test("composition at an empty paragraph element commits and restores through undo and redo", async () => {
+  const f = fixture("第一段");
+  point(f.editor, f.model.text.length);
+  input(f.root, "insertParagraph");
+  const before = f.model.text;
+  const empty = [...f.root.querySelectorAll("[data-leaf]")].find(element => !element.textContent);
+  assert.ok(empty);
+  assert.equal(window.getSelection().anchorNode, empty);
+  empty.dispatchEvent(new window.CompositionEvent("compositionstart", { bubbles: true }));
+  empty.textContent = "你好";
+  window.getSelection().collapse(empty.firstChild, 2);
+  empty.dispatchEvent(new window.InputEvent("input", { bubbles: true, isComposing: true, inputType: "insertCompositionText", data: "你好" }));
+  assert.equal(f.model.text, before);
+  empty.dispatchEvent(new window.CompositionEvent("compositionend", { bubbles: true, data: "你好" }));
+  await new Promise(resolve => queueMicrotask(resolve));
+  assert.equal(f.model.text, before + "你好");
+  f.editor.undo();
+  assert.equal(f.model.text, before);
+  f.editor.redo();
+  assert.equal(f.model.text, before + "你好");
   f.close();
 });
 test("task checkboxes update their own marker and undo without changing other tasks", () => {
