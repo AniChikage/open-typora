@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, writeFile, readFile, rm, realpath } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { DocumentStore, encodeText, decodeText, encodings } from "../electron/store.mjs";
 test("legacy and Unicode byte roundtrips preserve BOM and CRLF", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "open-typora-encoding-"));
@@ -33,7 +34,12 @@ test("untitled image survives first save and is readable from its persisted refe
   const directory = await mkdtemp(path.join(os.tmpdir(), "open-typora-draft-image-"));
   try { const store = new DocumentStore(directory), record = store.registerDraft({ id: "../opaque-id", content: "", name: "图片.md" });
     const bytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aNNsAAAAASUVORK5CYII=', 'base64');
-    const reference = await store.importImage(record.id, bytes, '中文.png'); assert.ok(reference.startsWith(await realpath(directory)));
+    const reference = await store.importImage(record.id, bytes, '中文.png');
+    const imageFile = reference.startsWith('file:') ? fileURLToPath(reference) : decodeURIComponent(reference);
+    assert.ok(imageFile.startsWith((await realpath(directory)) + path.sep));
     const file = path.join(directory, "saved.md"); await store.save(record.id, `![图片](${reference})`, file); assert.deepEqual(await readFile(await store.asset(record.id, reference)), bytes);
+    const relative = await store.importImage(record.id, bytes, '中文.png');
+    assert.ok(relative.startsWith('.assets/')); assert.ok(!relative.includes('\\'));
+    assert.deepEqual(await readFile(await store.asset(record.id, relative)), bytes);
   } finally { await rm(directory, { recursive: true, force: true }); }
 });

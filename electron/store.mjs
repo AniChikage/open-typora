@@ -11,7 +11,7 @@ import {
 } from "node:fs/promises";
 import path from "node:path";
 import iconv from "iconv-lite";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { randomUUID, createHash } from "node:crypto";
 
 export const digest = (value) =>
@@ -181,7 +181,7 @@ export class DocumentStore {
         );
         const updated = {
           ...record, encoding, bom,
-          path: file,
+          path: await realpath(file),
           name: path.basename(file),
           content: text,
           savedContent: text,
@@ -389,12 +389,15 @@ export class DocumentStore {
     if (!record.path) await mkdir(this.dataDir, { recursive: true });
     const parent = record.path ? path.dirname(record.path) : path.join(await realpath(this.dataDir), "DraftAssets", digest(record.id)), assets = path.resolve(parent, (configured || options.imageFolder || ".assets").replaceAll("${filename}", record.name.replace(/\.[^.]+$/, "")));
     const destination = path.join(assets, `${base}-${randomUUID().slice(0, 8)}.${type}`);
-    let relative = path.relative(parent, destination);
+    let relative = path.relative(parent, destination).split(path.sep).join("/");
     await mkdir(assets, { recursive: true });
     if (assets !== await realpath(assets))
       throw new Error("图片文件夹指向文档目录之外。");
     await atomicWrite(destination, data);
-    if (!record.path) relative = destination;
+    if (!record.path) {
+      if (process.platform === "win32") return pathToFileURL(destination).href;
+      relative = destination;
+    }
     if (options.imagePrefix && !relative.startsWith(".")) relative = "./" + relative;
     return options.imageEscape === false ? relative : relative.split("/").map(segment => encodeURIComponent(segment).replace(/[()]/g, c => "%" + c.charCodeAt(0).toString(16))).join("/");
   }
