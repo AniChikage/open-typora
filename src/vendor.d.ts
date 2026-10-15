@@ -16,3 +16,5 @@ declare module "turndown" {
   }
 }
 declare module "turndown-plugin-gfm" { export const gfm: (service: import("turndown").default) => void; }
+
+declare module "markdown-it-emoji/lib/data/full.mjs" { const names: Record<string, string>; export default names; }

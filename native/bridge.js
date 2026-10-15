@@ -1,7 +1,7 @@
 (() => {
   const pending = new Map(),
     listeners = new Set();
-  let sequence = 0;
+  let sequence = 0, fileOperationHandler = async () => false;
   const request = (name, args) =>
     new Promise((resolve, reject) => {
       const id = `request-${++sequence}`;
@@ -18,7 +18,7 @@
       }
     });
   const methods = [
-    "restore",
+    "restore", "imageAction", "importDocument", "exportConverted", "themes", "installTheme", "conversionSettings", "ready", "fileOperation", "recent", "recentAction", "searchFiles", "reveal",
     "registerDraft",
     "open",
     "openFolder",
@@ -49,13 +49,14 @@
   const desktop = Object.fromEntries(
     methods.map((name) => [name, (...args) => request(name, args)]),
   );
-  desktop.importImage = (id, bytes, name) => {
+  desktop.importImage = (id, bytes, name, options = {}) => {
     let text = "";
     for (let i = 0; i < bytes.length; i += 16384)
       text += String.fromCharCode(...bytes.subarray(i, i + 16384));
-    return request("importImage", [id, btoa(text), name]);
+    return request("importImage", [id, btoa(text), name, options]);
   };
   desktop.closeWindow = () => request("closeWindow", []);
+  desktop.onFileOperation = callback => { fileOperationHandler = callback; return () => { fileOperationHandler = async () => false; }; };
   desktop.onCommand = (callback) => {
     listeners.add(callback);
     return () => listeners.delete(callback);
@@ -63,6 +64,7 @@
   Object.defineProperty(window, "desktop", { value: Object.freeze(desktop) });
   Object.defineProperty(window, "__openTypora", {
     value: Object.freeze({
+      fileOperation(phase, change) { return fileOperationHandler(phase, change); },
       receive({ id, result }) {
         const item = pending.get(id);
         if (item) {

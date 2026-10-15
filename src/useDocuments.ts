@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { host } from "./host";
-import type { DocumentRecord, FileEntry } from "./types";
-export function useDocuments() {
+import type { DocumentRecord, FileEntry, PathChange, RecentEntry, FileOperation } from "./types";
+export function useDocuments(canPrepare: () => boolean = () => true) {
+  const prepareEditor = useRef(canPrepare); prepareEditor.current = canPrepare;
   const [documents, setDocuments] = useState<DocumentRecord[]>([]),
     [activeId, setActiveId] = useState("");
   const [files, setFiles] = useState<FileEntry[]>([]),
@@ -12,17 +13,18 @@ export function useDocuments() {
   const [autosave, setAutosave] = useState(
     () => localStorage.getItem("open-typora-autosave") !== "false",
   );
+  const [fileOperationBusy, setFileOperationBusy] = useState(false);
+  const [recent, setRecent] = useState<RecentEntry[]>([]);
   const current = useRef({ documents, activeId });
   current.current = { documents, activeId };
   const inFlight = useRef(new Map<string, Promise<unknown>>());
   const closing = useRef(false);
   const closed = useRef<{ id: string; name: string }[]>([]);
   const update = (id: string, patch: Partial<DocumentRecord>) =>
-    setDocuments((records) =>
-      records.map((record) =>
-        record.id === id ? { ...record, ...patch } : record,
-      ),
-    );
+    setDocuments((records) => {
+      const next = records.map(record => record.id === id ? { ...record, ...patch } : record);
+      current.current = { ...current.current, documents: next }; return next;
+    });
   const notify = (error: unknown) =>
     setMessage(error instanceof Error ? error.message : String(error));
   useEffect(() => {
@@ -44,6 +46,7 @@ export function useDocuments() {
           if (!disposed) setFiles(scanned.files);
         }
         if (session?.restoreError) setMessage(session.restoreError);
+        setRecent(await host.recent());
         setReady(true);
       })
       .catch((error) => {
@@ -76,7 +79,7 @@ export function useDocuments() {
     force = false,
     automatic = false,
   ) {
-    const record = current.current.documents.find((record) => record.id === id);
+    let record = current.current.documents.find((record) => record.id === id);
     if (!record) return;
     if (
       automatic &&
@@ -84,16 +87,19 @@ export function useDocuments() {
     )
       return;
     if (inFlight.current.has(id)) await inFlight.current.get(id);
+    record = current.current.documents.find(item => item.id === id);
+    if (!record) return;
+    const snapshot = record;
     setSaving(true);
     const promise = host
-      .save(id, record.content, saveAs, force)
+      .save(id, snapshot.content, saveAs, force)
       .then((result) => {
         if (result)
           update(id, {
             path: result.path,
             name: result.name,
             diskHash: result.diskHash,
-            savedContent: record.content,
+            savedContent: snapshot.content,
             conflict: false,
           });
       })
@@ -182,10 +188,11 @@ export function useDocuments() {
     );
     if (existing) {
       setActiveId(existing.id);
-      return;
+      return existing;
     }
     setDocuments((records) => [...records, record]);
     setActiveId(record.id);
+    return record;
   }
   async function create() {
     const id = crypto.randomUUID();
@@ -209,6 +216,8 @@ export function useDocuments() {
   async function open() {
     try {
       await add(await host.open());
+      await refresh();
+      setRecent(await host.recent());
     } catch (error) {
       notify(error);
     }
@@ -219,6 +228,7 @@ export function useDocuments() {
       if (result) {
         setFiles(result.files);
         setFolder(result.folder);
+        setRecent(await host.recent());
         if (result.truncated)
           setMessage("目录显示前 1000 个文件，或最多 8 层子目录。");
       }
@@ -228,7 +238,9 @@ export function useDocuments() {
   }
   async function openToken(token: string) {
     try {
-      await add(await host.openToken(token));
+      const added = await add(await host.openToken(token));
+      setRecent(await host.recent());
+      return added;
     } catch (error) {
       notify(error);
     }
@@ -237,9 +249,65 @@ export function useDocuments() {
     try {
       const result = await host.scan();
       setFiles(result.files);
+      setFolder(result.folder);
     } catch (error) {
       notify(error);
     }
+  }
+  const fileOperationHandler = useRef<(phase: string, change: PathChange) => Promise<boolean>>(async () => false);
+  fileOperationHandler.current = async (phase, change) => {
+    if (phase === "release") { closing.current = false; setFileOperationBusy(false); return true; }
+    if (phase === "prepare") {
+      if (closing.current || !prepareEditor.current()) return false;
+      closing.current = true; setFileOperationBusy(true);
+      await Promise.allSettled([...inFlight.current.values()]);
+      for (const record of current.current.documents) {
+        if (!change.removedPath || !record.path || !(record.path === change.removedPath || record.path.startsWith(change.removedPath + "/")) || record.content === record.savedContent) continue;
+        const answer = await host.confirmClose(record.name);
+        if (answer === "cancel") return false;
+        if (answer === "save") {
+          const saved = await host.save(record.id, record.content); if (!saved) return false;
+          current.current.documents = current.current.documents.map(item => item.id === saved.id ? saved : item);
+          setDocuments(current.current.documents);
+        }
+      }
+      await host.persist(current.current); return true;
+    }
+    if (phase === "commit") {
+      const records = current.current.documents.filter(record => !change.removedPath || !record.path || !(record.path === change.removedPath || record.path.startsWith(change.removedPath + "/"))).map(record => {
+        if (change.fromPath && change.toPath && record.path && (record.path === change.fromPath || record.path.startsWith(change.fromPath + "/"))) {
+          const path = change.toPath + record.path.slice(change.fromPath.length); return { ...record, path, name: path.split("/").at(-1)! };
+        }
+        return record;
+      });
+      const id = records.some(record => record.id === current.current.activeId) ? current.current.activeId : records[0]?.id || "";
+      current.current = { documents: records, activeId: id }; setDocuments(records); setActiveId(id);
+      await host.persist(current.current); await refresh(); setRecent(await host.recent()); return true;
+    }
+    return false;
+  };
+  useEffect(() => host.onFileOperation((phase, change) => fileOperationHandler.current(phase, change)), []);
+  useEffect(() => {
+    if (!ready || !host.native) return;
+    const timer = setInterval(() => { if (!closing.current && document.visibilityState === "visible") void refresh(); }, 4000);
+    return () => clearInterval(timer);
+  }, [ready]);
+  async function fileOperation(operation: FileOperation) {
+    const result = await host.fileOperation(operation);
+    if (!result) return;
+    await refresh();
+    if (result.newPath && /\.(md|markdown|mdown)$/i.test(result.newPath)) {
+      const scanned = await host.scan(), entry = scanned.files.find(file => file.path === result.newPath);
+      if (entry) await add(await host.openToken(entry.token));
+    }
+  }
+  async function recentAction(action: string, path?: string) {
+    const result = await host.recentAction(action, path);
+    if (result && !Array.isArray(result)) {
+      if ("files" in result) { setFiles(result.files); setFolder(result.folder); }
+      else await add(result);
+    }
+    setRecent(await host.recent());
   }
   async function close(id = current.current.activeId) {
     if (closing.current) return;
@@ -349,6 +417,7 @@ export function useDocuments() {
   return {
     documents,
     activeId,
+    fileOperationBusy, fileOperation, recent, recentAction,
     setActiveId,
     active: documents.find((record) => record.id === activeId),
     files,

@@ -25,6 +25,11 @@ function download(name: string, text: string, type = "text/markdown;charset=utf-
 }
 const browser: Host = {
   native: false,
+  async windowAction() { return false; },
+  async imageAction() { throw new Error("图片文件操作请使用桌面应用。"); },
+  async themes() { return []; }, async installTheme() { throw new Error("安装主题请使用桌面应用。"); },
+  async conversionSettings() { return { pandoc: "", word: false }; },
+  async importDocument() { throw new Error("导入文档请使用桌面应用。"); }, async exportConverted() { throw new Error("此格式导出请使用桌面应用。"); },
   async restore() {
     let session: Recovery | null = null;
     try {
@@ -61,6 +66,12 @@ const browser: Host = {
   async openFolder() {
     throw new Error("打开文件夹请使用桌面应用。浏览器预览可以打开单个文件。");
   },
+  async fileOperation() { throw new Error("文件操作请使用桌面应用。"); },
+  onFileOperation() { return () => {}; },
+  async recent() { return []; },
+  async recentAction() { return null; },
+  async searchFiles() { return { matches: [], truncated: false, skipped: 0 }; },
+  async reveal() {},
   async scan() {
     return { folder: null, files: [], truncated: false };
   },
@@ -132,7 +143,7 @@ export const host: Host = window.desktop
   ? new Proxy({ native: true } as Host, {
       get(target, name: keyof Host) {
         if (name === "native") return true;
-        if (name === "onCommand" || name === "closeWindow")
+        if (name === "onCommand" || name === "onFileOperation" || name === "closeWindow")
           return window.desktop![name];
         return async (...args: unknown[]) => {
           const response = await window.desktop![name](...args);

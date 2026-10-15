@@ -1,3 +1,4 @@
+import { alertTitle } from "./markdownExtensions.ts";
 import {
   editableHtml,
   renderMarkdown,
@@ -114,6 +115,8 @@ export function renderNode(
   environment: Record<string, unknown> = {},
 ): HTMLElement {
   const holder = document.createElement("div");
+  const alert = /^\s*>\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/i.exec(node.source);
+  if (alert) environment = { ...environment, alertType: alert[1].toUpperCase() };
   let pointer = 0,
     index = 0;
   const cells = node.kind === "table_open" ? tableCells(node.source) : [];
@@ -185,6 +188,9 @@ export function renderNode(
     const id = leaf(node.source); holder.innerHTML = `<p><span data-leaf="${id}" class="md-fence-opening">${escapeHtml(node.source)}</span></p>`;
   } else if (node.kind === "blockquote_open" && /^\s*(?:>\s*)+$/.test(node.source)) {
     const id = leaf("", [0, 1]); holder.innerHTML = `<blockquote><p><span data-leaf="${id}"><br /></span></p></blockquote>`;
+  } else if (["html_preview", "html_block"].includes(node.kind)) {
+    const { id, raw } = fenceLeaf();
+    holder.innerHTML = `<div class="md-fence md-html" contenteditable="false" data-fence="${id}"><div class="fence-preview">${renderMarkdown(node.source, documentId)}</div><pre class="fence-body"><code>${escapeHtml(raw)}</code></pre><span class="fence-language">html</span></div>`;
   } else if (node.kind === "frontmatter") {
     const id = leaf(node.source, null, "code");
     holder.innerHTML = `<pre class="md-frontmatter"><code data-leaf="${id}">${escapeHtml(node.source)}</code></pre>`;
@@ -372,6 +378,8 @@ function tokenInlineHtml(
     return raw.slice(at, end);
   };
   for (const token of inlineTokens(raw, environment)) {
+    if (cursor === 0 && token.type === "text" && environment.alertType && token.content === `[!${environment.alertType}]`) { const title = String(environment.alertType).toLowerCase(); append(object(token.content, alertTitle(title), "alert", 0)); cursor += token.content.length; continue; }
+    if (token.type === "html_embed") { append(object(token.content, renderMarkdown(token.content, documentId, { ...environment, fragment: true }).replace(/^<p>|<\/p>\n?$/g, ""), "image", cursor)); cursor += token.content.length; continue; }
     if (token.type === "comment") {
       append(object(token.markup, `<span class="md-comment-view">${escapeHtml(token.content.trim()) || "注释"}</span>`, "comment", cursor)); cursor += token.markup.length; continue;
     }

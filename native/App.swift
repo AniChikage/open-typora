@@ -25,7 +25,7 @@ final class Resources: NSObject, WKURLSchemeHandler {
     }
     let size = try file.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? DocumentStore.maxBytes + 1
     guard size <= DocumentStore.maxBytes else { throw NativeFailure("资源大小超出支持范围。") }
-    let mime = ["js":"application/javascript","css":"text/css","html":"text/html","woff2":"font/woff2","woff":"font/woff","ttf":"font/ttf","json":"application/json","svg":"image/svg+xml","png":"image/png","jpg":"image/jpeg","jpeg":"image/jpeg","webp":"image/webp","gif":"image/gif","avif":"image/avif"][file.pathExtension.lowercased()] ?? "application/octet-stream"
+    let mime = ["js":"application/javascript","css":"text/css","html":"text/html","woff2":"font/woff2","woff":"font/woff","ttf":"font/ttf","json":"application/json","svg":"image/svg+xml","png":"image/png","jpg":"image/jpeg","jpeg":"image/jpeg","webp":"image/webp","gif":"image/gif","avif":"image/avif","mp4":"video/mp4","webm":"video/webm","ogg":"audio/ogg","mp3":"audio/mpeg","wav":"audio/wav","m4a":"audio/mp4"][file.pathExtension.lowercased()] ?? "application/octet-stream"
     return (try Data(contentsOf: file), mime)
   }
   func webView(_ webView: WKWebView, start task: WKURLSchemeTask) {
@@ -75,6 +75,8 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
   var typewriterMode = false
   var sidebarVisible = true
   var tabGroupID: String?
+  var rendererReady = false
+  var pendingCommands = [[String: Any]]()
   var titleObservation: NSKeyValueObservation?
   func show(hidden: Bool = false) {
     let configuration = WKWebViewConfiguration()
@@ -120,9 +122,14 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
     send("close-window")
     return false
   }
-  func send(_ action: String, record: DocumentRecord? = nil) {
+  func send(_ action: String, record: DocumentRecord? = nil, anchor: String? = nil, line: Int? = nil) {
     var message: [String: Any] = ["action": action]
     if let record { message["document"] = try? jsonValue(record) }
+    if let anchor { message["anchor"] = anchor }; if let line { message["line"] = line }
+    deliver(message)
+  }
+  func deliver(_ message: [String: Any]) {
+    guard rendererReady else { pendingCommands.append(message); return }
     guard let bytes = try? JSONSerialization.data(withJSONObject: message),
       let text = String(data: bytes, encoding: .utf8)
     else { return }
@@ -142,12 +149,110 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
         return
       }
     #endif
+    if name == "readResource", let address = args.first as? String, let url = URL(string: address), ["http", "https"].contains(url.scheme ?? "") {
+      Task { @MainActor in
+        do {
+          var request = URLRequest(url: url); request.timeoutInterval = 15
+          let (data, response) = try await URLSession.shared.data(for: request)
+          guard let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode), response.mimeType?.hasPrefix("image/") == true, data.count <= DocumentStore.maxBytes else { throw NativeFailure("远程图片无法读取或超过 20 MB。") }
+          reply(id, ["ok": true, "value": ["base64": data.base64EncodedString(), "mime": response.mimeType ?? "image/png"]])
+        } catch { reply(id, ["ok": false, "error": error.localizedDescription]) }
+      }
+      return
+    }
+    if name == "imageAction" {
+      Task { @MainActor in
+        do { let value = try await imageAction(args); reply(id, ["ok": true, "value": value as Any? ?? NSNull()]) }
+        catch { reply(id, ["ok": false, "error": error.localizedDescription]) }
+      }
+      return
+    }
+    if name == "importDocument" || name == "exportConverted" {
+      do {
+        if name == "importDocument" {
+          let panel = NSOpenPanel(); panel.allowedContentTypes = ["docx", "doc", "rtf", "odt", "epub", "tex", "rst", "html", "txt"].compactMap { UTType(filenameExtension: $0) }
+          guard panel.runModal() == .OK, let file = panel.url else { reply(id, ["ok": true, "value": NSNull()]); return }
+          let directory = store.dataDirectory
+          DispatchQueue.global(qos: .userInitiated).async {
+            let result: [String: Any]
+            do { result = ["ok": true, "value": try Interchange.importFile(file, directory: directory)] }
+            catch { result = ["ok": false, "error": error.localizedDescription] }
+            DispatchQueue.main.async { self.reply(id, result) }
+          }
+        } else {
+          let doc = try store.require(arg(args, 0, String.self)), format = try arg(args, 1, String.self), source = try arg(args, 2, String.self), html = try arg(args, 3, String.self)
+          let panel = NSSavePanel(), ext = ["latex":"tex", "revealjs":"html", "mediawiki":"wiki"][format] ?? format
+          panel.allowedContentTypes = [UTType(filenameExtension: ext) ?? .data]; panel.nameFieldStringValue = (doc.name as NSString).deletingPathExtension + "." + ext
+          guard panel.runModal() == .OK, let destination = panel.url else { reply(id, ["ok": true, "value": NSNull()]); return }
+          let directory = store.dataDirectory, working = doc.path.map { URL(fileURLWithPath: $0).deletingLastPathComponent() } ?? directory
+          DispatchQueue.global(qos: .userInitiated).async {
+            let result: [String: Any]
+            do { try Interchange.export(format, source: source, html: html, destination: destination, workingDirectory: working, temporaryDirectory: directory); result = ["ok": true, "value": destination.path] }
+            catch { result = ["ok": false, "error": error.localizedDescription] }
+            DispatchQueue.main.async { self.reply(id, result) }
+          }
+        }
+      } catch { reply(id, ["ok": false, "error": error.localizedDescription]) }
+      return
+    }
+    if name == "fileOperation" {
+      Task { @MainActor in
+        guard !owner.fileOperationRunning else { reply(id, ["ok": false, "error": "另一个文件操作正在进行。"]); return }
+        owner.fileOperationRunning = true
+        defer { owner.fileOperationRunning = false }
+        let participants = owner.hosts
+        var locked = [NativeWindowHost]()
+        var outcome: [String: Any] = ["ok": false, "error": "文件操作未完成。"]
+        do {
+          let operation = try arg(args, 0, [String: String].self)
+          if operation["action"] == "trash", !confirm("移到废纸篓？", detail: operation["path"] ?? "", yes: "移到废纸篓") {
+            reply(id, ["ok": true, "value": NSNull()]); return
+          }
+          for host in participants {
+            locked.append(host)
+            let answer = try await host.webView.callAsyncJavaScript("return await window.__openTypora.fileOperation('prepare', change)", arguments: ["change": ["removedPath": operation["action"] == "trash" ? operation["path"] ?? "" : ""]], in: nil, contentWorld: .page)
+            guard answer as? Bool == true else { throw NativeFailure("文件操作已取消。") }
+          }
+          let change = try owner.workspace.execute(operation, store: store)
+          try? owner.workspace.updateRecent(change)
+          if let from = change["fromPath"], let to = change["toPath"] {
+            owner.recentClosedFiles = owner.recentClosedFiles.map { item in (URL(fileURLWithPath: item.url.path == from || item.url.path.hasPrefix(from + "/") ? to + item.url.path.dropFirst(from.count) : item.url.path), item.group) }
+            owner.persistClosedHistory()
+          }
+          for host in participants {
+            host.store.applyPathChange(change)
+            try host.store.persist(SessionRecord(documents: Array(host.store.records.values), activeId: host.store.activeId))
+            _ = try await host.webView.callAsyncJavaScript("return await window.__openTypora.fileOperation('commit', change)", arguments: ["change": change], in: nil, contentWorld: .page)
+          }
+          outcome = ["ok": true, "value": change]
+        } catch { outcome = ["ok": false, "error": error.localizedDescription] }
+        for host in locked {
+          _ = try? await host.webView.callAsyncJavaScript("return await window.__openTypora.fileOperation('release', {})", arguments: [:], in: nil, contentWorld: .page)
+        }
+        owner.fileOperationRunning = false
+        reply(id, outcome)
+      }
+      return
+    }
+    if name == "searchFiles" {
+      do {
+        let query = try arg(args, 0, String.self), options = try arg(args, 1, [String: Bool].self)
+        let files = try store.scan()["files"] as? [[String: String]] ?? []
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+          let result: [String: Any]
+          do { result = ["ok": true, "value": try Workspace.search(files, query: query, regex: options["regex"] == true, caseSensitive: options["caseSensitive"] == true)] }
+          catch { result = ["ok": false, "error": error.localizedDescription] }
+          DispatchQueue.main.async { self?.reply(id, result) }
+        }
+      } catch { reply(id, ["ok": false, "error": error.localizedDescription]) }
+      return
+    }
     if name == "exportPdf" {
       do {
         let html = try arg(args, 0, String.self)
         guard html.utf8.count <= 50 * 1024 * 1024 else { throw NativeFailure("导出内容过大。") }
         #if WEBTEST
-          let destination = store.dataDirectory.appendingPathComponent("native-test.pdf")
+          let destination = store.dataDirectory.appendingPathComponent((args.count > 1 && (args[1] as? [String: Any])?["testName"] as? String == "long") ? "native-test-long.pdf" : "native-test.pdf")
         #else
           let panel = NSSavePanel()
           panel.allowedContentTypes = [.pdf]
@@ -160,7 +265,7 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
         let exporter = PDFExporter(
           resources: Bundle.main.resourceURL!.appendingPathComponent("dist"), store: store)
         pdfExporter = exporter
-        exporter.export(html) { [weak self] result in
+        exporter.export(html, options: args.count > 1 ? args[1] as? [String: Any] ?? [:] : [:]) { [weak self] result in
           guard let self else { return }
           do {
             try atomicWrite(destination, try result.get())
@@ -229,6 +334,35 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
   }
   func handle(_ name: String, _ args: [Any]) throws -> Any? {
     switch name {
+    case "themes": return try Interchange.themes(owner.directory)
+    case "installTheme":
+      let panel = NSOpenPanel(); panel.allowedContentTypes = [UTType(filenameExtension: "css") ?? .plainText]
+      guard panel.runModal() == .OK, let file = panel.url else { return nil }
+      return try Interchange.installTheme(file, directory: owner.directory)
+    case "conversionSettings":
+      if args.first as? Bool == true {
+        let panel = NSOpenPanel(); panel.title = "选择 Pandoc 可执行文件"; panel.canChooseDirectories = false
+        if panel.runModal() == .OK, let file = panel.url, FileManager.default.isExecutableFile(atPath: file.path) { UserDefaults.standard.set(file.path, forKey: "pandocPath") }
+      }
+      return ["pandoc": Interchange.pandoc()?.path ?? "", "word": true]
+    case "ready":
+      rendererReady = true
+      let queued = pendingCommands; pendingCommands.removeAll()
+      for item in queued { deliver(item) }; return nil
+    case "recent": return try jsonValue(owner.workspace.recent())
+    case "recentAction":
+      let action = try arg(args, 0, String.self), path = args.count > 1 ? args[1] as? String ?? "" : ""
+      if action == "open" {
+        guard let item = owner.workspace.recent().first(where: { $0.path == path }) else { throw NativeFailure("最近项目已移除。") }
+        let url = URL(fileURLWithPath: path)
+        if item.folder { try owner.workspace.remember(url, folder: true); return try store.scan(url) }
+        let record = try store.open(url); try owner.workspace.remember(url, folder: false)
+        return try jsonValue(record)
+      }
+      return try jsonValue(owner.workspace.recentAction(action, path: path))
+    case "reveal":
+      let target = try owner.workspace.authorize(arg(args, 0, String.self), store: store)
+      NSWorkspace.shared.activateFileViewerSelecting([target]); return nil
     case "restore":
       if let seed {
         for record in seed.documents { store.records[record.id] = record }
@@ -260,15 +394,19 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       return try jsonValue(store.draft(record))
     case "open":
       guard let file = chooseFile(false) else { return nil }
-      return try jsonValue(store.open(file))
+      let record = try store.open(file); try owner.workspace.remember(file, folder: false)
+      if store.folder == nil { _ = try store.scan(file.deletingLastPathComponent()) }
+      return try jsonValue(record)
     case "openFolder":
       guard let file = chooseFile(false, folder: true) else { return nil }
+      try owner.workspace.remember(file, folder: true)
       return try store.scan(file)
     case "scan": return try store.scan()
     case "openToken":
       let token = try arg(args, 0, String.self)
       guard let file = store.tokens[token] else { throw NativeFailure("目录已更新，请刷新后重试。") }
-      return try jsonValue(store.open(file))
+      let record = try store.open(file); try owner.workspace.remember(file, folder: false)
+      return try jsonValue(record)
     case "reopen": return try jsonValue(store.reopen(arg(args, 0, String.self)))
     case "readResource":
       guard let url = URL(string: try arg(args, 0, String.self)) else { throw NativeFailure("资源引用无效。") }
@@ -280,6 +418,7 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       else if action == "open" { if let file = chooseFile(false) { owner.openWindow(file) } }
       else if action == "reopen" {
         guard let recent = owner.recentClosedFiles.popLast() else { return false }
+        owner.persistClosedHistory()
         owner.openWindow(recent.url, tabGroupID: recent.group); return true
       }
       else { throw NativeFailure("窗口操作不支持。") }
@@ -288,11 +427,11 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       let id = try arg(args, 0, String.self)
       _ = try store.require(id)
       let panel = NSOpenPanel()
-      panel.allowedContentTypes = [.png, .jpeg, .gif, UTType(filenameExtension: "webp") ?? .image]
+      panel.allowedContentTypes = [.png, .jpeg, .gif, .svg, UTType(filenameExtension: "webp") ?? .image]
       panel.canChooseDirectories = false
       guard panel.runModal() == .OK, let file = panel.url else { return nil }
       let bytes = try Data(contentsOf: file)
-      return ["path": try store.importImage(id, bytes: bytes, name: file.lastPathComponent), "alt": file.lastPathComponent]
+      return ["path": try store.importImage(id, bytes: bytes, name: file.lastPathComponent, options: args.count > 1 ? args[1] as? [String: Any] ?? [:] : [:]), "alt": file.lastPathComponent]
     case "writeClipboard":
       let text = try arg(args, 0, String.self)
       NSPasteboard.general.clearContents(); NSPasteboard.general.setString(text, forType: .string)
@@ -327,7 +466,9 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       if force && !confirm("覆盖磁盘上的修改？", detail: "当前草稿将替换磁盘文件。也可以取消并另存为副本。", yes: "覆盖") {
         return nil
       }
-      return try jsonValue(store.save(id, text: text, destination: destination, force: force))
+      let saved = try store.save(id, text: text, destination: destination, force: force)
+      if let path = saved.path { try? owner.workspace.remember(URL(fileURLWithPath: path), folder: false) }
+      return try jsonValue(saved)
     case "persist":
       let value = try arg(args, 0, [String: Any].self)
       var json = value
@@ -354,7 +495,7 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       guard encoded.count <= 28 * 1024 * 1024, let bytes = Data(base64Encoded: encoded) else {
         throw NativeFailure("图片数据无效。")
       }
-      return try store.importImage(id, bytes: bytes, name: filename)
+      return try store.importImage(id, bytes: bytes, name: filename, options: args.count > 3 ? args[3] as? [String: Any] ?? [:] : [:])
     case "openLink":
       let address = try arg(args, 0, String.self)
       guard let url = URL(string: address),
@@ -364,11 +505,19 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       return nil
     case "openDocumentLink":
       let record = try store.require(arg(args, 0, String.self)), address = try arg(args, 1, String.self)
-      guard let path = record.path, let relative = address.split(separator: "#", maxSplits: 1).first.map(String.init)?.removingPercentEncoding,
-        !relative.hasPrefix("/"), !relative.contains(":"), !relative.contains("\\") else { throw NativeFailure("请先保存文档，并使用相对 Markdown 文件路径。") }
-      let base = URL(fileURLWithPath: path).deletingLastPathComponent().resolvingSymlinksInPath(), target = base.appendingPathComponent(relative).resolvingSymlinksInPath()
-      guard contained(base, target) else { throw NativeFailure("链接位于当前文档目录之外，请用“打开文件”选择目标。") }
-      owner.openWindow(target); return nil
+      let parts = address.components(separatedBy: "#"), relative = (parts.first ?? "").removingPercentEncoding ?? ""
+      guard let path = record.path, !relative.contains(":"), !relative.contains("\\") else { throw NativeFailure("请先保存文档，并使用本地 Markdown 文件路径。") }
+      let base = URL(fileURLWithPath: path).deletingLastPathComponent().resolvingSymlinksInPath()
+      let target = (relative.hasPrefix("/") ? URL(fileURLWithPath: relative) : base.appendingPathComponent(relative)).standardizedFileURL
+      let root = store.folder ?? base
+      guard target.path == target.resolvingSymlinksInPath().path,
+        contained(root, target) || store.records.values.contains(where: { $0.path == target.path }) else { throw NativeFailure("链接位于已打开文件夹之外，请先打开该文件夹或目标文件。") }
+      if !FileManager.default.fileExists(atPath: target.path) {
+        guard ["md", "markdown", "mdown"].contains(target.pathExtension.lowercased()), confirm("创建链接指向的文档？", detail: target.path, yes: "创建") else { return nil }
+        guard FileManager.default.fileExists(atPath: target.deletingLastPathComponent().path) else { throw NativeFailure("目标文件夹不存在。") }
+        try atomicWrite(target, Data())
+      }
+      owner.openWindow(target, anchor: parts.count > 1 ? parts.dropFirst().joined(separator: "#").removingPercentEncoding : nil); return nil
     case "confirmClose":
       #if WEBTEST
         return "cancel"
@@ -411,6 +560,7 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
     _ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
     decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
   ) {
+    if action.targetFrame?.isMainFrame == false, action.request.url?.scheme == "https" { decisionHandler(.allow); return }
     decisionHandler(
       action.request.url?.scheme == "opentypora" && action.request.url?.host == "app"
         ? .allow : .cancel)
@@ -491,6 +641,8 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
   }
 }
 final class NativeApplication: NSObject, NSApplicationDelegate, NSMenuItemValidation {
+  lazy var workspace = Workspace(directory)
+  var fileOperationRunning = false
   var recentClosedFiles: [(url: URL, group: String?)] = []
   lazy var commandGroups: [CommandGroup] = {
     let bytes = try! Data(contentsOf: Bundle.main.resourceURL!.appendingPathComponent("commands.json"))
@@ -534,6 +686,9 @@ final class NativeApplication: NSObject, NSApplicationDelegate, NSMenuItemValida
     if let resource = Bundle.main.resourceURL,
       let icon = NSImage(contentsOf: resource.appendingPathComponent("icon.icns")) {
       NSApp.applicationIconImage = icon
+    }
+    if let bytes = try? Data(contentsOf: directory.appendingPathComponent("recent-closed.json")), let entries = try? JSONSerialization.jsonObject(with: bytes) as? [[String: String]] {
+      recentClosedFiles = entries.compactMap { item in guard let path = item["path"] else { return nil }; return (URL(fileURLWithPath: path), item["group"]) }
     }
     launched = true
     makeWindow(directory: directory)
@@ -584,27 +739,33 @@ final class NativeApplication: NSObject, NSApplicationDelegate, NSMenuItemValida
       host.window.makeKeyAndOrderFront(nil)
     }
   }
-  func openWindow(_ file: URL, tabGroupID: String? = nil) {
+  func openWindow(_ file: URL, tabGroupID: String? = nil, anchor: String? = nil) {
     let resolved = file.resolvingSymlinksInPath().path
     if let existing = hosts.first(where: { host in
       host.store.records.values.contains { $0.path == resolved }
     }) {
       existing.window.makeKeyAndOrderFront(nil)
       if let record = existing.store.records.values.first(where: { $0.path == resolved }) {
-        existing.send("opened", record: record)
+        existing.send("opened", record: record, anchor: anchor)
       }
       return
     }
     let location = directory.appendingPathComponent("windows/" + UUID().uuidString)
     do {
       let record = try DocumentStore(location).open(file)
+      try workspace.remember(file, folder: false)
       if let tabGroupID { try atomicWrite(location.appendingPathComponent("tab-group"), Data(tabGroupID.utf8)) }
-      makeWindow(directory: location, seed: SessionRecord(documents: [record], activeId: record.id))
+      let host = makeWindow(directory: location, seed: SessionRecord(documents: [record], activeId: record.id, folder: file.deletingLastPathComponent().path))
+      if let anchor { host.send("opened", record: record, anchor: anchor) }
     } catch {
       let alert = NSAlert()
       alert.messageText = error.localizedDescription
       alert.runModal()
     }
+  }
+  func persistClosedHistory() {
+    let entries = recentClosedFiles.suffix(20).map { item -> [String: String] in var result = ["path": item.url.path]; if let group = item.group { result["group"] = group }; return result }
+    if let bytes = try? JSONSerialization.data(withJSONObject: entries) { try? atomicWrite(directory.appendingPathComponent("recent-closed.json"), bytes) }
   }
   func windowClosed(_ host: NativeWindowHost) {
     if !terminating {
@@ -617,6 +778,7 @@ final class NativeApplication: NSObject, NSApplicationDelegate, NSMenuItemValida
         }
       }
       recentClosedFiles = Array(recentClosedFiles.suffix(20))
+      persistClosedHistory()
     }
     if !terminating, host.store.dataDirectory != directory {
       try? atomicWrite(host.store.dataDirectory.appendingPathComponent("closed"), Data())
@@ -661,6 +823,7 @@ final class NativeApplication: NSObject, NSApplicationDelegate, NSMenuItemValida
     } else if action == "close-window" {
       current?.send("close-window")
     } else if action == "reopen", let recent = recentClosedFiles.popLast() {
+      persistClosedHistory()
       openWindow(recent.url, tabGroupID: recent.group)
     } else {
       current?.send(action)
@@ -670,6 +833,7 @@ final class NativeApplication: NSObject, NSApplicationDelegate, NSMenuItemValida
 #if !WEBTEST
   @main struct OpenTyporaMain {
     static func main() {
+      #if STORETEST
       if CommandLine.arguments.contains("--store-test") {
         do { try runStoreTests() } catch {
           fputs("\(error)\n", stderr)
@@ -677,6 +841,7 @@ final class NativeApplication: NSObject, NSApplicationDelegate, NSMenuItemValida
         }
         return
       }
+      #endif
       let application = NSApplication.shared
       let delegate = NativeApplication()
       application.delegate = delegate

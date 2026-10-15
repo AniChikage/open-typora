@@ -1,6 +1,14 @@
 const { contextBridge, ipcRenderer } = require("electron");
 const call = (name, ...args) => ipcRenderer.invoke(`document:${name}`, ...args);
 contextBridge.exposeInMainWorld("desktop", {
+  themes: () => call("themes"), installTheme: () => call("installTheme"), conversionSettings: choose => call("conversionSettings", choose), importDocument: () => call("importDocument"), exportConverted: (id, format, source, html) => call("exportConverted", id, format, source, html), imageAction: (id, sources, action, options) => call("imageAction", id, sources, action, options),
+  ready: () => call("ready"),
+  fileOperation: operation => call("fileOperation", operation),
+  recent: () => call("recent"),
+  recentAction: (action, path) => call("recentAction", action, path),
+  searchFiles: (query, options) => call("searchFiles", query, options),
+  reveal: path => call("reveal", path),
+  onFileOperation: callback => { const listener = async (_, id, phase, change) => { try { ipcRenderer.send("workspace:prepared", id, await callback(phase, change)); } catch { ipcRenderer.send("workspace:prepared", id, false); } }; ipcRenderer.on("workspace:operation", listener); return () => ipcRenderer.removeListener("workspace:operation", listener); },
   restore: () => call("restore"),
   registerDraft: (record) => call("draft", record),
   open: () => call("open"),
@@ -8,7 +16,7 @@ contextBridge.exposeInMainWorld("desktop", {
   scan: () => call("scan"),
   openToken: (token) => call("token", token),
   reopen: id => call("reopen", id),
-  chooseImage: id => call("chooseImage", id),
+  chooseImage: (id, options) => call("chooseImage", id, options),
   exportHtml: (name, html) => call("html", name, html),
   writeClipboard: text => call("writeClipboard", text),
   readClipboard: () => call("readClipboard"),
@@ -19,7 +27,7 @@ contextBridge.exposeInMainWorld("desktop", {
   check: (id) => call("check", id),
   reload: (id) => call("reload", id),
   acceptDisk: (id, content, hash) => call("acceptDisk", id, content, hash),
-  importImage: (id, bytes, name) => call("image", id, bytes, name),
+  importImage: (id, bytes, name, options) => call("image", id, bytes, name, options),
   exportPdf: () => call("pdf"),
   openLink: (url) => call("link", url),
   openDocumentLink: (id, url) => call("documentLink", id, url),

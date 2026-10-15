@@ -17,15 +17,22 @@ import { InsertDialog } from "./components/InsertDialog";
 import type { InsertKind } from "./components/InsertDialog";
 import { QuickOpen } from "./components/QuickOpen";
 import { Dialog } from "./components/Dialog";
+import { imageReferences, updateImageReferences } from "./editor/images";
+import { htmlToMarkdown } from "./editor/clipboard";
 import { documentStatistics } from "./editor/statistics";
+import { FileOperationDialog, RecentDialog, GlobalSearch } from "./components/WorkspaceDialog";
+import type { FileOperation } from "./types";
 import type { Command } from "./types";
 import appIcon from "../design/icon.svg";
 import { version as appVersion } from "../package.json";
 export default function App() {
-  const session = useDocuments();
+  const editors = useRef(new Map<string, EditorHandle>());
+  const session = useDocuments(() => ![...editors.current.values()].some(editor => editor.composing()));
   const [preferences, setPreferences] = useState(() => { const initial = loadPreferences(); setMarkdownOptions(initial); return initial; });
+  const [themes, setThemes] = useState<{ id: string; name: string; css: string }[]>([]);
   const [typewriter, setTypewriter] = useState(false);
-  const [dialog, setDialog] = useState<"preferences" | "quick-open" | "statistics" | InsertKind | null>(null);
+  const [dialog, setDialog] = useState<"preferences" | "quick-open" | "statistics" | "recent" | "global-search" | InsertKind | null>(null);
+  const [fileOperation, setFileOperation] = useState<FileOperation | null>(null);
   const [selectedText, setSelectedText] = useState("");
   const [selection, setSelection] = useState("");
   const [countUnit, setCountUnit] = useState<"characters" | "words">(() => localStorage.getItem("open-typora-count-unit") === "words" ? "words" : "characters");
@@ -40,7 +47,6 @@ export default function App() {
     );
   const [cursor, setCursor] = useState({ line: 1, column: 1 }),
     [about, setAbout] = useState(false);
-  const editors = useRef(new Map<string, EditorHandle>());
   const editor = () => editors.current.get(session.activeId);
   const printDocument = useRef<HTMLElement>(null);
   const commands = useRef<(command: Command) => void>(() => {});
@@ -53,8 +59,8 @@ export default function App() {
     () => Array.from((active?.content || "").replace(/\s/g, "")).length,
     [active?.content],
   );
-  const wholeStatistics = useMemo(() => countUnit === "words" || dialog === "statistics" ? documentStatistics(active?.content || "") : null, [active?.content, preferences, countUnit, dialog]);
-  const statistics = useMemo(() => dialog === "statistics" && selection ? documentStatistics(selection, selection) : wholeStatistics, [dialog, selection, wholeStatistics]);
+  const wholeStatistics = useMemo(() => countUnit === "words" || dialog === "statistics" ? documentStatistics(active?.content || "", undefined, preferences.readingSpeed) : null, [active?.content, preferences, countUnit, dialog]);
+  const statistics = useMemo(() => dialog === "statistics" && selection ? documentStatistics(selection, selection, preferences.readingSpeed) : wholeStatistics, [dialog, selection, wholeStatistics]);
   const selectionCharacters = useMemo(() => Array.from(selection.replace(/\s/g, "")).length, [selection]);
   useEffect(() => { localStorage.setItem("open-typora-count-unit", countUnit); }, [countUnit]);
   useEffect(() => {
@@ -62,15 +68,28 @@ export default function App() {
     document.documentElement.style.setProperty("--editor-font-size", `${preferences.fontSize}px`);
   }, [preferences]);
   useEffect(() => { if (window.desktop?.viewState) void window.desktop.viewState(focus, typewriter, sidebar).catch(() => {}); }, [focus, typewriter, sidebar]);
+  async function refreshThemes() { const items = await host.themes(); setThemes(items); return items; }
+  useEffect(() => { if (session.ready) void refreshThemes().catch(e => session.setMessage(e.message)); }, [session.ready]);
+  useEffect(() => {
+    const selected = themes.find(item => theme === "custom:" + item.id), style = document.createElement("style"); style.dataset.customTheme = "true";
+    if (selected) { style.textContent = selected.css.replace(/#write\b/g, ":is(.rich-document,.print-document)").replace(/#typora-sidebar\b/g, ".sidebar"); document.head.append(style); }
+    return () => style.remove();
+  }, [theme, themes]);
+  async function installTheme() { const selected = await host.installTheme(); if (selected) { await refreshThemes(); setTheme("custom:" + selected); } }
+  async function importDocument() {
+    try { const imported = await host.importDocument(); if (!imported) return; const content = imported.markdown ?? htmlToMarkdown(imported.html || ""), record = { id: crypto.randomUUID(), path: null, name: imported.name, content, savedContent: "", diskHash: null, lineEnding: "\n" }; await host.registerDraft(record); await session.add(record); }
+    catch (e) { session.setMessage((e as Error).message); }
+  }
   function closeDialog() { setDialog(null); queueMicrotask(() => editor()?.focus()); }
   function changePreferences(next: typeof preferences) { setMarkdownOptions(next); setPreferences(next); }
-  async function exportDocument(kind: "pdf" | "html") {
+  async function exportDocument(kind: string) {
     if (exportingRef.current || !active || !printDocument.current) return;
     exportingRef.current = true; setExporting(true); document.body.classList.add("printing");
     try {
+      await host.persist({ documents: session.documents, activeId: session.activeId });
       printDocument.current.innerHTML = renderMarkdown(active.content, active.id);
       await Promise.all([renderDiagrams(printDocument.current), renderMath(printDocument.current), document.fonts.ready]);
-      const result = kind === "pdf" ? await host.exportPdf(exportHtml(printDocument.current)) : await host.exportHtml(active.name, await portableHtml(printDocument.current, active.name));
+      const result = kind === "pdf" ? await host.exportPdf(exportHtml(printDocument.current), { paper: preferences.pdfPaper, margin: preferences.pdfMargin, header: preferences.pdfHeader, footer: preferences.pdfFooter, title: active.name }) : kind === "html" ? await host.exportHtml(active.name, await portableHtml(printDocument.current, active.name)) : await host.exportConverted(active.id, kind, active.content, await portableHtml(printDocument.current, active.name));
       if (result) session.setMessage(`${kind.toUpperCase()} 已导出。`);
     } catch (error) { session.setMessage((error as Error).message); }
     finally { document.body.classList.remove("printing"); exportingRef.current = false; setExporting(false); }
@@ -85,13 +104,14 @@ export default function App() {
   useEffect(() => {
     editor()?.focus();
   }, [session.activeId]);
-  commands.current = ({ action, document: opened }) => {
-    if (["new", "newWindow", "newTab", "open"].includes(action) && window.desktop?.windowAction) { void window.desktop.windowAction(action).catch((error: Error) => session.setMessage(error.message)); return; }
+  commands.current = ({ action, document: opened, anchor, line, message }) => {
+    if (["new", "newWindow", "newTab", "open"].includes(action) && window.desktop?.windowAction) { void host.windowAction(action).catch((error: Error) => session.setMessage(error.message)); return; }
     const context = commandsByAction.get(action)?.context;
     if (context && !active) return;
     if (["rich", "table"].includes(context || "") && !editor()?.richMode()) return;
-    if (action === "opened") {
-      if (opened) void session.add(opened);
+    if (action === "notice") { if (message) session.setMessage(message); }
+    else if (action === "opened") {
+      if (opened) void session.add(opened).then(record => { if (record && (anchor || line)) requestAnimationFrame(() => { const heading = anchor ? extractHeadings(record.content).find(heading => heading.id === anchor || heading.text === anchor) : undefined; editors.current.get(record.id)?.jump(line || heading?.line || 1); }); });
     } else if (["new", "newWindow", "newTab"].includes(action)) void session.create();
     else if (action === "open") void session.open();
     else if (action === "folder") void session.openFolder();
@@ -99,7 +119,7 @@ export default function App() {
     else if (action === "saveAs") void session.save(true);
     else if (action === "close") void session.close();
     else if (action === "reopen") {
-      if (window.desktop?.windowAction) void window.desktop.windowAction("reopen")
+      if (window.desktop?.windowAction) void host.windowAction("reopen")
         .then((handled: unknown) => { if (!handled) return session.reopen(); })
         .catch((error: Error) => session.setMessage(error.message));
       else void session.reopen();
@@ -115,7 +135,9 @@ export default function App() {
       setTheme((value) => (value === "dark" ? "light" : "dark"));
     else if (action === "focus") setFocus((value) => !value);
     else if (action === "typewriter") setTypewriter(value => !value);
-    else if (["preferences", "quick-open", "statistics", "table", "link", "footnote"].includes(action)) {
+    else if (action === "new-file" || action === "new-folder") setFileOperation({ action, path: session.folder || undefined, name: action === "new-file" ? "未命名.md" : "新文件夹" });
+    else if (action === "undo-file") void session.fileOperation({ action: "undo" }).catch(e => session.setMessage(e.message));
+    else if (["preferences", "quick-open", "statistics", "recent", "global-search", "table", "link", "reference-link", "footnote"].includes(action)) {
       setSelectedText(editor()?.selectionText() || ""); setDialog(action as typeof dialog);
     }
     else if (action === "find") editor()?.find();
@@ -136,12 +158,24 @@ export default function App() {
     else if (action === "code") editor()?.codeBlock();
     else if (action === "autosave") session.setAutosave((value) => !value);
     else if (action === "about") setAbout(true);
-    else if (action === "pdf" || action === "html") void exportDocument(action);
+    else if (["pdf", "html", "docx", "rtf", "odt", "epub", "latex", "rst", "mediawiki", "textile", "opml", "revealjs"].includes(action)) void exportDocument(action);
+    else if (action === "import") void importDocument();
+    else if (["copy-all-images", "move-all-images", "upload-all-images"].includes(action) && active) {
+      const source = active.content, sources = [...new Set(imageReferences(source).map(image => image.url))];
+      if (!sources.length) { session.setMessage("当前文档没有图片。"); return; }
+      void host.persist({ documents: session.documents, activeId: session.activeId }).then(() => host.imageAction(active.id, sources, action.split("-")[0], { ...preferences })).then(mapping => { if (mapping) editors.current.get(active.id)?.transform(text => updateImageReferences(text, mapping)); }).catch(e => session.setMessage(e.message));
+    }
     else if (action === "copy-markdown") void host.writeClipboard(editor()?.selectionText(true) || "").catch(error => session.setMessage(error.message));
     else if (action === "paste-plain") void host.readClipboard().then(text => editor()?.insert(text)).catch(error => session.setMessage(error.message));
-    else if (action === "image" && active) void host.chooseImage(active.id).then(image => { if (image) editor()?.insert(`![${image.alt.replace(/[\[\]]/g, "")}](${image.path})`); }).catch(error => session.setMessage(error.message));
+    else if (action === "image" && active) void (async () => {
+      await host.persist({ documents: session.documents, activeId: session.activeId });
+      const image = await host.chooseImage(active.id, { ...preferences, source: active.content }); if (!image) return;
+      if (preferences.imageAutoUpload) { try { const mapping = await host.imageAction(active.id, [image.path], "upload", { ...preferences }); if (mapping?.[image.path]) image.path = mapping[image.path]; } catch (e) { session.setMessage(`上传失败，已保留本地图片：${(e as Error).message}`); } }
+      editors.current.get(active.id)?.insert(`![${image.alt.replace(/[\[\]]/g, "")}](${image.path})`);
+    })().catch(error => session.setMessage(error.message));
     else editor()?.command(action);
   };
+  useEffect(() => { if (session.ready && window.desktop?.ready) void window.desktop.ready(); }, [session.ready]);
   useEffect(() => host.onCommand((command) => commands.current(command)), []);
   useEffect(() => {
     const shortcut = (event: KeyboardEvent) => {
@@ -195,6 +229,8 @@ export default function App() {
         context={editor()?.context() || ""}
       />
       <Sidebar
+        operation={operation => { if (operation.action === "trash" || operation.action === "undo" || operation.target) void session.fileOperation(operation).catch(e => session.setMessage(e.message)); else setFileOperation(operation); }}
+        search={() => setDialog("global-search")} recent={() => setDialog("recent")} notify={session.setMessage}
         documents={session.documents}
         activeId={session.activeId}
         files={session.files}
@@ -212,7 +248,7 @@ export default function App() {
         theme={theme}
         toggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
       />
-      <main className="writing-area" aria-label="写作空间">
+      <main className="writing-area" aria-label="写作空间" inert={session.fileOperationBusy}>
         {active?.conflict && (
           <div className="conflict-banner" role="alert">
             <AlertCircle size={17} />
@@ -281,7 +317,7 @@ export default function App() {
           title={`${status} · 第 ${cursor.line} 行，第 ${cursor.column} 列 · Markdown · UTF-8`}
           aria-label={`${characters} 字，${status}`}
         >
-          {countUnit === "characters" ? (selection ? selectionCharacters : characters) : (selection ? documentStatistics(selection, selection).words : wholeStatistics?.words || 0)} {countUnit === "characters" ? "字" : "词"}{selection && "（选中）"}{exporting && " · 正在导出…"}
+          {countUnit === "characters" ? (selection ? selectionCharacters : characters) : (selection ? documentStatistics(selection, selection, preferences.readingSpeed).words : wholeStatistics?.words || 0)} {countUnit === "characters" ? "字" : "词"}{selection && "（选中）"}{exporting && " · 正在导出…"}
         </button>
       </footer>
       {focus && (
@@ -297,14 +333,17 @@ export default function App() {
           </button>
         </div>
       )}
-      {dialog === "preferences" && <PreferencesDialog value={preferences} change={changePreferences} theme={theme} changeTheme={setTheme} close={closeDialog} />}
-      {dialog === "quick-open" && <QuickOpen documents={session.documents} files={session.files} select={session.setActiveId} open={session.openToken} close={closeDialog} />}
-      {dialog && ["table", "link", "footnote"].includes(dialog) && <InsertDialog kind={dialog as InsertKind} selected={selectedText} close={closeDialog} submit={value => {
+      {fileOperation && <FileOperationDialog operation={fileOperation} files={session.files} folder={session.folder} run={session.fileOperation} close={() => setFileOperation(null)} />}
+      {dialog === "recent" && <RecentDialog entries={session.recent} action={session.recentAction} close={closeDialog} />}
+      {dialog === "global-search" && <GlobalSearch folder={session.folder} close={closeDialog} open={async match => { const record = await session.openToken(match.token); if (record) requestAnimationFrame(() => editors.current.get(record.id)?.jump(match.line)); }} />}
+      {dialog === "preferences" && <PreferencesDialog value={preferences} change={changePreferences} theme={theme} changeTheme={setTheme} themes={themes} installTheme={installTheme} close={closeDialog} />}
+      {dialog === "quick-open" && <QuickOpen documents={session.documents} files={session.files} recent={session.recent} openRecent={path => session.recentAction("open", path)} select={session.setActiveId} open={session.openToken} close={closeDialog} />}
+      {dialog && ["table", "link", "reference-link", "footnote"].includes(dialog) && <InsertDialog kind={dialog as InsertKind} selected={selectedText} close={closeDialog} submit={value => {
         if (dialog === "link") editor()?.insert(`[${(value.label || value.value || "链接").replace(/[\[\]]/g, character => "\\" + character)}](${value.value})`);
         else editor()?.command(dialog, value);
         closeDialog();
       }} />}
-      {dialog === "statistics" && statistics && <Dialog title="字数统计" close={closeDialog}><dl className="document-statistics"><dt>范围</dt><dd>{statistics.selected ? "选中文字" : "全文"}</dd><dt>单词</dt><dd>{statistics.words}</dd><dt>字符（不含空白）</dt><dd>{statistics.compactCharacters}</dd><dt>字符（含空白）</dt><dd>{statistics.characters}</dd><dt>行数</dt><dd>{statistics.lines}</dd><dt>预计阅读</dt><dd>{statistics.minutes} 分钟</dd></dl><label>底部显示<select aria-label="底部显示" value={countUnit} onChange={e => setCountUnit(e.target.value as typeof countUnit)}><option value="characters">字符数</option><option value="words">单词数</option></select></label><p className="dialog-note">单词不计格式符号，中文按每字一词；字符包含源码符号。阅读速度按每分钟 200 词估算。</p></Dialog>}
+      {dialog === "statistics" && statistics && <Dialog title="字数统计" close={closeDialog}><dl className="document-statistics"><dt>范围</dt><dd>{statistics.selected ? "选中文字" : "全文"}</dd><dt>单词</dt><dd>{statistics.words}</dd><dt>字符（不含空白）</dt><dd>{statistics.compactCharacters}</dd><dt>字符（含空白）</dt><dd>{statistics.characters}</dd><dt>行数</dt><dd>{statistics.lines}</dd><dt>预计阅读</dt><dd>{statistics.minutes} 分钟</dd></dl><label>底部显示<select aria-label="底部显示" value={countUnit} onChange={e => setCountUnit(e.target.value as typeof countUnit)}><option value="characters">字符数</option><option value="words">单词数</option></select></label><p className="dialog-note">单词不计格式符号，中文按每字一词；字符包含源码符号。阅读速度按每分钟 {preferences.readingSpeed} 词估算。</p></Dialog>}
       {about && (
         <div className="dialog-backdrop" onClick={() => setAbout(false)}>
           <section

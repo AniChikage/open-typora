@@ -6,12 +6,14 @@ import {
   Moon,
   Sun,
   X,
-  ChevronDown,
+  ChevronDown, MoreHorizontal, Search, History,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import type { DocumentRecord, FileEntry } from "../types";
+import type { DocumentRecord, FileEntry, FileOperation } from "../types";
 import type { Heading } from "../editor/markdown";
-import { FileTree } from "./FileTree";
+import { FileTree, sortFiles } from "./FileTree";
+import type { FileSort } from "./FileTree";
+import { host } from "../host";
 interface Props {
   documents: DocumentRecord[];
   activeId: string;
@@ -29,8 +31,25 @@ interface Props {
   jump(line: number): void;
   theme: string;
   toggleTheme(): void;
+  operation(operation: FileOperation): void;
+  search(): void;
+  recent(): void;
+  notify(message: string): void;
 }
 export function Sidebar(props: Props) {
+  const [menu, setMenu] = useState<{ x: number; y: number; file: FileEntry | null } | null>(null);
+  const [sort, setSort] = useState<FileSort>(() => (localStorage.getItem("open-typora-file-sort") || "natural") as FileSort);
+  const [descending, setDescending] = useState(() => localStorage.getItem("open-typora-file-desc") === "true");
+  const [foldersFirst, setFoldersFirst] = useState(() => localStorage.getItem("open-typora-folders-first") !== "false");
+  const sorted = sortFiles(props.files.filter(file => file.isDirectory !== "true"), sort, descending, foldersFirst);
+  useEffect(() => { localStorage.setItem("open-typora-file-sort", sort); localStorage.setItem("open-typora-file-desc", String(descending)); localStorage.setItem("open-typora-folders-first", String(foldersFirst)); }, [sort, descending, foldersFirst]);
+  useEffect(() => { if (!menu) return; const close = () => setMenu(null); const key = (event: KeyboardEvent) => { if (event.key === "Escape") close(); }; document.addEventListener("click", close); document.addEventListener("keydown", key); return () => { document.removeEventListener("click", close); document.removeEventListener("keydown", key); }; }, [menu]);
+  const context = (event: React.MouseEvent, file: FileEntry | null) => { event.preventDefault(); event.stopPropagation(); setMenu({ x: Math.min(event.clientX, window.innerWidth - 210), y: Math.min(event.clientY, window.innerHeight - 380), file }); };
+  function operate(action: FileOperation["action"]) {
+    const file = menu?.file, directory = file?.isDirectory === "true";
+    const parent = directory ? file!.path : file?.path.slice(0, -file.name.length - 1) || props.folder || undefined;
+    props.operation({ action, path: ["new-file", "new-folder"].includes(action) ? parent : file?.path, name: action === "new-file" ? "未命名.md" : action === "new-folder" ? "新文件夹" : action === "duplicate" ? file?.name.replace(/(\.[^.]+)$/, " 副本$1") : file?.name }); setMenu(null);
+  }
   const [switcher, setSwitcher] = useState(false);
   const heading = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -95,6 +114,7 @@ export function Sidebar(props: Props) {
                 >
                   <Plus size={16} />
                 </button>
+                {props.folder && <button className="icon-button" aria-label="文件夹操作" onClick={event => context(event, null)}><MoreHorizontal size={16} /></button>}
                 {props.folder && (
                   <button
                     className="icon-button"
@@ -111,6 +131,7 @@ export function Sidebar(props: Props) {
                 <div
                   className={`file-row ${props.activeId === record.id ? "selected" : ""}`}
                   key={record.id}
+                  onContextMenu={event => { if (record.path) context(event, { token: "", name: record.name, path: record.path, relative: record.name }); }}
                 >
                   <button
                     className="file-select"
@@ -132,7 +153,7 @@ export function Sidebar(props: Props) {
                   </button>
                 </div>
               ))}
-              {props.tab === "tree" ? <FileTree files={props.files} activePath={props.documents.find(record => record.id === props.activeId)?.path} open={props.openToken} /> : props.files
+              {props.tab === "tree" ? <FileTree files={props.files} folder={props.folder} activePath={props.documents.find(record => record.id === props.activeId)?.path} open={props.openToken} context={context} move={(path, target) => props.operation({ action: "move", path, target })} sort={sort} descending={descending} foldersFirst={foldersFirst} /> : sorted
                 .filter(
                   (file) =>
                     !props.documents.some(
@@ -140,7 +161,7 @@ export function Sidebar(props: Props) {
                     ),
                 )
                 .map((file) => (
-                  <div className="file-row" key={file.token}>
+                  <div className="file-row" key={file.token} onContextMenu={event => context(event, file)}>
                     <button
                       className="file-select"
                       title={file.relative}
@@ -182,7 +203,12 @@ export function Sidebar(props: Props) {
           </nav>
         )}
       </div>
-      <div className="sidebar-footer">
+      {menu && <div className="file-context-menu" role="menu" aria-label="文件操作" style={{ left: menu.x, top: Math.max(45, menu.y) }} onClick={event => event.stopPropagation()}>
+        <button role="menuitem" onClick={() => operate("new-file")}>新建文件…</button><button role="menuitem" onClick={() => operate("new-folder")}>新建文件夹…</button>
+        {menu.file && <><hr />{menu.file.isDirectory !== "true" && <button role="menuitem" onClick={() => operate("duplicate")}>创建副本…</button>}<button role="menuitem" onClick={() => operate("rename")}>重命名…</button><button role="menuitem" onClick={() => operate("move")}>移动到…</button><button role="menuitem" onClick={() => operate("trash")}>移到废纸篓</button><button role="menuitem" onClick={() => { void host.writeClipboard(menu.file!.path); setMenu(null); }}>复制路径</button><button role="menuitem" onClick={() => { void host.reveal(menu.file!.path).catch(e => props.notify(e.message)); setMenu(null); }}>在 Finder 中显示</button></>}
+        <hr /><button role="menuitem" onClick={() => operate("undo")}>撤销上次文件操作</button><hr /><label>排序<select aria-label="文件排序" value={sort} onChange={e => setSort(e.target.value as FileSort)}><option value="natural">自然名称</option><option value="name">字母顺序</option><option value="modified">修改时间</option><option value="created">创建时间</option></select></label><label><input type="checkbox" checked={descending} onChange={e => setDescending(e.target.checked)} />降序</label><label><input type="checkbox" checked={foldersFirst} onChange={e => setFoldersFirst(e.target.checked)} />文件夹优先</label>
+      </div>}
+      <div className="sidebar-footer"><button className="icon-button" aria-label="搜索文件夹" title="搜索文件夹 ⌘⇧F" onClick={props.search}><Search size={16} /></button><button className="icon-button" aria-label="最近项目" onClick={props.recent}><History size={16} /></button>
         <button
           className="icon-button"
           aria-label="打开文件夹"

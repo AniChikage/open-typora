@@ -1,3 +1,7 @@
+import { ImageDialog } from "../components/ImageDialog";
+import { imageReferences } from "./images";
+import type { ImageReference } from "./images";
+import { textMatches, replaceTextMatches } from "./search";
 import {
   forwardRef,
   useEffect,
@@ -44,6 +48,8 @@ export interface EditorHandle {
   clearFormat(): void;
   findNext(back?: boolean): void;
   context(): string;
+  composing(): boolean;
+  transform(change: (text: string) => string): void;
 }
 interface Props {
   document: DocumentRecord;
@@ -73,12 +79,15 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
     const [visibleMode, setVisibleMode] = useState(
       rendered && record.content.length <= 300_000,
     );
+    const [editingImage, setEditingImage] = useState<ImageReference | null>(null);
+    const imageQueue = useRef(Promise.resolve());
     const [searchOpen, setSearchOpen] = useState(false),
       [query, setQuery] = useState(""),
       [replacement, setReplacement] = useState("");
+    const [searchOptions, setSearchOptions] = useState({ regex: false, caseSensitive: false, wholeWord: false });
     const [searchStatus, setSearchStatus] = useState("");
     const searchField = useRef<HTMLInputElement>(null);
-    const searchTerms = useRef({ query, replacement }); searchTerms.current = { query, replacement };
+    const searchTerms = useRef({ query, replacement, searchOptions }); searchTerms.current = { query, replacement, searchOptions };
     const syncing = useRef(false);
     const sourceBehavior = useRef(new Compartment());
     const sourceOptions = () => [indentUnit.of(" ".repeat(viewOptions.current.preferences?.tabSize || 2)), ...(viewOptions.current.preferences?.autoPair ? [closeBrackets(), keymap.of(closeBracketsKeymap)] : [])];
@@ -105,60 +114,27 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
       callbacks.current.onChange(model.current!.toMarkdown());
       historyState();
     };
+    function matches() {
+      try { return textMatches(model.current?.text || "", searchTerms.current.query, searchTerms.current.replacement, searchTerms.current.searchOptions); }
+      catch (error) { setSearchStatus(`表达式无效：${(error as Error).message}`); return null; }
+    }
     function findNext(back = false) {
-      const doc = model.current;
-      const query = searchTerms.current.query;
-      if (!doc || !query) return;
-      const start = back
-        ? Math.min(doc.selection.anchor, doc.selection.head) - 1
-        : Math.max(doc.selection.anchor, doc.selection.head);
-      let at = back
-        ? doc.text.lastIndexOf(query, start)
-        : doc.text.indexOf(query, start);
-      if (at < 0)
-        at = back ? doc.text.lastIndexOf(query) : doc.text.indexOf(query);
-      if (at < 0) {
-        setSearchStatus("未找到匹配内容");
-        return;
-      }
-      rich.current?.select({ anchor: at, head: at + query.length }, false);
-      setSearchStatus(
-        `${doc.text.slice(0, at).split(query).length} / ${doc.text.split(query).length - 1}`,
-      );
+      const doc = model.current, found = matches(); if (!doc || !found) return;
+      if (!found.length) { setSearchStatus("未找到匹配内容"); return; }
+      const from = Math.min(doc.selection.anchor, doc.selection.head), to = Math.max(doc.selection.anchor, doc.selection.head);
+      const exact = found.findIndex(match => match.from === from && match.to === to);
+      const index = exact >= 0 ? (exact + (back ? -1 : 1) + found.length) % found.length : back ? found.findLastIndex(match => match.to <= from) : found.findIndex(match => match.from >= to);
+      const chosen = index >= 0 ? index : back ? found.length - 1 : 0, match = found[chosen];
+      rich.current?.select({ anchor: match.from, head: match.to }, false); setSearchStatus(`${chosen + 1} / ${found.length}`);
     }
     function replaceMatch(all = false) {
-      const doc = model.current;
-      if (!doc || !query) return;
-      rich.current?.releaseFence();
-      if (all) {
-        const count = doc.text.split(query).length - 1;
-        if (!count) {
-          setSearchStatus("未找到匹配内容");
-          return;
-        }
-        doc.closeGroup();
-        doc.replace(
-          0,
-          doc.text.length,
-          doc.text.split(query).join(replacement),
-          "replace-all",
-          { anchor: 0, head: 0 },
-        );
-        rich.current?.render(false);
-        publish();
-        setSearchStatus(`已替换 ${count} 处`);
-        return;
-      }
-      const from = Math.min(doc.selection.anchor, doc.selection.head),
-        to = Math.max(doc.selection.anchor, doc.selection.head);
-      if (doc.text.slice(from, to) !== query) {
-        findNext();
-        return;
-      }
-      doc.replace(from, to, replacement, "replace");
-      rich.current?.render(false);
-      publish();
-      findNext();
+      const doc = model.current, found = matches(); if (!doc || !found) return;
+      if (!found.length) { setSearchStatus("未找到匹配内容"); return; }
+      rich.current?.releaseFence(); doc.closeGroup();
+      if (all) { doc.replace(0, doc.text.length, replaceTextMatches(doc.text, found), "replace-all", { anchor: 0, head: 0 }); rich.current?.render(false); publish(); setSearchStatus(`已替换 ${found.length} 处`); return; }
+      const from = Math.min(doc.selection.anchor, doc.selection.head), to = Math.max(doc.selection.anchor, doc.selection.head), match = found.find(item => item.from === from && item.to === to);
+      if (!match) { findNext(); return; }
+      doc.replace(from, to, match.replacement, "replace"); rich.current?.render(false); publish(); findNext();
     }
     function syncSource() {
       const view = source.current,
@@ -189,13 +165,15 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
         source.current?.focus();
       }
     }
-    async function insertImage(file: File) {
+    function insertImage(file: File) { imageQueue.current = imageQueue.current.then(() => insertImageNow(file)); return imageQueue.current; }
+    async function insertImageNow(file: File) {
       try {
-        const relative = await host.importImage(
+        let relative = await host.importImage(
           initial.current.id,
           new Uint8Array(await file.arrayBuffer()),
-          file.name,
+          file.name, { ...viewOptions.current.preferences, source: model.current?.toMarkdown() },
         );
+        if (viewOptions.current.preferences?.imageAutoUpload) { try { const mapped = await host.imageAction(initial.current.id, [relative], "upload", { ...viewOptions.current.preferences }); if (mapped?.[relative]) relative = mapped[relative]; } catch (e) { callbacks.current.onError(`上传失败，已保留本地图片：${(e as Error).message}`); } }
         insert(`![${file.name.replace(/[\[\]]/g, "")}](${relative})`, "paste");
       } catch (error) {
         callbacks.current.onError((error as Error).message);
@@ -379,6 +357,8 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
       ref,
       () => ({
         view: () => source.current,
+        composing: () => !!(rich.current?.composing || source.current?.composing),
+        transform: change => { const doc = model.current; if (!doc) return; doc.closeGroup(); const next = change(doc.text); if (next !== doc.text) { doc.replace(0, doc.text.length, next, "document-command"); if (activeMode.current) rich.current?.render(false); else syncSource(); publish(); } },
         find: () => {
           if (!activeMode.current) {
             ensureSource();
@@ -493,7 +473,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
     });
     useEffect(() => {
       if (rich.current) {
-        rich.current.setOptions({ spellcheck: preferences?.spellcheck ?? false, tabSize: preferences?.tabSize || 2, typewriter, autoPair: preferences?.autoPair ?? false });
+        rich.current.setOptions({ spellcheck: preferences?.spellcheck ?? false, tabSize: preferences?.tabSize || 2, typewriter, autoPair: preferences?.autoPair ?? false, emoji: preferences?.emoji ?? true });
         model.current?.refreshCaret(); rich.current.render(false);
       }
       if (source.current) source.current.contentDOM.spellcheck = preferences?.spellcheck ?? false;
@@ -544,6 +524,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
                 ↓
               </button>
               <span role="status">{searchStatus}</span>
+              {([["caseSensitive", "区分大小写"], ["wholeWord", "全词匹配"], ["regex", "正则表达式"]] as const).map(([key, label]) => <button key={key} aria-label={label} aria-pressed={searchOptions[key]} className={searchOptions[key] ? "search-option-active" : ""} onClick={() => { setSearchOptions(previous => ({ ...previous, [key]: !previous[key] })); setSearchStatus(""); }}>{key === "caseSensitive" ? "Aa" : key === "wholeWord" ? "W" : ".*"}</button>)}
               <button
                 onClick={() => {
                   setSearchOpen(false);
@@ -566,7 +547,19 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
             </div>
           </div>
         )}
-        <div className="rich-scroller" hidden={!visibleMode}>
+        {editingImage && <ImageDialog image={editingImage} documentId={record.id} options={{ ...preferences }} close={() => { setEditingImage(null); rich.current?.restore(); }} submit={value => {
+          const doc = model.current!; if (doc.text.slice(editingImage.from, editingImage.to) !== editingImage.source) { callbacks.current.onError("图片源码已变化，请重新选择图片。"); return; }
+          doc.closeGroup(); doc.replace(editingImage.from, editingImage.to, value, "image-edit"); rich.current?.render(false); publish();
+        }} />}
+        <div className="rich-scroller" hidden={!visibleMode} onDoubleClick={event => {
+          const image = (event.target as HTMLElement).closest("img"); if (!image) return;
+          const object = image.closest<HTMLElement>(".md-inline[data-mark='image']");
+          let from: number | undefined;
+          if (object) { const leaf = rich.current?.leaves.get(object.closest<HTMLElement>("[data-leaf]")?.dataset.leaf || ""); from = leaf?.positions[Number(object.dataset.inlineFrom)]; }
+          const node = image.closest<HTMLElement>("[data-cid]"); if (from === undefined && node) from = model.current?.nodes.find(item => item.id === node.dataset.cid)?.from;
+          const reference = imageReferences(model.current?.text || "").find(item => item.from === from);
+          if (reference) { event.preventDefault(); setEditingImage(reference); }
+        }} onContextMenu={event => { if ((event.target as HTMLElement).closest("img")) { event.preventDefault(); (event.target as HTMLElement).dispatchEvent(new MouseEvent("dblclick", { bubbles: true })); } }}>
           <div className="rich-document" ref={root} />
         </div>
         <div

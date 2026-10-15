@@ -1,3 +1,4 @@
+import DOMPurify from "dompurify";
 import type { MarkdownIt } from "markdown-it";
 export interface DocumentHeading { line: number; level: number; text: string; id: string }
 export interface FootnoteDefinition { id: string; text: string; line: number }
@@ -8,7 +9,24 @@ interface SyntaxEnvironment {
 export function headingSlug(text: string) {
   return text.toLowerCase().trim().replace(/[^\p{L}\p{N}_\-\s]/gu, "").replace(/\s+/g, "-") || "section";
 }
+export function alertTitle(kind: string) {
+  const label = kind[0].toUpperCase() + kind.slice(1).toLowerCase();
+  return `<span class="markdown-alert-title"><svg class="alert-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7v4M8 4.3v1" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>${label}</span>`;
+}
 export function configureDocumentSyntax(md: MarkdownIt) {
+  md.renderer.rules.html_block = (tokens, index) => DOMPurify.sanitize(tokens[index].content, { ALLOW_DATA_ATTR: false, FORBID_ATTR: ["contenteditable"], ADD_TAGS: ["video", "audio", "source", "iframe"], ADD_ATTR: ["allowfullscreen", "sandbox"] });
+  md.renderer.rules.alert_marker = (tokens, index) => alertTitle(tokens[index].content);
+  md.core.ruler.after("inline", "alert_blocks", state => {
+    for (let i = 0; i < state.tokens.length - 2; i++) {
+      const token = state.tokens[i], inline = state.tokens[i + 2];
+      if (token.type !== "blockquote_open" || inline.type !== "inline") continue;
+      const match = /^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\](?:\n|$)/i.exec(inline.content); if (!match) continue;
+      token.attrJoin("class", `markdown-alert markdown-alert-${match[1].toLowerCase()}`);
+      const title = match[1][0].toUpperCase() + match[1].slice(1).toLowerCase(); token.attrSet("data-alert", title);
+      const marker = inline.children?.[0];
+      if (marker?.type === "text" && marker.content === match[0].trim()) { marker.type = "alert_marker"; marker.markup = marker.content; marker.content = title; }
+    }
+  });
   md.block.ruler.before("hr", "frontmatter", (state, startLine, endLine, silent) => {
     if (startLine !== 0 || state.src.slice(state.bMarks[0], state.eMarks[0]) !== "---") return false;
     let end = 1;
@@ -92,6 +110,13 @@ export function configureDocumentSyntax(md: MarkdownIt) {
     }
     if (!state.env.fragment) state.env.headings = headings;
   });
+  md.inline.ruler.before("emphasis", "html_embed", (state, silent) => {
+    const raw = state.src.slice(state.pos), match = /^(?:<img\b[^>]*>|<(span|a|ruby|abbr|small|b|i|strong|em|code|samp|time|label)\b[^>]*>[\s\S]*?<\/\1>)/i.exec(raw);
+    if (!match) return false;
+    if (!silent) { const token = state.push("html_embed", "span", 0); token.content = match[0]; token.markup = match[0]; }
+    state.pos += match[0].length; return true;
+  });
+  md.renderer.rules.html_embed = (tokens, index) => DOMPurify.sanitize(tokens[index].content, { ALLOW_DATA_ATTR: false, FORBID_ATTR: ["contenteditable"] });
   md.inline.ruler.before("emphasis", "safe_inline_html", (state, silent) => {
     const raw = state.src.slice(state.pos), close = /^<\/(u|sub|sup|mark|kbd|span)>/i.exec(raw), open = /^<(u|sub|sup|mark|kbd)>/i.exec(raw), span = /^<span\s+style\s*=\s*(["'])\s*color\s*:\s*(#[0-9a-f]{3,8}|[a-z]+)\s*;?\s*\1\s*>/i.exec(raw);
     const match = close || open || span;

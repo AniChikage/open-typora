@@ -139,6 +139,9 @@ try {
     "fixture.png",
   );
   if (!imported.ok) throw new Error(imported.error);
+  const uploadedImage = await window.desktop.imageAction("webkit-fixture", [imported.value], "upload", {imageUploader:uploaderURL});
+  if (!uploadedImage.ok) throw new Error(uploadedImage.error);
+  check(uploadedImage.value[imported.value] === "https://images.example.invalid/owned-fixture.png", "native PicGo upload validates the response from an owned local HTTP server");
   pointText("WebKit 验收", 9);
   const transfer = new DataTransfer();
   transfer.setData("text/plain", "\n\n![验收](" + imported.value + ")\n\n");
@@ -167,6 +170,13 @@ try {
     saved.value.content === source,
     "native save bridge returns the exact source content",
   );
+  const renamedFile = await window.desktop.fileOperation({action:'rename', path:saved.value.path, name:'Renamed-fixture.md'});
+  if (!renamedFile.ok) throw new Error(renamedFile.error);
+  await wait(() => document.querySelector('.document-title')?.textContent.includes('Renamed-fixture.md'));
+  const undoneFile = await window.desktop.fileOperation({action:'undo'});
+  if (!undoneFile.ok) throw new Error(undoneFile.error);
+  await wait(() => document.querySelector('.document-title')?.textContent.includes('WebKit-fixture.md'));
+  check(readSource() === source, "native file operation preparation, path synchronization and undo preserve exact editor bytes");
   window.__openTypora.command({ action: "pdf" });
   await wait(() =>
     document.querySelector(".toast")?.textContent.includes("PDF 已导出"),
@@ -175,12 +185,23 @@ try {
     true,
     "native PDF export completes asynchronously without blocking the editor",
   );
+  const longHtml = '<!doctype html><html><head><style>html,body{margin:0;padding:0}.print-document{display:flow-root;font:14px/24px sans-serif}h2{margin:20px 0 8px}table{width:100%;border-collapse:collapse}td{padding:10px;border:1px solid #ccc}p{margin:0 0 16px}</style></head><body><article class="print-document"><h1>Pagination fixture</h1>' + Array.from({length:90}, (_, i) => '<h2>Heading-' + String(i+1).padStart(3,'0') + '</h2><p>Paragraph-' + String(i+1).padStart(3,'0') + ' keeps each complete line on a page.</p>').join('') + '<table>' + Array.from({length:30}, (_, i) => '<tr><td>Row-' + String(i+1).padStart(3,'0') + '</td><td>Complete table cell</td></tr>').join('') + '</table></article></body></html>';
+  const longPdf = await window.desktop.exportPdf(longHtml, {testName:'long', paper:'letter', margin:42, title:'Pagination fixture', header:'${title}', footer:'${pageNo} / ${totalPages}'});
+  if (!longPdf.ok) throw new Error(longPdf.error);
+  check(true, "long PDF uses configurable paper, margins, headers and line-aware page boundaries");
   const marginPdf = await window.desktop.exportPdf('<!doctype html><html><head><style>html,body{margin:0;padding:0}.print-document{display:flow-root}p{margin:0 0 800px;font:16px/24px sans-serif}</style></head><body><article class="print-document"><p>Trailing margin regression</p></article></body></html>');
   if (!marginPdf.ok) throw new Error(marginPdf.error);
   check(true, "native PDF ignores an unpainted trailing block margin");
   window.__openTypora.command({ action: "html" });
   await wait(() => document.querySelector(".toast")?.textContent.includes("HTML 已导出"));
   check(true, "native HTML export embeds local fonts and images without live app links");
+  const reopenDraft = {id:'reopen-draft',path:null,name:'Reopen-draft.md',content:'',savedContent:'',diskHash:null,lineEnding:'\n'};
+  const registeredDraft = await window.desktop.registerDraft(reopenDraft); if (!registeredDraft.ok) throw new Error(registeredDraft.error);
+  window.__openTypora.command({action:'opened',document:reopenDraft}); await wait(() => document.querySelector('.document-title')?.textContent === 'Reopen-draft.md');
+  window.__openTypora.command({action:'close'}); await wait(() => document.querySelector('.document-title')?.textContent === 'WebKit-fixture.md');
+  window.__openTypora.command({action:'reopen'}); await wait(() => document.querySelector('.document-title')?.textContent === 'Reopen-draft.md');
+  check(true, "native reopen falls back to the same-window closed-document history when no closed window exists");
+  window.__openTypora.command({action:'close'}); await wait(() => document.querySelector('.document-title')?.textContent === 'WebKit-fixture.md');
   await sourceMode(false);
   pointText("粗测新体", 2);
   input("insertText", "保留");

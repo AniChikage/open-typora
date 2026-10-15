@@ -32,6 +32,10 @@ struct SessionRecord: Codable {
 func hashData(_ data: Data) -> String {
   SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
 }
+func canonicalFileURL(_ url: URL) -> URL {
+  if let path = Darwin.realpath(url.path, nil) { defer { free(path) }; return URL(fileURLWithPath: String(cString: path)) }
+  return url.standardizedFileURL.resolvingSymlinksInPath()
+}
 func contained(_ base: URL, _ target: URL) -> Bool {
   let prefix = base.standardizedFileURL.path + "/"
   return target.standardizedFileURL.path.hasPrefix(prefix)
@@ -73,7 +77,7 @@ final class DocumentStore {
   var tokens = [String: URL]()
   var folder: URL?
   var activeId: String?
-  private var closedRecords = [String: DocumentRecord]()
+  var closedRecords = [String: DocumentRecord]()
   private var closedOrder = [String]()
   static let maxBytes = 20 * 1024 * 1024
   init(_ directory: URL) { dataDirectory = directory }
@@ -91,7 +95,8 @@ final class DocumentStore {
     return (text, bom)
   }
   func open(_ file: URL, id: String? = nil) throws -> DocumentRecord {
-    let resolved = file.resolvingSymlinksInPath().standardizedFileURL
+    let resolved = canonicalFileURL(file)
+    if id == nil, let existing = records.values.first(where: { $0.path == resolved.path }) { return existing }
     guard ["md", "markdown", "mdown"].contains(resolved.pathExtension.lowercased()) else {
       throw NativeFailure("请选择 Markdown 文件。")
     }
@@ -183,34 +188,38 @@ final class DocumentStore {
     return updated
   }
   func scan(_ directory: URL? = nil) throws -> [String: Any] {
-    if let directory { folder = directory.resolvingSymlinksInPath() }
+    if let directory { folder = canonicalFileURL(directory) }
     guard let root = folder else { return ["folder": NSNull(), "files": [], "truncated": false] }
     tokens = [:]
     var files = [[String: String]]()
     var truncated = false
     func walk(_ parent: URL, _ depth: Int) throws {
       let children = try FileManager.default.contentsOfDirectory(
-        at: parent, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
+        at: parent, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey, .contentModificationDateKey, .creationDateKey],
         options: [.skipsHiddenFiles]
       ).sorted {
         $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending
       }
       for file in children {
-        let values = try file.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+        let values = try file.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey, .contentModificationDateKey, .creationDateKey])
         if values.isSymbolicLink == true || file.lastPathComponent == "node_modules" { continue }
         if files.count >= 1000 {
           truncated = true
           return
         }
-        if values.isDirectory == true {
-          if depth < 8 { try walk(file, depth + 1) } else { truncated = true }
-        } else if ["md", "markdown", "mdown"].contains(file.pathExtension.lowercased()) {
-          let token = UUID().uuidString
+        if values.isDirectory == true || ["md", "markdown", "mdown"].contains(file.pathExtension.lowercased()) {
+          let token = hashData(Data(file.path.utf8))
           tokens[token] = file
           files.append([
             "token": token, "name": file.lastPathComponent,
             "relative": String(file.path.dropFirst(root.path.count + 1)), "path": file.path,
+            "isDirectory": values.isDirectory == true ? "true" : "false",
+            "modified": String(values.contentModificationDate?.timeIntervalSince1970 ?? 0),
+            "created": String(values.creationDate?.timeIntervalSince1970 ?? 0),
           ])
+          if values.isDirectory == true {
+            if depth < 8 { try walk(file, depth + 1) } else { truncated = true }
+          }
         }
       }
     }
@@ -284,21 +293,32 @@ final class DocumentStore {
       return SessionRecord(documents: [], restoreError: "上次会话未能读取，原始恢复文件已另存为备份。")
     }
   }
+  func yamlValue(_ key: String, source: String) -> String? {
+    let normalized = source.replacingOccurrences(of: "\r\n", with: "\n")
+    guard normalized.hasPrefix("---\n"), let end = normalized.dropFirst(4).range(of: "\n---") else { return nil }
+    let metadata = String(normalized[normalized.index(normalized.startIndex, offsetBy: 4)..<end.lowerBound])
+    for line in metadata.components(separatedBy: "\n") where line.hasPrefix(key + ":") {
+      let value = line.dropFirst(key.count + 1).trimmingCharacters(in: .whitespaces)
+      return value.trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+    }
+    return nil
+  }
   func asset(_ id: String, relative: String) throws -> URL {
     let record = try require(id)
-    guard let path = record.path, !relative.hasPrefix("/"),
-      ["png", "jpg", "jpeg", "gif", "webp", "avif"].contains(
-        (relative as NSString).pathExtension.lowercased())
-    else { throw NativeFailure("图片路径不可用。") }
-    let base = URL(fileURLWithPath: path).deletingLastPathComponent().resolvingSymlinksInPath()
-    let target = base.appendingPathComponent(relative).resolvingSymlinksInPath()
-    guard contained(base, target),
-      (try target.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? Self.maxBytes + 1)
-        <= Self.maxBytes
-    else { throw NativeFailure("图片位于文档目录之外或超过 20 MB。") }
+    let reference = URL(string: relative).flatMap { $0.isFileURL ? $0.path : nil } ?? relative.removingPercentEncoding ?? relative
+    guard ["png", "jpg", "jpeg", "gif", "webp", "avif", "svg", "mp4", "webm", "ogg", "mp3", "wav", "m4a"].contains((reference as NSString).pathExtension.lowercased()), !reference.contains("\0") else { throw NativeFailure("图片路径不可用。") }
+    let parent = record.path.map { URL(fileURLWithPath: $0).deletingLastPathComponent() } ?? dataDirectory
+    let target: URL
+    if let root = yamlValue("typora-root-url", source: record.content), !root.contains("://") {
+      let base = root.hasPrefix("/") ? URL(fileURLWithPath: root) : parent.appendingPathComponent(root)
+      target = base.appendingPathComponent(reference.trimmingCharacters(in: CharacterSet(charactersIn: "/"))).standardizedFileURL
+    } else { target = (reference.hasPrefix("/") ? URL(fileURLWithPath: reference) : parent.appendingPathComponent(reference)).standardizedFileURL }
+    guard target.path == target.resolvingSymlinksInPath().path,
+      (try target.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])).isRegularFile == true,
+      (try target.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? Self.maxBytes + 1) <= Self.maxBytes else { throw NativeFailure("图片路径指向目录之外的符号链接，或超过 20 MB。") }
     return target
   }
-  func importImage(_ id: String, bytes: Data, name: String) throws -> String {
+  func importImage(_ id: String, bytes: Data, name: String, options: [String: Any] = [:]) throws -> String {
     let record = try require(id)
     guard let path = record.path else { throw NativeFailure("请先保存文档，再添加本地图片。") }
     guard bytes.count >= 12, bytes.count <= Self.maxBytes else { throw NativeFailure("图片大小无效。") }
@@ -315,18 +335,26 @@ final class DocumentStore {
     {
       ext = "webp"
     }
-    guard let ext else { throw NativeFailure("支持 PNG、JPEG、GIF 和 WebP 图片。") }
+    if ext == nil, let text = String(data: bytes.prefix(1024), encoding: .utf8), text.contains("<svg") { ext = "svg" }
+    guard let ext else { throw NativeFailure("支持 PNG、JPEG、GIF、WebP 和 SVG 图片。") }
     let parent = URL(fileURLWithPath: path).deletingLastPathComponent().resolvingSymlinksInPath()
-    let assets = parent.appendingPathComponent(".assets")
+    let source = options["source"] as? String ?? record.content
+    let configured = yamlValue("typora-copy-images-to", source: source) ?? options["imageFolder"] as? String ?? ".assets"
+    let folderName = configured.replacingOccurrences(of: "${filename}", with: (record.name as NSString).deletingPathExtension)
+    guard !folderName.contains("://"), !folderName.contains("\0") else { throw NativeFailure("图片复制目录无效。") }
+    let assets = (folderName.hasPrefix("/") ? URL(fileURLWithPath: folderName) : parent.appendingPathComponent(folderName.isEmpty ? ".assets" : folderName)).standardizedFileURL
+    guard assets.path == assets.resolvingSymlinksInPath().path else { throw NativeFailure("图片目录指向文档目录之外的符号链接。") }
     try FileManager.default.createDirectory(at: assets, withIntermediateDirectories: true)
-    guard contained(parent, assets.resolvingSymlinksInPath()) else {
-      throw NativeFailure("图片目录指向文档目录之外。")
-    }
     let stem = (name as NSString).deletingPathExtension.unicodeScalars.map {
       CharacterSet.alphanumerics.contains($0) || $0 == "_" || $0 == "-" ? String($0) : "-"
     }.prefix(60).joined()
-    let relative = ".assets/\(stem.isEmpty ? "image" : stem)-\(UUID().uuidString.prefix(8)).\(ext)"
-    try atomicWrite(parent.appendingPathComponent(relative), bytes)
+    let destination = assets.appendingPathComponent("\(stem.isEmpty ? "image" : stem)-\(UUID().uuidString.prefix(8)).\(ext)")
+    try atomicWrite(destination, bytes)
+    let parentParts = parent.pathComponents, targetParts = destination.pathComponents
+    var common = 0; while common < min(parentParts.count, targetParts.count) && parentParts[common] == targetParts[common] { common += 1 }
+    var relative = (Array(repeating: "..", count: parentParts.count - common) + targetParts.dropFirst(common)).joined(separator: "/")
+    if options["imagePrefix"] as? Bool == true, !relative.hasPrefix(".") { relative = "./" + relative }
+    if options["imageEscape"] as? Bool != false { relative = relative.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: " ()#?"))) ?? relative }
     return relative
   }
 }

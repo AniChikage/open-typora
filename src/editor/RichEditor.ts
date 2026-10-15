@@ -1,3 +1,6 @@
+import emojiNames from "markdown-it-emoji/lib/data/full.mjs";
+import { clearInlineFormats } from "./inlineFormats.ts";
+import type { InlineFormat } from "./inlineFormats.ts";
 import { EditorState, Compartment } from "@codemirror/state";
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { indentUnit } from "@codemirror/language";
@@ -36,6 +39,12 @@ export class RichEditor {
   private pointing = false;
   private html = new Map<string, string>();
   private fence: { id: string; leaf: Leaf; view: EditorView } | null = null;
+  private emojiPopup: HTMLDivElement;
+  private emojiOptions: string[] = [];
+  private emojiIndex = 0;
+  private emojiFrom = 0;
+  private emojiEnabled = true;
+  private emojiDismissed = "";
   private tableToolbar: HTMLDivElement;
   private pendingFormat = new Map<string, string>();
   private tabSize = 2;
@@ -96,13 +105,16 @@ export class RichEditor {
       button.addEventListener("click", () => this.tableAction(action));
       this.tableToolbar.append(button);
     }
+    this.emojiPopup = document.createElement("div"); this.emojiPopup.className = "emoji-completion"; this.emojiPopup.hidden = true; this.emojiPopup.role = "listbox"; this.emojiPopup.setAttribute("aria-label", "Emoji 建议");
+    this.emojiPopup.addEventListener("mousedown", event => event.preventDefault());
+    root.parentElement!.append(this.emojiPopup);
     root.parentElement!.append(this.tableToolbar);
     this.render(false);
   }
   destroy() {
     cancelAnimationFrame(this.scrollFrame);
     this.fence?.view.destroy();
-    this.tableToolbar.remove();
+    this.tableToolbar.remove(); this.emojiPopup.remove();
     document.removeEventListener("selectionchange", this.selectionChange);
     document.removeEventListener("pointerup", this.pointerUp);
     for (const [type, listener] of [
@@ -301,9 +313,10 @@ export class RichEditor {
     const before = this.model.text.slice(0, this.model.selection.head),
       lines = before.split("\n");
     this.callbacks.cursor(lines.length, lines.at(-1)!.length + 1);
-    this.updateWritingMode();
+    this.updateWritingMode(); this.updateEmoji();
   }
-  setOptions(options: { spellcheck: boolean; tabSize: number; typewriter: boolean; autoPair?: boolean }) {
+  setOptions(options: { spellcheck: boolean; tabSize: number; typewriter: boolean; autoPair?: boolean; emoji?: boolean }) {
+    this.emojiEnabled = options.emoji !== false;
     this.root.spellcheck = options.spellcheck;
     this.tabSize = options.tabSize;
     this.typewriter = options.typewriter;
@@ -314,6 +327,11 @@ export class RichEditor {
   private updateWritingMode() {
     const active = this.model.nodeAt(this.model.selection.head);
     for (const block of this.root.children) block.classList.toggle("is-active", block.getAttribute("data-cid") === active?.id);
+    const activeElement = active && this.root.querySelector<HTMLElement>(`[data-cid="${active.id}"]`), selection = window.getSelection();
+    if (activeElement && selection?.rangeCount && activeElement.contains(selection.anchorNode)) {
+      const range = selection.getRangeAt(0), rect = typeof range.getBoundingClientRect === "function" ? range.getBoundingClientRect() : null;
+      if (rect && rect.height) { const parent = selection.anchorNode?.parentElement, height = parent ? parseFloat(getComputedStyle(parent).lineHeight) || rect.height : rect.height; activeElement.style.setProperty("--focus-line-top", `${Math.max(0, rect.top - activeElement.getBoundingClientRect().top - (height - rect.height) / 2)}px`); activeElement.style.setProperty("--focus-line-height", `${height}px`); }
+    }
     if (!this.typewriter || this.composing || !this.root.contains(window.getSelection()?.anchorNode || null)) return;
     cancelAnimationFrame(this.scrollFrame);
     this.scrollFrame = requestAnimationFrame(() => {
@@ -586,16 +604,21 @@ export class RichEditor {
   };
   private paste = (event: ClipboardEvent) => {
     if ((event.target as HTMLElement).closest(".cm-editor")) return;
-    const image = [...(event.clipboardData?.files || [])].find((file) =>
-      file.type.startsWith("image/"),
-    );
-    if (image) {
+    const images = [...(event.clipboardData?.files || [])].filter(file => file.type.startsWith("image/"));
+    if (images.length) {
       event.preventDefault();
       this.model.selection = this.bookmark();
-      this.callbacks.image(image);
+      for (const image of images) this.callbacks.image(image);
       return;
     }
     const html = event.clipboardData?.getData("text/html");
+    const plain = event.clipboardData?.getData("text/plain") || "";
+    const cell = window.getSelection()?.anchorNode?.parentElement?.closest("td,th");
+    if (cell && (plain.includes("\t") || html && /<table\b/i.test(html))) {
+      const table = html ? new DOMParser().parseFromString(html, "text/html").querySelector("table") : null;
+      const grid = table ? [...table.rows].map(row => [...row.cells].map(cell => htmlToMarkdown(cell.innerHTML))) : plain.replace(/\r\n/g, "\n").replace(/\n$/, "").split("\n").map(line => line.split("\t"));
+      if (this.pasteTable(grid, cell as HTMLTableCellElement)) { event.preventDefault(); return; }
+    }
     const text = event.clipboardData?.getData("text/x-open-typora-markdown") || (html ? htmlToMarkdown(html) : event.clipboardData?.getData("text/plain"));
     if (text !== undefined) {
       event.preventDefault();
@@ -702,13 +725,13 @@ export class RichEditor {
       this.publish();
   };
   private drop = (event: DragEvent) => {
-    const image = [...(event.dataTransfer?.files || [])].find((file) =>
-      file.type.startsWith("image/"),
-    );
-    if (image) {
+    const droppedPath = event.dataTransfer?.getData("application/x-open-typora-file");
+    if (droppedPath) { event.preventDefault(); const name = droppedPath.split("/").at(-1) || "文档"; this.insert(`[${name.replace(/[\[\]]/g, "")}](${encodeURI(droppedPath).replace(/[()]/g, c => "%" + c.charCodeAt(0).toString(16))})`, "drop"); return; }
+    const images = [...(event.dataTransfer?.files || [])].filter(file => file.type.startsWith("image/"));
+    if (images.length) {
       event.preventDefault();
       this.model.selection = this.bookmark();
-      this.callbacks.image(image);
+      for (const image of images) this.callbacks.image(image);
     }
   };
   private click = (event: MouseEvent) => {
@@ -748,6 +771,23 @@ export class RichEditor {
     const object = target.closest<HTMLElement>('.md-inline[data-mark="math"],.md-inline[data-mark="sub"],.md-inline[data-mark="sup"],.md-inline[data-mark="emoji"],.md-inline[data-mark="image"]');
     if (object && target.closest(".md-view")) { const leaf = this.leaves.get(object.closest<HTMLElement>("[data-leaf]")!.dataset.leaf!)!; const at = leaf.positions[Number(object.dataset.inlineFrom)] + (object.dataset.mark === "image" ? 2 : 1); this.model.selection = { anchor: at, head: at }; this.restore(); }
   };
+  private updateEmoji() {
+    const selection = this.model.selection, match = /(?:^|[\s(]):([a-zA-Z0-9_+-]{1,30})$/.exec(this.model.text.slice(0, selection.head));
+    const node = this.model.nodeAt(selection.head);
+    if (!this.emojiEnabled || this.composing || this.fence || selection.anchor !== selection.head || !match || ["fence", "frontmatter", "html_preview", "html_block"].includes(node?.kind || "") || !this.root.contains(window.getSelection()?.anchorNode || null) || this.emojiDismissed === `${selection.head}:${match[1]}`) { this.emojiPopup.hidden = true; return; }
+    const names = Object.keys(emojiNames).filter(name => name.startsWith(match[1].toLowerCase())).slice(0, 10);
+    if (!names.length) { this.emojiPopup.hidden = true; return; }
+    if (names.join() !== this.emojiOptions.join()) this.emojiIndex = 0;
+    this.emojiOptions = names; this.emojiFrom = selection.head - match[1].length - 1;
+    this.emojiPopup.replaceChildren(...names.map((name, index) => { const button = document.createElement("button"); button.role = "option"; button.setAttribute("aria-selected", String(index === this.emojiIndex)); button.textContent = `${emojiNames[name]}  :${name}:`; button.addEventListener("click", () => this.chooseEmoji(index)); return button; }));
+    const range = window.getSelection()?.rangeCount ? window.getSelection()!.getRangeAt(0) : null, rect = range && typeof range.getBoundingClientRect === "function" ? range.getBoundingClientRect() : this.root.getBoundingClientRect();
+    this.emojiPopup.style.left = `${Math.min(window.innerWidth - 245, Math.max(12, rect.left))}px`; this.emojiPopup.style.top = `${Math.min(window.innerHeight - 300, rect.bottom + 6)}px`; this.emojiPopup.hidden = false;
+  }
+  private chooseEmoji(index: number) {
+    const name = this.emojiOptions[index]; if (!name) return;
+    this.emojiPopup.hidden = true; this.model.closeGroup();
+    if (this.model.replace(this.emojiFrom, this.model.selection.head, `:${name}:`, "emoji")) this.publish();
+  }
   private keydown = (event: KeyboardEvent) => {
     if (
       this.composing ||
@@ -755,6 +795,13 @@ export class RichEditor {
       (event.target as HTMLElement).closest(".cm-editor")
     )
       return;
+    if (!this.emojiPopup.hidden && ["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(event.key)) {
+      event.preventDefault(); event.stopPropagation();
+      if (event.key === "Escape") { this.emojiDismissed = `${this.model.selection.head}:${this.model.text.slice(this.emojiFrom + 1, this.model.selection.head)}`; this.emojiPopup.hidden = true; }
+      else if (event.key === "Enter" || event.key === "Tab") this.chooseEmoji(this.emojiIndex);
+      else { this.emojiIndex = (this.emojiIndex + (event.key === "ArrowDown" ? 1 : -1) + this.emojiOptions.length) % this.emojiOptions.length; this.updateEmoji(); }
+      return;
+    }
     if (event.key === "z" && (event.metaKey || event.ctrlKey)) {
       event.preventDefault();
       event.shiftKey ? this.redo() : this.undo();
@@ -1075,14 +1122,41 @@ export class RichEditor {
     if (applyBlockCommand(this.model, action, args, this.tabSize)) this.publish();
   }
   clearFormat() {
-    const selection = this.bookmark(), node = this.model.nodeAt(selection.head);
-    if (!node || ["fence", "table_open", "frontmatter"].includes(node.kind)) return;
-    this.model.selection = selection;
+    if (this.composing || this.fence?.view.hasFocus) return;
+    const selection = this.bookmark();
     let from = Math.min(selection.anchor, selection.head), to = Math.max(selection.anchor, selection.head);
-    if (from === to) { from = node.from; to = node.to; }
-    const raw = this.model.text.slice(from, to);
-    const plain = inlineTokens(raw, this.model.environment).map(token => token.nesting ? "" : token.type.endsWith("break") ? "\n" : token.content).join("");
-    if (this.model.replace(from, to, plain, "clear-format", { anchor: from, head: from + plain.length })) this.publish();
+    if (from === to) { const leaf = [...this.leaves.values()].find(item => !item.kind && item.positions[0] <= from && item.positions.at(-1)! >= from); if (!leaf) return; from = leaf.positions[0]; to = leaf.positions.at(-1)!; }
+    const formats: InlineFormat[] = [];
+    for (const leaf of this.leaves.values()) {
+      if (leaf.kind || leaf.positions[0] > to || leaf.positions.at(-1)! < from) continue;
+      const element = this.root.querySelector(`[data-leaf="${leaf.id}"]`);
+      for (const inline of element?.querySelectorAll<HTMLElement>(".md-inline") || []) {
+        const first = inline.firstElementChild, last = inline.lastElementChild;
+        let open = first?.classList.contains("md-meta") ? first.textContent || "" : "", close = last?.classList.contains("md-meta") ? last.textContent || "" : "";
+        if (["sub", "sup"].includes(inline.dataset.mark || "")) open = close = inline.dataset.mark === "sub" ? "~" : "^";
+        if (!open || !close) continue;
+        formats.push({ from: leaf.positions[Number(inline.dataset.inlineFrom)], to: leaf.positions[Number(inline.dataset.inlineTo)], open, close });
+      }
+    }
+    const next = clearInlineFormats(this.model.text, from, to, formats);
+    this.model.closeGroup();
+    if (this.model.replace(0, this.model.text.length, next.text, "clear-format", { anchor: next.from, head: next.to })) this.publish();
+  }
+  pasteTable(grid: string[][], cell: HTMLTableCellElement) {
+    if (!grid.length || grid.length > 100 || grid.some(row => row.length > 30)) return false;
+    const element = cell.closest<HTMLElement>("[data-cid]"), node = this.model.nodes.find(node => node.id === element?.dataset.cid);
+    if (!node || node.kind !== "table_open") return false;
+    const lines = node.source.split("\n"), rows = lines.map(line => tableRowCells(line).map(cell => cell.raw));
+    let row = (cell.parentElement as HTMLTableRowElement).rowIndex; if (row > 0) row++;
+    const column = cell.cellIndex, width = Math.max(rows[0].length, column + Math.max(...grid.map(row => row.length)));
+    if (width > 30 || row + grid.length > 102) return false;
+    while (rows.length < row + grid.length + (row === 0 ? 1 : 0)) rows.push(Array(width).fill(""));
+    for (const [i, cells] of rows.entries()) while (cells.length < width) cells.push(i === 1 ? "---" : "");
+    for (let i = 0; i < grid.length; i++) { const at = row + i + (row === 0 && i > 0 ? 1 : 0); if (!rows[at]) rows[at] = Array(width).fill(""); for (let j = 0; j < grid[i].length; j++) rows[at][column + j] = grid[i][j].replace(/(?<!\\)\|/g, "\\|").replace(/\r?\n/g, "<br>"); }
+    const output = rows.map(cells => `| ${cells.join(" | ")} |`).join("\n");
+    this.model.closeGroup();
+    if (this.model.replace(node.from, node.to, output, "table-paste")) this.publish();
+    return true;
   }
   codeBlock() {
     if (this.fence?.view.hasFocus) return;

@@ -14,7 +14,15 @@ export interface FileEntry {
   name: string;
   relative: string;
   path: string;
+  isDirectory?: string;
+  modified?: string;
+  created?: string;
 }
+export interface RecentEntry { path: string; name: string; folder: boolean; pinned: boolean }
+export interface FileOperation { action: "new-file" | "new-folder" | "duplicate" | "rename" | "move" | "trash" | "undo"; path?: string; name?: string; target?: string }
+export interface PathChange { fromPath?: string; toPath?: string; removedPath?: string; newPath?: string }
+export interface SearchMatch { token: string; path: string; name: string; line: number; column: number; length: number; preview: string }
+export interface SearchResult { matches: SearchMatch[]; truncated: boolean; skipped: number }
 export interface FolderResult {
   folder: string | null;
   files: FileEntry[];
@@ -38,18 +46,34 @@ export interface SessionSnapshot {
 }
 export interface Command {
   action: string;
+  message?: string;
   document?: DocumentRecord;
+  anchor?: string;
+  line?: number;
 }
 export interface Host {
   native: boolean;
+  windowAction(action: string): Promise<unknown>;
+  imageAction(id: string, sources: string[], action: string, options?: Record<string, unknown>): Promise<Record<string, string> | null>;
+  themes(): Promise<{ id: string; name: string; css: string }[]>;
+  installTheme(): Promise<string | null>;
+  conversionSettings(choose?: boolean): Promise<{ pandoc: string; word: boolean }>;
+  importDocument(): Promise<{ html?: string; markdown?: string; name: string } | null>;
+  exportConverted(id: string, format: string, source: string, html: string): Promise<string | null>;
   restore(): Promise<Recovery | null>;
   registerDraft(record: DocumentRecord): Promise<unknown>;
   open(): Promise<DocumentRecord | null>;
   openFolder(): Promise<FolderResult | null>;
   scan(): Promise<FolderResult>;
+  fileOperation(operation: FileOperation): Promise<PathChange | null>;
+  onFileOperation(callback: (phase: string, change: PathChange) => Promise<boolean>): () => void;
+  recent(): Promise<RecentEntry[]>;
+  recentAction(action: string, path?: string): Promise<FolderResult | DocumentRecord | RecentEntry[] | null>;
+  searchFiles(query: string, options: { regex: boolean; caseSensitive: boolean }): Promise<SearchResult>;
+  reveal(path: string): Promise<unknown>;
   openToken(token: string): Promise<DocumentRecord>;
   reopen(id: string): Promise<DocumentRecord>;
-  chooseImage(id: string): Promise<{ path: string; alt: string } | null>;
+  chooseImage(id: string, options?: Record<string, unknown>): Promise<{ path: string; alt: string } | null>;
   save(
     id: string,
     text: string,
@@ -64,8 +88,8 @@ export interface Host {
     content: string,
     hash: string,
   ): Promise<DocumentRecord>;
-  importImage(id: string, bytes: Uint8Array, name: string): Promise<string>;
-  exportPdf(html?: string): Promise<string | null>;
+  importImage(id: string, bytes: Uint8Array, name: string, options?: Record<string, unknown>): Promise<string>;
+  exportPdf(html?: string, options?: Record<string, unknown>): Promise<string | null>;
   exportHtml(name: string, html: string): Promise<string | null>;
   writeClipboard(text: string): Promise<unknown>;
   readClipboard(): Promise<string>;

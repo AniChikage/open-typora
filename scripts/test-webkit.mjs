@@ -1,8 +1,18 @@
 import { execFileSync, spawn } from "node:child_process";
-import { mkdtemp, mkdir, cp, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, cp, writeFile, rm, readFile } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
+import { createServer } from "node:http";
+import assert from "node:assert/strict";
 const directory = await mkdtemp(path.join(os.tmpdir(), "open-typora-webkit-"));
+const uploads = [];
+const server = createServer(async (request, response) => {
+  try { let body = ""; for await (const chunk of request) body += chunk; const value = JSON.parse(body); assert.equal(request.method, "POST"); assert.equal(value.list.length, 1); const file = value.list[0]; assert.match(file, /fixture-[A-Fa-f0-9-]+\.png$/); const bytes = await readFile(file); assert.deepEqual([...bytes.subarray(0, 8)], [137,80,78,71,13,10,26,10]); uploads.push({ bytes: bytes.length }); response.writeHead(200, {"Content-Type":"application/json"}); response.end(JSON.stringify({success:true,result:["https://images.example.invalid/owned-fixture.png"]})); }
+  catch (error) { response.writeHead(400); response.end(JSON.stringify({error:error.message})); }
+});
+await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+const uploaderURL = `http://127.0.0.1:${server.address().port}/upload`;
+
 try {
   const contents = path.join(directory, "WebKitTests.app/Contents"),
     resources = path.join(contents, "Resources"),
@@ -12,13 +22,15 @@ try {
   execFileSync(
     "/usr/bin/xcrun",
     [
-      "swiftc",
+      "swiftc", "-target", `${process.arch === "arm64" ? "arm64" : "x86_64"}-apple-macos14.0`,
       "-D",
       "WEBTEST",
       "-swift-version",
       "5",
       "native/DocumentStore.swift",
-      "native/StoreTests.swift",
+    "native/Workspace.swift",
+    "native/Interchange.swift",
+    "native/ImageActions.swift",
       "native/App.swift",
       "native/PDFExporter.swift",
       "tests/WebKitTests.swift",
@@ -56,6 +68,7 @@ try {
       env: {
         ...process.env,
         OPEN_TYPORA_DATA_DIR: path.join(directory, "data"),
+        OPEN_TYPORA_TEST_UPLOADER: uploaderURL,
       },
       stdio: "inherit",
     });
@@ -64,6 +77,14 @@ try {
       code === 0 ? resolve() : reject(new Error(`WebKit tests exited ${code}`)),
     );
   });
+  assert.equal(uploads.length, 1, "native PicGo request reaches the owned HTTP fixture once");
+  console.log("PASS: native PicGo integration sends owned PNG bytes and accepts the returned URL");
+  if (process.env.OPEN_TYPORA_QA_DIR) {
+    await mkdir(process.env.OPEN_TYPORA_QA_DIR, { recursive: true });
+    await cp(path.join(directory, "data/native-test-long.pdf"), path.join(process.env.OPEN_TYPORA_QA_DIR, "native-pagination.pdf"));
+  }
 } finally {
+  await new Promise(resolve => server.close(resolve));
+  if (process.env.OPEN_TYPORA_QA_DIR) { await mkdir(process.env.OPEN_TYPORA_QA_DIR, { recursive: true }); try { await cp(path.join(directory, "data/native-test-long.pdf"), path.join(process.env.OPEN_TYPORA_QA_DIR, "native-pagination.pdf")); } catch {} }
   await rm(directory, { recursive: true, force: true });
 }

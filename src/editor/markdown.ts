@@ -9,6 +9,7 @@ import sup from "markdown-it-sup";
 import { full as emoji } from "markdown-it-emoji";
 import { configureDocumentSyntax } from "./markdownExtensions.ts";
 import type { Token } from "markdown-it";
+let allowRemoteImages = true;
 export interface Block {
   fromLine: number;
   toLine: number;
@@ -22,7 +23,7 @@ export interface Heading {
   id: string;
 }
 const md = new MarkdownIt({
-  html: false,
+  html: true,
   linkify: true,
   breaks: true,
   highlight(code, language): string {
@@ -34,8 +35,9 @@ const md = new MarkdownIt({
   .use(taskLists, { enabled: false })
   .use(configureMath)
   .use(mark).use(sub).use(sup).use(emoji, { shortcuts: {} })
-  .use(configureDocumentSyntax);
+  .use(configureDocumentSyntax).disable("html_inline");
 export function setMarkdownOptions(options: { highlight: boolean; subscript: boolean; superscript: boolean; emoji: boolean; inlineMath: boolean }) {
+  allowRemoteImages = (options as { remoteImages?: boolean }).remoteImages !== false;
   for (const [rule, enabled] of [["mark", options.highlight], ["sub", options.subscript], ["sup", options.superscript], ["emoji", options.emoji], ["math_inline", options.inlineMath]] as const)
     enabled ? md.enable(rule, true) : md.disable(rule, true);
 }
@@ -50,9 +52,9 @@ md.renderer.rules.image = (tokens, index, _options, env) => {
     alt = md.utils.escapeHtml(token.content || "图片");
   const documentId =
     typeof env?.documentId === "string" ? env.documentId : undefined;
-  if (/^https?:\/\//i.test(source))
+  if (/^https?:\/\//i.test(source) && !allowRemoteImages)
     return `<span class="remote-image">${alt}（远程图片：${md.utils.escapeHtml(source)}）</span>`;
-  const url = /^data:image\/(png|jpeg|gif|webp);/i.test(source)
+  const url = /^(?:https?:\/\/|data:image\/(?:png|jpeg|gif|webp);)/i.test(source)
     ? source
     : documentId
       ? `open-typora-asset://local/${encodeURIComponent(documentId)}/${encodeURIComponent(source)}`
@@ -61,14 +63,30 @@ md.renderer.rules.image = (tokens, index, _options, env) => {
     ? `<img src="${url}" alt="${alt}" loading="lazy" />`
     : `<span class="remote-image">${alt}（${md.utils.escapeHtml(source)}）</span>`;
 };
+function cleanHtml(html: string, documentId?: string) {
+  const safe = DOMPurify.sanitize(html, { ADD_URI_SAFE_ATTR: ["src"], ADD_TAGS: ["video", "audio", "source", "iframe"], ADD_ATTR: ["controls", "poster", "allowfullscreen", "sandbox"] });
+  const template = document.createElement("template"); template.innerHTML = safe;
+  for (const image of template.content.querySelectorAll("img")) {
+    const source = image.getAttribute("src") || "";
+    if (/^https?:\/\//i.test(source) && !allowRemoteImages) { image.replaceWith(document.createTextNode(image.alt || "远程图片")); continue; }
+    if (documentId && source && !/^(?:https?:|data:|open-typora-asset:)/i.test(source)) image.src = `open-typora-asset://local/${encodeURIComponent(documentId)}/${encodeURIComponent(source)}`;
+    for (const attribute of ["width", "height"]) if (image.hasAttribute(attribute) && !/^\d+(?:\.\d+)?%?$/.test(image.getAttribute(attribute)!)) image.removeAttribute(attribute);
+  }
+  for (const frame of template.content.querySelectorAll("iframe")) {
+    if (!/^https:\/\//i.test(frame.getAttribute("src") || "")) { frame.remove(); continue; }
+    frame.setAttribute("sandbox", "allow-scripts allow-same-origin allow-presentation"); frame.setAttribute("referrerpolicy", "no-referrer"); frame.setAttribute("loading", "lazy");
+  }
+  for (const media of template.content.querySelectorAll("video,audio,source")) {
+    const source = media.getAttribute("src"); if (source && documentId && !/^(?:https?:|data:|open-typora-asset:)/i.test(source)) media.setAttribute("src", `open-typora-asset://local/${encodeURIComponent(documentId)}/${encodeURIComponent(source)}`);
+  }
+  return template.innerHTML;
+}
 export function renderMarkdown(
   source: string,
   documentId?: string,
   environment: Record<string, unknown> = {},
 ) {
-  return DOMPurify.sanitize(md.render(source, { ...environment, documentId }), {
-    ADD_URI_SAFE_ATTR: ["src"],
-  });
+  return cleanHtml(md.render(source, { ...environment, documentId }), documentId);
 }
 export function parseBlocks(
   source: string,

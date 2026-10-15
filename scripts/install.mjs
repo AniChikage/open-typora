@@ -53,7 +53,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const destination = path.join(os.homedir(), "Applications/Open Typora.app");
   await installBundle({
     source: path.resolve("release/native/Open Typora.app"), destination,
-    running: execFileSync("/bin/ps", ["-axo", "command"], { encoding: "utf8" }),
+    running: execFileSync("/bin/ps", ["-axo", "comm"], { encoding: "utf8" }),
     sign: file => execFileSync("/usr/bin/codesign", ["--force", "--deep", "--sign", "-", "--timestamp=none", file], { stdio: "inherit" }),
     verify: file => execFileSync("/usr/bin/codesign", ["--verify", "--deep", "--strict", file], { stdio: "inherit" }),
   });

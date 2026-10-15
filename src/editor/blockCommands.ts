@@ -1,6 +1,6 @@
 import type { MarkdownDocument } from "./model.ts";
 
-export interface BlockArguments { rows?: number; columns?: number; value?: string }
+export interface BlockArguments { rows?: number; columns?: number; value?: string; label?: string; reference?: string }
 function selectedLines(model: MarkdownDocument) {
   const selection = model.selection;
   const lo = Math.min(selection.anchor, selection.head);
@@ -12,7 +12,7 @@ function selectedLines(model: MarkdownDocument) {
 }
 function transformLines(model: MarkdownDocument, transform: (line: string, index: number) => string) {
   const { from, to } = selectedLines(model), old = model.text.slice(from, to);
-  if (model.nodes.some(node => ["fence", "math_block", "frontmatter", "table_open", "footnote_definition"].includes(node.kind) && node.from < to && node.to > from)) return false;
+  if (model.nodes.some(node => ["fence", "math_block", "frontmatter", "html_block", "table_open", "footnote_definition"].includes(node.kind) && node.from < to && node.to > from)) return false;
   const lines = old.split("\n"), next = lines.map(transform);
   const map = (position: number) => {
     let oldOffset = from, newOffset = from;
@@ -52,7 +52,7 @@ export function insertBlock(model: MarkdownDocument, text: string, inside = 0, r
 export function applyBlockCommand(model: MarkdownDocument, action: string, args: BlockArguments = {}, tabSize = 2) {
   const node = model.nodeAt(model.selection.head);
   if (!node) return false;
-  if (["fence", "math_block", "frontmatter"].includes(node.kind) && !["paragraph-above", "paragraph-below"].includes(action)) return false;
+  if (["fence", "math_block", "frontmatter", "html_block"].includes(node.kind) && !["paragraph-above", "paragraph-below"].includes(action)) return false;
   const level = /^heading-([0-6])$/.exec(action);
   if (level || action === "heading-up" || action === "heading-down") {
     if (node.kind === "table_open") return false;
@@ -103,6 +103,14 @@ export function applyBlockCommand(model: MarkdownDocument, action: string, args:
     if (existing) { model.selection = { anchor: existing.from + 4, head: existing.from + 4 }; return true; }
     const at = 4;
     return model.replace(0, 0, "---\n\n---\n\n", "insert-block", { anchor: at, head: at });
+  }
+  if (action === "reference-link") {
+    const from = Math.min(model.selection.anchor, model.selection.head), to = Math.max(model.selection.anchor, model.selection.head);
+    let id = (args.reference || "link").replace(/[\[\]\s]/g, "-"); if (!id) id = "link";
+    const base = id; let number = 2; while (new RegExp(`^\\[${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\]:`, "im").test(model.text)) id = base + "-" + number++;
+    const label = (args.label || model.text.slice(from, to) || "链接").replace(/[\[\]]/g, character => "\\" + character), link = `[${label}][${id}]`;
+    const body = model.text.slice(0, from) + link + model.text.slice(to), prefix = body.endsWith("\n\n") ? "" : body.endsWith("\n") ? "\n" : "\n\n";
+    return model.replace(0, model.text.length, body + prefix + `[${id}]: ${args.value || "https://"}\n`, "reference-link", { anchor: from + 1, head: from + label.length + 1 });
   }
   if (action === "footnote") {
     let number = 1;

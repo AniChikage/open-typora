@@ -12,6 +12,9 @@ import {
 } from "electron";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { pandocPath, convertExport, convertImport, themes } from "./interchange.mjs";
+import { Workspace } from "./workspace.mjs";
+import { randomUUID } from "node:crypto";
 import { atomicWrite, DocumentStore } from "./store.mjs";
 import { readFile, realpath } from "node:fs/promises";
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -26,7 +29,7 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 let window,
-  store,
+  store, workspace,
   dirty = false,
   closing = false;
 const pending = [];
@@ -45,7 +48,31 @@ const send = (command) =>
     typeof command === "string" ? { action: command } : command,
   );
 const showError = (error) => dialog.showErrorBox("Open Typora", error.message);
+const handshakes = new Map();
+ipcMain.on("workspace:prepared", (event, id, value) => { if (event.sender !== window?.webContents) return; handshakes.get(id)?.(value); });
+function prepareOperation(phase, change) { return new Promise((resolve, reject) => { const id = randomUUID(), timeout = setTimeout(() => { handshakes.delete(id); reject(new Error("文件操作等待超时。")); }, 30000); handshakes.set(id, value => { clearTimeout(timeout); handshakes.delete(id); resolve(value); }); window.webContents.send("workspace:operation", id, phase, change); }); }
+let operationRunning = false;
 const handlers = {
+  themes: () => themes(store.dataDir),
+  installTheme: async () => { const result = await dialog.showOpenDialog(window, { filters: [{ name: "CSS", extensions: ["css"] }], properties: ["openFile"] }); if (result.canceled) return null; const name = path.basename(result.filePaths[0]); await atomicWrite(path.join(store.dataDir, "themes", name), await readFile(result.filePaths[0])); return name; },
+  conversionSettings: async (_, choose) => { if (choose) { const result = await dialog.showOpenDialog(window, { title: "选择 Pandoc 可执行文件", properties: ["openFile"] }); if (!result.canceled) process.env.OPEN_TYPORA_PANDOC = result.filePaths[0]; } return { word: process.platform === "darwin", pandoc: await pandocPath() }; },
+  importDocument: async () => { const result = await dialog.showOpenDialog(window, { title: "导入文档", properties: ["openFile"], filters: [{ name: "文档", extensions: ["docx", "doc", "rtf", "odt", "epub", "tex", "rst", "html", "txt"] }] }); return result.canceled ? null : convertImport(result.filePaths[0]); },
+  exportConverted: async (_, id, format, source, html) => { const record = store.require(id), ext = { latex: "tex", revealjs: "html", mediawiki: "wiki" }[format] || format; const result = await dialog.showSaveDialog(window, { defaultPath: record.name.replace(/\.[^.]+$/, "." + ext) }); return result.canceled ? null : convertExport(store.dataDir, format, source, html, result.filePath); },
+  imageAction: async (_, id, sources, action, options) => { if (action !== "upload") throw new Error("图片文件管理请使用原生安装版。"); const mapping = {}; for (const source of sources) { const file = await store.asset(id, source); const response = await fetch(options?.imageUploader || "http://127.0.0.1:36677/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ list: [file] }), signal: AbortSignal.timeout(30000) }); const result = await response.json(); if (!response.ok || !result.success || !/^https?:\/\//.test(result.result?.[0] || "")) throw new Error("PicGo 未返回有效图片地址。"); mapping[source] = result.result[0]; } return mapping; },
+  ready: () => true,
+  recent: () => workspace.recent(),
+  recentAction: async (_, action, file) => { if (action !== "open") return workspace.recentAction(action, file); const item = (await workspace.recent()).find(item => item.path === file); if (!item) throw new Error("最近项目已移除。"); await workspace.remember(file, item.folder); return item.folder ? store.scan(file) : store.open(file); },
+  searchFiles: async (_, query, options) => workspace.search((await store.scan()).files, query, options),
+  reveal: async (_, file) => shell.showItemInFolder(await workspace.authorize(file, store)),
+  fileOperation: async (_, operation) => {
+    if (operationRunning) throw new Error("另一个文件操作正在进行。"); operationRunning = true;
+    try {
+      if (operation.action === "trash") { const answer = await dialog.showMessageBox(window, { message: "移到废纸篓？", detail: operation.path, buttons: ["取消", "移到废纸篓"], cancelId: 0 }); if (answer.response !== 1) return null; }
+      if (!await prepareOperation("prepare", { removedPath: operation.action === "trash" ? operation.path : undefined })) throw new Error("文件操作已取消。");
+      const change = await workspace.execute(operation, store, file => shell.trashItem(file)); workspace.apply(change, store);
+      await prepareOperation("commit", change); return change;
+    } finally { try { await prepareOperation("release", {}); } finally { operationRunning = false; } }
+  },
   restore: async () => {
     const restored = await store.restore();
     if (restored) return restored;
@@ -84,16 +111,16 @@ const handlers = {
     return result.canceled ? null : store.scan(result.filePaths[0]);
   },
   scan: () => store.scan(),
-  token: (_, token) => store.openToken(token),
+  token: async (_, token) => { const record = await store.openToken(token); await workspace.remember(record.path); return record; },
   reopen: (_, id) => store.reload(id),
   writeClipboard: (_, text) => clipboard.writeText(String(text)),
   readClipboard: () => clipboard.readText(),
-  chooseImage: async (_, id) => {
+  chooseImage: async (_, id, options) => {
     store.require(id);
     const result = await dialog.showOpenDialog(window, { title: "插入图片", properties: ["openFile"], filters: [{ name: "图片", extensions: ["png", "jpg", "jpeg", "gif", "webp"] }] });
     if (result.canceled) return null;
     const file = result.filePaths[0];
-    return { path: await store.importImage(id, new Uint8Array(await readFile(file)), path.basename(file)), alt: path.basename(file) };
+    return { path: await store.importImage(id, new Uint8Array(await readFile(file)), path.basename(file), options), alt: path.basename(file) };
   },
   html: async (_, name, html) => {
     const result = await dialog.showSaveDialog(window, { title: "导出 HTML", defaultPath: String(name).replace(/\.(?:md|markdown|mdown)$/i, "") + ".html", filters: [{ name: "HTML", extensions: ["html"] }] });
@@ -138,7 +165,7 @@ const handlers = {
       throw new Error("磁盘内容已再次变化。");
     return store.acceptDisk(id, content, hash, disk.bom);
   },
-  image: (_, id, bytes, name) => store.importImage(id, bytes, name),
+  image: (_, id, bytes, name, options) => store.importImage(id, bytes, name, options),
   pdf: async () => {
     const result = await dialog.showSaveDialog(window, {
       title: "导出 PDF",
@@ -194,6 +221,7 @@ app
   .whenReady()
   .then(async () => {
     store = new DocumentStore(app.getPath("userData"));
+    workspace = new Workspace(app.getPath("userData"));
     protocol.handle("open-typora-asset", async (request) => {
       try {
         const url = new URL(request.url);
@@ -271,103 +299,14 @@ app
       }
     });
     const command = (action) => () => send(action);
-    Menu.setApplicationMenu(
-      Menu.buildFromTemplate([
-        {
-          label: "Open Typora",
-          submenu: [
-            { label: "关于 Open Typora", role: "about" },
-            { type: "separator" },
-            { role: "hide", label: "隐藏 Open Typora" },
-            { role: "hideOthers", label: "隐藏其他应用" },
-            { type: "separator" },
-            {
-              label: "退出 Open Typora",
-              accelerator: "CmdOrCtrl+Q",
-              click: command("quit"),
-            },
-          ],
-        },
-        {
-          label: "文件",
-          submenu: [
-            {
-              label: "新建",
-              accelerator: "CmdOrCtrl+N",
-              click: command("new"),
-            },
-            {
-              label: "打开文件…",
-              accelerator: "CmdOrCtrl+O",
-              click: command("open"),
-            },
-            { label: "打开文件夹…", click: command("folder") },
-            { type: "separator" },
-            {
-              label: "保存",
-              accelerator: "CmdOrCtrl+S",
-              click: command("save"),
-            },
-            {
-              label: "另存为…",
-              accelerator: "CmdOrCtrl+Shift+S",
-              click: command("saveAs"),
-            },
-            { label: "导出 PDF…", click: command("pdf") },
-            { type: "separator" },
-            {
-              label: "关闭当前文档",
-              accelerator: "CmdOrCtrl+W",
-              click: command("close"),
-            },
-          ],
-        },
-        {
-          label: "编辑",
-          submenu: [
-            { role: "undo", label: "撤销" },
-            { role: "redo", label: "重做" },
-            { type: "separator" },
-            { role: "cut", label: "剪切" },
-            { role: "copy", label: "复制" },
-            { role: "paste", label: "粘贴" },
-            { role: "selectAll", label: "全选" },
-            { type: "separator" },
-            {
-              label: "查找与替换",
-              accelerator: "CmdOrCtrl+F",
-              click: command("find"),
-            },
-          ],
-        },
-        {
-          label: "视图",
-          submenu: [
-            {
-              label: "切换源码模式",
-              accelerator: "CmdOrCtrl+/",
-              click: command("source"),
-            },
-            {
-              label: "专注模式",
-              accelerator: "CmdOrCtrl+Shift+F",
-              click: command("focus"),
-            },
-            {
-              label: "切换侧栏",
-              accelerator: "CmdOrCtrl+\\",
-              click: command("sidebar"),
-            },
-            { label: "大纲", click: command("outline") },
-            { label: "文件列表", click: command("files") },
-            { type: "separator" },
-            { label: "切换明暗主题", click: command("theme") },
-            { role: "togglefullscreen", label: "全屏" },
-          ],
-        },
-        { role: "windowMenu", label: "窗口" },
-      ]),
-    );
+    const groups = JSON.parse(await readFile(path.join(root, "shared/commands.json"), "utf8"));
+    const roles = { "cut:": "cut", "copy:": "copy", "paste:": "paste", "selectAll:": "selectAll" };
+    const accelerator = key => key?.replaceAll("Mod-", "CommandOrControl+").replaceAll("Ctrl-", "Control+").replaceAll("Alt-", "Alt+").replaceAll("Shift-", "Shift+");
+    Menu.setApplicationMenu(Menu.buildFromTemplate([
+      { label: "Open Typora", submenu: [{ label: "关于 Open Typora", click: command("about") }, { label: "偏好设置…", accelerator: "CommandOrControl+,", click: command("preferences") }, { type: "separator" }, { role: "hide", label: "隐藏 Open Typora" }, { role: "hideOthers", label: "隐藏其他应用" }, { type: "separator" }, { label: "退出 Open Typora", accelerator: "CommandOrControl+Q", click: command("quit") }] },
+      ...groups.map(group => ({ label: group.title, submenu: group.items.filter(item => item.action !== "preferences").map(item => ({ label: item.label, accelerator: accelerator(item.key), ...(item.selector ? { role: roles[item.selector] } : { click: command(item.action) }) })) })),
+      { role: "windowMenu", label: "窗口" }
+    ]));
     createWindow();
     app.on("activate", () => {
       if (!window) {

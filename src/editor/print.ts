@@ -8,7 +8,8 @@ export function exportHtml(content: HTMLElement) {
         `<link rel="stylesheet" href="${link.href.replaceAll('"', "&quot;")}" />`,
     )
     .join("");
-  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"/>${styles}<style>
+  const custom = [...document.querySelectorAll<HTMLStyleElement>("style[data-custom-theme]")].map(style => `<style>${style.textContent?.replace(/<\/style/gi, "<\\/style") || ""}</style>`).join("");
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"/>${styles}${custom}<style>
   html,body{margin:0!important;padding:0!important;height:auto!important;min-height:0!important;overflow:visible!important;background:white!important;color:#333!important}
   .print-document{display:flow-root!important;position:static!important;width:auto!important;max-width:none!important;padding:0 1px 0 0!important;font:13px/1.6 "Open Sans","PingFang SC",sans-serif;color:#333}
   .print-document h1{font-size:29px;line-height:1.2;margin:0 0 18px}.print-document h2{font-size:23px;margin:22px 0 12px}.print-document p{margin:12px 0}

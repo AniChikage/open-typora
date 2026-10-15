@@ -10,10 +10,13 @@ try {
   execFileSync(
     "/usr/bin/xcrun",
     [
-      "swiftc",
+      "swiftc", "-D", "STORETEST", "-target", `${process.arch === "arm64" ? "arm64" : "x86_64"}-apple-macos14.0`,
       "-swift-version",
       "5",
       "native/DocumentStore.swift",
+    "native/Workspace.swift",
+    "native/Interchange.swift",
+    "native/ImageActions.swift",
       "native/StoreTests.swift",
       "native/App.swift",
     "native/PDFExporter.swift",

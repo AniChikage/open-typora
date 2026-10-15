@@ -537,3 +537,44 @@ test("word statistics exclude Markdown syntax and count each Han character as on
   assert.equal(stats.words, 5); assert.equal(stats.characters, Array.from(source).length); assert.equal(stats.lines, 3);
 });
 test.after(() => dom.window.close());
+
+test("partial nested clear-format preserves styles on both sides and undoes once", () => {
+  const value = fixture("**bold *middle* tail**\n\nsecond **styled**\n");
+  try {
+    const from = value.model.text.indexOf("middle") + 1, to = from + 3;
+    value.model.selection = { anchor: from, head: to }; value.editor.restore(); value.editor.clearFormat();
+    assert.ok(value.model.text.includes("idd"));
+    assert.equal(value.root.querySelectorAll("strong").length >= 2, true);
+    assert.equal([...value.root.querySelectorAll("strong")].some(el => el.textContent.includes("idd")), false);
+    value.editor.undo(); assert.equal(value.model.toMarkdown(), "**bold *middle* tail**\n\nsecond **styled**\n");
+  } finally { value.close(); }
+});
+test("table grid paste expands dimensions, escapes pipes, and undoes in one step", () => {
+  const original = "| A | B |\n| --- | --- |\n| C | D |\n", value = fixture(original);
+  try {
+    const cell = value.root.querySelector("td");
+    value.editor.pasteTable([["1", "2", "3"], ["x|y", "z", "4"]], cell);
+    assert.equal(value.root.querySelectorAll("tr").length, 3);
+    assert.equal(value.root.querySelectorAll("th").length, 3);
+    assert.ok(value.model.text.includes("x\\|y"));
+    value.editor.undo(); assert.equal(value.model.toMarkdown(), original);
+  } finally { value.close(); }
+});
+test("alerts and raw HTML previews retain exact source while stripping active markup", async () => {
+  const { renderMarkdown } = await import("../src/editor/markdown.ts");
+  const original = '> [!NOTE]\n> 提示 **内容**\n\n<div data-leaf="forged" onclick="evil()"><strong>HTML 中文</strong><script>evil()</script></div>\n';
+  const value = fixture(original);
+  try {
+    assert.ok(value.root.querySelector(".markdown-alert-note")); assert.equal(value.root.querySelector(".markdown-alert-title").textContent, "Note"); assert.ok(value.root.querySelector(".md-html .fence-preview strong"));
+    assert.equal(value.root.querySelector("[onclick],script,[data-leaf=forged]"), null);
+    assert.equal(value.model.toMarkdown(), original);
+    assert.ok(!renderMarkdown(original).includes("<script>"));
+  } finally { value.close(); }
+});
+test("image sizing syntax preserves alt text and exact paths", async () => {
+  const { imageReferences, imageMarkdown, updateImageReferences } = await import("../src/editor/images.ts");
+  const source = '前文 ![图](<assets/中文 图.png>)\n\n<img src="old.png" width="50%" alt="描述" />\n';
+  const images = imageReferences(source); assert.equal(images.length, 2); assert.equal(images[0].url, "assets/中文 图.png");
+  assert.ok(imageMarkdown(images[0].url, images[0].alt, "400").includes('width="400"'));
+  assert.ok(updateImageReferences(source, { "old.png": "new.png" }).includes('width="50%"'));
+});

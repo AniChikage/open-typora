@@ -58,7 +58,7 @@ export class DocumentStore {
   constructor(dataDir) {
     this.dataDir = dataDir;
   }
-  async open(file) {
+  async open(file, reload = false) {
     const resolved = await realpath(file);
     if (!markdown.test(resolved)) throw new Error("请选择 Markdown 文件。");
     const metadata = await stat(resolved);
@@ -69,6 +69,7 @@ export class DocumentStore {
     const existing = [...this.records.values()].find(
       (record) => record.path === resolved,
     );
+    if (existing && !reload) return { ...existing };
     const id = existing?.id ?? randomUUID();
     const record = {
       id,
@@ -196,18 +197,16 @@ export class DocumentStore {
           return;
         }
         const file = path.join(directory, entry.name);
-        if (entry.isDirectory()) {
-          if (depth < 8) await walk(file, depth + 1);
-          else truncated = true;
-        } else if (entry.isFile() && markdown.test(entry.name)) {
-          const token = randomUUID();
+        if (entry.isDirectory() || entry.isFile() && markdown.test(entry.name)) {
+          const token = digest(file); const metadata = await stat(file);
           this.fileTokens.set(token, file);
           files.push({
             token,
             name: entry.name,
             relative: path.relative(this.folder, file),
-            path: file,
+            path: file, isDirectory: String(entry.isDirectory()), modified: String(metadata.mtimeMs / 1000), created: String(metadata.birthtimeMs / 1000),
           });
+          if (entry.isDirectory()) { if (depth < 8) await walk(file, depth + 1); else truncated = true; }
         }
       }
     };
@@ -251,7 +250,7 @@ export class DocumentStore {
   }
   async reload(id) {
     const record = this.require(id);
-    return this.open(record.path);
+    return this.open(record.path, true);
   }
   async persist(session) {
     if (!session || !Array.isArray(session.documents))
@@ -333,17 +332,17 @@ export class DocumentStore {
     if (
       !record.path ||
       typeof relative !== "string" ||
-      !/\.(png|jpe?g|gif|webp|avif)$/i.test(relative)
+      !/\.(png|jpe?g|gif|webp|avif|svg)$/i.test(relative)
     )
       throw new Error("图片路径不可用。");
     const base = path.dirname(record.path),
       target = await realpath(path.resolve(base, relative));
-    if (!within(base, target)) throw new Error("图片位于文档目录之外。");
+    if (target !== path.resolve(base, relative)) throw new Error("图片位于文档目录之外。");
     if ((await stat(target)).size > 20 * 1024 * 1024)
       throw new Error("图片超过 20 MB。");
     return target;
   }
-  async importImage(id, bytes, name) {
+  async importImage(id, bytes, name, options = {}) {
     const record = this.require(id);
     if (!record.path) throw new Error("请先保存文档，再添加本地图片。");
     const data = Buffer.from(bytes);
@@ -367,13 +366,15 @@ export class DocumentStore {
         .replace(/\.[^.]+$/, "")
         .replace(/[^\p{L}\p{N}_-]/gu, "-")
         .slice(0, 60) || "image";
-    const relative = `.assets/${base}-${randomUUID().slice(0, 8)}.${type}`;
-    const parent = path.dirname(record.path),
-      assets = path.join(parent, ".assets");
+    const yaml = /^---\r?\n([\s\S]*?)\r?\n---/.exec(options.source || record.content), configured = /^typora-copy-images-to:\s*(.+)$/m.exec(yaml?.[1] || "")?.[1].trim().replace(/^["']|["']$/g, "");
+    const parent = path.dirname(record.path), assets = path.resolve(parent, (configured || options.imageFolder || ".assets").replaceAll("${filename}", record.name.replace(/\.[^.]+$/, "")));
+    const destination = path.join(assets, `${base}-${randomUUID().slice(0, 8)}.${type}`);
+    let relative = path.relative(parent, destination);
     await mkdir(assets, { recursive: true });
-    if (!within(parent, await realpath(assets)))
+    if (assets !== await realpath(assets))
       throw new Error("图片文件夹指向文档目录之外。");
     await atomicWrite(path.join(path.dirname(record.path), relative), data);
-    return relative;
+    if (options.imagePrefix && !relative.startsWith(".")) relative = "./" + relative;
+    return options.imageEscape === false ? relative : relative.split("/").map(segment => encodeURIComponent(segment).replace(/[()]/g, c => "%" + c.charCodeAt(0).toString(16))).join("/");
   }
 }

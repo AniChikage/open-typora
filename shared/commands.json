@@ -7,10 +7,25 @@
     {"label":"快速打开…","action":"quick-open","key":"Mod-Shift-O"},
     {"label":"重新打开关闭的文档","action":"reopen","key":"Mod-Shift-T"},
     {"label":"打开文件夹…","action":"folder"},
+    {"label":"最近文件与文件夹…","action":"recent"},
+    {"label":"在文件夹中新建文件…","action":"new-file"},
+    {"label":"新建文件夹…","action":"new-folder"},
+    {"label":"撤销文件操作","action":"undo-file"},
     {"label":"保存","action":"save","key":"Mod-S","context":"document"},
     {"label":"另存为…","action":"saveAs","key":"Mod-Shift-S","context":"document"},
+    {"label":"导入 Word / 其他格式…","action":"import"},
     {"label":"导出 HTML…","action":"html","context":"document"},
     {"label":"导出 PDF…","action":"pdf","context":"document"},
+    {"label":"导出 Word…","action":"docx","context":"document"},
+    {"label":"导出 RTF…","action":"rtf","context":"document"},
+    {"label":"导出 OpenDocument…","action":"odt","context":"document"},
+    {"label":"导出 EPUB…","action":"epub","context":"document"},
+    {"label":"导出 LaTeX…","action":"latex","context":"document"},
+    {"label":"导出 reStructuredText…","action":"rst","context":"document"},
+    {"label":"导出 MediaWiki…","action":"mediawiki","context":"document"},
+    {"label":"导出 Textile…","action":"textile","context":"document"},
+    {"label":"导出 OPML…","action":"opml","context":"document"},
+    {"label":"导出 Reveal.js…","action":"revealjs","context":"document"},
     {"label":"关闭窗口","action":"close-window","key":"Mod-W"}
   ]},
   {"title":"编辑","items":[
@@ -24,7 +39,8 @@
     {"label":"粘贴为纯文本","action":"paste-plain","key":"Mod-Shift-V","context":"document"},
     {"label":"查找与替换","action":"find","key":"Mod-F","context":"document"},
     {"label":"查找下一个","action":"find-next","key":"Mod-G","context":"document"},
-    {"label":"查找上一个","action":"find-previous","key":"Mod-Shift-G","context":"document"}
+    {"label":"查找上一个","action":"find-previous","key":"Mod-Shift-G","context":"document"},
+    {"label":"搜索文件夹内容…","action":"global-search","key":"Mod-Shift-F"}
   ]},
   {"title":"段落","items":[
     {"label":"一级标题","action":"heading-1","key":"Mod-1","context":"rich"},
@@ -83,7 +99,11 @@
     {"label":"上标","action":"superscript","context":"rich"},
     {"label":"下标","action":"subscript","context":"rich"},
     {"label":"超链接…","action":"link","key":"Mod-K","context":"rich"},
+    {"label":"插入引用链接…","action":"reference-link","context":"rich"},
     {"label":"插入图片…","action":"image","key":"Mod-Ctrl-I","context":"document"},
+    {"label":"复制 / 下载所有图片到…","action":"copy-all-images","context":"document"},
+    {"label":"移动所有图片到…","action":"move-all-images","context":"document"},
+    {"label":"上传所有图片","action":"upload-all-images","context":"document"},
     {"label":"清除格式","action":"clear-format","key":"Mod-\\","context":"rich"}
   ]},
   {"title":"显示","items":[
