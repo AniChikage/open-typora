@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FilePlus2, FolderOpen, X, AlertCircle } from "lucide-react";
 import { useDocuments } from "./useDocuments";
+import { EncodingDialog, encodingNames } from "./components/EncodingDialog";
 import { Toolbar } from "./components/Toolbar";
 import { Sidebar } from "./components/Sidebar";
 import { MarkdownEditor } from "./editor/MarkdownEditor";
@@ -9,7 +10,7 @@ import { extractHeadings, renderMarkdown, setMarkdownOptions } from "./editor/ma
 import { host } from "./host";
 import { renderDiagrams } from "./editor/diagrams";
 import { renderMath } from "./editor/math";
-import { exportHtml, portableHtml } from "./editor/print";
+import { exportHtml, portableHtml, conversionMarkdown } from "./editor/print";
 import { commandForKey, commandsByAction } from "./commands";
 import { loadPreferences } from "./preferences";
 import { PreferencesDialog } from "./components/PreferencesDialog";
@@ -31,7 +32,7 @@ export default function App() {
   const [preferences, setPreferences] = useState(() => { const initial = loadPreferences(); setMarkdownOptions(initial); return initial; });
   const [themes, setThemes] = useState<{ id: string; name: string; css: string }[]>([]);
   const [typewriter, setTypewriter] = useState(false);
-  const [dialog, setDialog] = useState<"preferences" | "quick-open" | "statistics" | "recent" | "global-search" | InsertKind | null>(null);
+  const [dialog, setDialog] = useState<"preferences" | "quick-open" | "statistics" | "recent" | "global-search" | "encoding" | InsertKind | null>(null);
   const [fileOperation, setFileOperation] = useState<FileOperation | null>(null);
   const [selectedText, setSelectedText] = useState("");
   const [selection, setSelection] = useState("");
@@ -84,12 +85,13 @@ export default function App() {
   function changePreferences(next: typeof preferences) { setMarkdownOptions(next); setPreferences(next); }
   async function exportDocument(kind: string) {
     if (exportingRef.current || !active || !printDocument.current) return;
+    if (editor()?.composing()) { session.setMessage("请先完成当前输入法组合输入，再导出。"); return; }
     exportingRef.current = true; setExporting(true); document.body.classList.add("printing");
     try {
       await host.persist({ documents: session.documents, activeId: session.activeId });
       printDocument.current.innerHTML = renderMarkdown(active.content, active.id);
       await Promise.all([renderDiagrams(printDocument.current), renderMath(printDocument.current), document.fonts.ready]);
-      const result = kind === "pdf" ? await host.exportPdf(exportHtml(printDocument.current), { paper: preferences.pdfPaper, margin: preferences.pdfMargin, header: preferences.pdfHeader, footer: preferences.pdfFooter, title: active.name }) : kind === "html" ? await host.exportHtml(active.name, await portableHtml(printDocument.current, active.name)) : await host.exportConverted(active.id, kind, active.content, await portableHtml(printDocument.current, active.name));
+      const result = kind === "pdf" ? await host.exportPdf(exportHtml(printDocument.current), { paper: preferences.pdfPaper, margin: preferences.pdfMargin, header: preferences.pdfHeader, footer: preferences.pdfFooter, title: active.name }) : kind === "html" ? await host.exportHtml(active.name, await portableHtml(printDocument.current, active.name)) : await host.exportConverted(active.id, kind, await conversionMarkdown(active.content, printDocument.current), await portableHtml(printDocument.current, active.name));
       if (result) session.setMessage(`${kind.toUpperCase()} 已导出。`);
     } catch (error) { session.setMessage((error as Error).message); }
     finally { document.body.classList.remove("printing"); exportingRef.current = false; setExporting(false); }
@@ -116,6 +118,7 @@ export default function App() {
     else if (action === "open") void session.open();
     else if (action === "folder") void session.openFolder();
     else if (action === "save") void session.save();
+    else if (action === "encoding") setDialog("encoding");
     else if (action === "saveAs") void session.save(true);
     else if (action === "close") void session.close();
     else if (action === "reopen") {
@@ -314,11 +317,12 @@ export default function App() {
       </main>
       <footer className="statusbar">
         <button onClick={() => setDialog("statistics")}
-          title={`${status} · 第 ${cursor.line} 行，第 ${cursor.column} 列 · Markdown · UTF-8`}
+          title={`${status} · 第 ${cursor.line} 行，第 ${cursor.column} 列 · Markdown · ${encodingNames[active?.encoding || "utf-8"]}`}
           aria-label={`${characters} 字，${status}`}
         >
           {countUnit === "characters" ? (selection ? selectionCharacters : characters) : (selection ? documentStatistics(selection, selection, preferences.readingSpeed).words : wholeStatistics?.words || 0)} {countUnit === "characters" ? "字" : "词"}{selection && "（选中）"}{exporting && " · 正在导出…"}
         </button>
+        {active && <button aria-label="更改文本编码" title="文本编码与字节顺序标记" onClick={() => setDialog("encoding")}>{encodingNames[active.encoding || "utf-8"]}{active.bom ? " BOM" : ""}</button>}
       </footer>
       {focus && (
         <button className="leave-focus" onClick={() => setFocus(false)}>
@@ -334,6 +338,7 @@ export default function App() {
         </div>
       )}
       {fileOperation && <FileOperationDialog operation={fileOperation} files={session.files} folder={session.folder} run={session.fileOperation} close={() => setFileOperation(null)} />}
+      {dialog === "encoding" && active && <EncodingDialog key={active.id} record={active} change={session.changeEncoding} close={closeDialog} />}
       {dialog === "recent" && <RecentDialog entries={session.recent} action={session.recentAction} close={closeDialog} />}
       {dialog === "global-search" && <GlobalSearch folder={session.folder} close={closeDialog} open={async match => { const record = await session.openToken(match.token); if (record) requestAnimationFrame(() => editors.current.get(record.id)?.jump(match.line)); }} />}
       {dialog === "preferences" && <PreferencesDialog value={preferences} change={changePreferences} theme={theme} changeTheme={setTheme} themes={themes} installTheme={installTheme} close={closeDialog} />}

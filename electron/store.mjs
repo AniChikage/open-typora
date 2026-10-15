@@ -10,6 +10,8 @@ import {
   open,
 } from "node:fs/promises";
 import path from "node:path";
+import iconv from "iconv-lite";
+import { fileURLToPath } from "node:url";
 import { randomUUID, createHash } from "node:crypto";
 
 export const digest = (value) =>
@@ -49,6 +51,26 @@ export async function atomicWrite(file, data, beforeCommit) {
     await unlink(temporary).catch(() => {});
   }
 }
+export const encodings = ["utf-8", "utf-16le", "utf-16be", "gb18030", "gbk", "big5", "shift_jis", "windows-1252"];
+export function decodeText(bytes, requested) {
+  const marker = bytes.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf])) ? ["utf-8", 3] : bytes[0] === 0xff && bytes[1] === 0xfe ? ["utf-16le", 2] : bytes[0] === 0xfe && bytes[1] === 0xff ? ["utf-16be", 2] : null;
+  const encoding = requested || marker?.[0] || "utf-8", bom = marker?.[0] === encoding;
+  if (!encodings.includes(encoding)) throw new Error("不支持的文本编码。");
+  let text;
+  try { text = new TextDecoder(encoding, { fatal: true, ignoreBOM: true }).decode(bom ? bytes.subarray(marker[1]) : bytes); }
+  catch { throw Object.assign(new Error(`无法按 ${encoding.toUpperCase()} 读取文本，请选择文件的实际编码。`), { code: "INVALID_ENCODING" }); }
+  if (/[\u0000-\u0008\u000b\u000e-\u001f]/.test(text)) throw Object.assign(new Error("文件包含非文本字符。"), { code: "INVALID_ENCODING" });
+  return { content: text, bom, encoding };
+}
+export function encodeText(text, encoding = "utf-8", bom = false) {
+  if (!encodings.includes(encoding)) throw new Error("不支持的文本编码。");
+  const bytes = iconv.encode(text, encoding);
+  if (iconv.decode(bytes, encoding, { stripBOM: false }) !== text) throw Object.assign(new Error("此编码无法无损保存部分字符，请改用 UTF-8。原文件未修改。"), { code: "ENCODING_LOSS" });
+  const prefix = bom ? { "utf-8": [0xef, 0xbb, 0xbf], "utf-16le": [0xff, 0xfe], "utf-16be": [0xfe, 0xff] }[encoding] || [] : [];
+  const output = Buffer.concat([Buffer.from(prefix), bytes]);
+  if (output.length > 20 * 1024 * 1024) throw new Error("编码后的文件超过 20 MB。");
+  return output;
+}
 export class DocumentStore {
   records = new Map();
   fileTokens = new Map();
@@ -58,18 +80,17 @@ export class DocumentStore {
   constructor(dataDir) {
     this.dataDir = dataDir;
   }
-  async open(file, reload = false) {
+  async open(file, reload = false, encoding) {
     const resolved = await realpath(file);
     if (!markdown.test(resolved)) throw new Error("请选择 Markdown 文件。");
     const metadata = await stat(resolved);
     if (!metadata.isFile() || metadata.size > 20 * 1024 * 1024)
       throw new Error("文件超过首版支持的 20 MB。");
     const bytes = await readFile(resolved);
-    const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-    const existing = [...this.records.values()].find(
-      (record) => record.path === resolved,
-    );
+    const existing = [...this.records.values()].find(record => record.path === resolved);
     if (existing && !reload) return { ...existing };
+    const decoded = decodeText(bytes, encoding);
+    const text = decoded.content;
     const id = existing?.id ?? randomUUID();
     const record = {
       id,
@@ -79,7 +100,7 @@ export class DocumentStore {
       savedContent: text,
       diskHash: digest(bytes),
       lineEnding: text.includes("\r\n") ? "\r\n" : "\n",
-      bom: bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf,
+      bom: decoded.bom, encoding: decoded.encoding,
     };
     this.records.set(id, record);
     return { ...record };
@@ -111,7 +132,7 @@ export class DocumentStore {
     if (!record) throw new Error("文件已关闭，请重新打开。");
     return record;
   }
-  async save(id, text, destination, force = false) {
+  async save(id, text, destination, force = false, options = {}) {
     if (typeof text !== "string" || Buffer.byteLength(text) > 20 * 1024 * 1024)
       throw new Error("文件内容无效或超过 20 MB。");
     const prior = this.queues.get(id) ?? Promise.resolve();
@@ -121,6 +142,7 @@ export class DocumentStore {
         const record = this.require(id);
         const file = destination ? path.resolve(destination) : record.path;
         if (!file) throw new Error("请先为草稿选择保存位置。");
+        if (record.path === file && record.conflict && !force) throw Object.assign(new Error("磁盘冲突尚未解决，请另存副本或确认覆盖。"), { code: "EXTERNAL_CHANGE" });
         if (record.path === file && !force) {
           let bytes;
           try {
@@ -134,7 +156,8 @@ export class DocumentStore {
             throw error;
           }
         }
-        const bytes = Buffer.from((record.bom ? "\uFEFF" : "") + text, "utf-8");
+        const encoding = options.encoding || record.encoding || "utf-8", bom = (options.bom ?? record.bom ?? false) && encoding.startsWith("utf-");
+        const bytes = encodeText(text, encoding, bom);
         await atomicWrite(
           file,
           bytes,
@@ -157,7 +180,7 @@ export class DocumentStore {
             : undefined,
         );
         const updated = {
-          ...record,
+          ...record, encoding, bom,
           path: file,
           name: path.basename(file),
           content: text,
@@ -227,30 +250,30 @@ export class DocumentStore {
       return hash === record.diskHash
         ? null
         : {
-            content: new TextDecoder("utf-8", { fatal: true }).decode(bytes),
+            ...decodeText(bytes, this.hasBOM(bytes) ? undefined : record.encoding),
             diskHash: hash,
-            bom: bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf,
           };
     } catch (e) {
       return { missing: e.code === "ENOENT", error: "磁盘文件暂时无法读取。" };
     }
   }
-  acceptDisk(id, content, diskHash, bom = this.require(id).bom) {
+  hasBOM(bytes) { return bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf || bytes[0] === 0xff && bytes[1] === 0xfe || bytes[0] === 0xfe && bytes[1] === 0xff; }
+  acceptDisk(id, content, diskHash, bom = this.require(id).bom, encoding = this.require(id).encoding) {
     const record = this.require(id);
     const updated = {
       ...record,
       content,
       savedContent: content,
       diskHash,
-      bom,
+      bom, encoding,
       lineEnding: content.includes("\r\n") ? "\r\n" : "\n",
     };
     this.records.set(id, updated);
     return updated;
   }
-  async reload(id) {
+  async reload(id, encoding) {
     const record = this.require(id);
-    return this.open(record.path, true);
+    return this.open(record.path, true, encoding || record.encoding);
   }
   async persist(session) {
     if (!session || !Array.isArray(session.documents))
@@ -265,10 +288,7 @@ export class DocumentStore {
       return {
         ...record,
         content: document.content,
-        savedContent:
-          typeof document.savedContent === "string"
-            ? document.savedContent
-            : record.savedContent,
+        savedContent: record.savedContent,
       };
     });
     const bytes = JSON.stringify({
@@ -302,6 +322,7 @@ export class DocumentStore {
               record.content = changed.content;
               record.savedContent = changed.content;
               record.diskHash = changed.diskHash;
+              record.encoding = changed.encoding; record.bom = changed.bom; record.lineEnding = changed.content.includes("\r\n") ? "\r\n" : "\n";
             } else record.conflict = true;
           } else if (changed?.error) record.conflict = true;
         } else this.registerDraft(record);
@@ -329,22 +350,20 @@ export class DocumentStore {
   }
   async asset(id, relative) {
     const record = this.require(id);
-    if (
-      !record.path ||
-      typeof relative !== "string" ||
-      !/\.(png|jpe?g|gif|webp|avif|svg)$/i.test(relative)
-    )
-      throw new Error("图片路径不可用。");
-    const base = path.dirname(record.path),
-      target = await realpath(path.resolve(base, relative));
-    if (target !== path.resolve(base, relative)) throw new Error("图片位于文档目录之外。");
+    if (typeof relative !== "string") throw new Error("图片路径不可用。");
+    let reference = relative.startsWith("file://") ? fileURLToPath(relative) : decodeURIComponent(relative);
+    if (!/\.(png|jpe?g|gif|webp|avif|svg|mp4|webm|ogg|mp3|wav|m4a)$/i.test(reference) || reference.includes("\0")) throw new Error("图片路径不可用。");
+    const base = await realpath(record.path ? path.dirname(record.path) : this.dataDir);
+    let requested = path.resolve(base, reference);
+    if (process.platform === "darwin") { if (requested.startsWith("/var/")) requested = "/private" + requested; else if (requested.startsWith("/tmp/")) requested = "/private" + requested; }
+    const target = await realpath(requested);
+    if (target !== requested) throw new Error("图片位于文档目录之外。");
     if ((await stat(target)).size > 20 * 1024 * 1024)
       throw new Error("图片超过 20 MB。");
     return target;
   }
   async importImage(id, bytes, name, options = {}) {
     const record = this.require(id);
-    if (!record.path) throw new Error("请先保存文档，再添加本地图片。");
     const data = Buffer.from(bytes);
     if (data.length > 20 * 1024 * 1024 || data.length < 12)
       throw new Error("图片大小无效。");
@@ -367,13 +386,15 @@ export class DocumentStore {
         .replace(/[^\p{L}\p{N}_-]/gu, "-")
         .slice(0, 60) || "image";
     const yaml = /^---\r?\n([\s\S]*?)\r?\n---/.exec(options.source || record.content), configured = /^typora-copy-images-to:\s*(.+)$/m.exec(yaml?.[1] || "")?.[1].trim().replace(/^["']|["']$/g, "");
-    const parent = path.dirname(record.path), assets = path.resolve(parent, (configured || options.imageFolder || ".assets").replaceAll("${filename}", record.name.replace(/\.[^.]+$/, "")));
+    if (!record.path) await mkdir(this.dataDir, { recursive: true });
+    const parent = record.path ? path.dirname(record.path) : path.join(await realpath(this.dataDir), "DraftAssets", digest(record.id)), assets = path.resolve(parent, (configured || options.imageFolder || ".assets").replaceAll("${filename}", record.name.replace(/\.[^.]+$/, "")));
     const destination = path.join(assets, `${base}-${randomUUID().slice(0, 8)}.${type}`);
     let relative = path.relative(parent, destination);
     await mkdir(assets, { recursive: true });
     if (assets !== await realpath(assets))
       throw new Error("图片文件夹指向文档目录之外。");
-    await atomicWrite(path.join(path.dirname(record.path), relative), data);
+    await atomicWrite(destination, data);
+    if (!record.path) relative = destination;
     if (options.imagePrefix && !relative.startsWith(".")) relative = "./" + relative;
     return options.imageEscape === false ? relative : relative.split("/").map(segment => encodeURIComponent(segment).replace(/[()]/g, c => "%" + c.charCodeAt(0).toString(16))).join("/");
   }

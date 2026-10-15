@@ -13,6 +13,7 @@
     {"label":"撤销文件操作","action":"undo-file"},
     {"label":"保存","action":"save","key":"Mod-S","context":"document"},
     {"label":"另存为…","action":"saveAs","key":"Mod-Shift-S","context":"document"},
+    {"label":"文本编码…","action":"encoding","context":"document"},
     {"label":"导入 Word / 其他格式…","action":"import"},
     {"label":"导出 HTML…","action":"html","context":"document"},
     {"label":"导出 PDF…","action":"pdf","context":"document"},

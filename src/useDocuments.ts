@@ -81,6 +81,8 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
   ) {
     let record = current.current.documents.find((record) => record.id === id);
     if (!record) return;
+    if (!prepareEditor.current()) { if (!automatic) setMessage("请先完成当前输入法组合输入，再保存。"); return; }
+    if (record.conflict && !force && !saveAs) { if (!automatic) setMessage("磁盘文件已改变，请选择重新载入、另存副本或确认覆盖。"); return; }
     if (
       automatic &&
       (!record.path || record.conflict || inFlight.current.has(id))
@@ -100,6 +102,7 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
             name: result.name,
             diskHash: result.diskHash,
             savedContent: snapshot.content,
+            bom: result.bom, encoding: result.encoding,
             conflict: false,
           });
       })
@@ -133,13 +136,13 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
     if (!ready || !host.native) return;
     let running = false;
     const timer = setInterval(async () => {
-      if (running || closing.current) return;
+      if (running || closing.current || !prepareEditor.current()) return;
       running = true;
       try {
         for (const record of current.current.documents) {
           if (!record.path || inFlight.current.has(record.id)) continue;
           const change = await host.check(record.id);
-          if (!change) continue;
+          if (!change || !prepareEditor.current()) continue;
           const latest = current.current.documents.find(
             (item) => item.id === record.id,
           );
@@ -152,6 +155,7 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
               change.content,
               change.diskHash,
             );
+            if (!prepareEditor.current()) { update(record.id, { conflict: true }); continue; }
             setDocuments((records) =>
               records.map((latestRecord) =>
                 latestRecord.id !== record.id
@@ -165,6 +169,7 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
                         diskHash: accepted.diskHash,
                         lineEnding: accepted.lineEnding,
                         bom: accepted.bom,
+                        encoding: accepted.encoding,
                         conflict: false,
                       }
                     : { ...latestRecord, conflict: true },
@@ -310,6 +315,7 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
     setRecent(await host.recent());
   }
   async function close(id = current.current.activeId) {
+    if (!prepareEditor.current()) { setMessage("请先完成当前输入法组合输入，再关闭文档。"); return; }
     if (closing.current) return;
     closing.current = true;
     try {
@@ -341,6 +347,7 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
     try { await add(await host.reopen(item.id)); closed.current.pop(); } catch (error) { notify(error); }
   }
   async function reload() {
+    if (!prepareEditor.current()) { setMessage("请先完成当前输入法组合输入，再重新打开。"); return; }
     const record = current.current.documents.find(
       (item) => item.id === current.current.activeId,
     );
@@ -356,7 +363,24 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
       notify(error);
     }
   }
+  async function changeEncoding(mode: "reopen" | "convert", encoding: string, bom: boolean) {
+    if (closing.current || !prepareEditor.current()) throw new Error("请先完成输入法组合输入。");
+    closing.current = true;
+    try {
+      const id = current.current.activeId;
+      await inFlight.current.get(id);
+      const record = current.current.documents.find(item => item.id === id);
+      if (!record) return false;
+      if (mode === "reopen" && record.content !== record.savedContent && !await host.confirmDiscard(record.name)) return false;
+      const result = mode === "reopen" ? await host.reload(id, encoding) : await host.save(id, record.content, false, false, { encoding, bom });
+      if (!result) return false;
+      update(id, result);
+      await host.persist(current.current);
+      return true;
+    } finally { closing.current = false; }
+  }
   async function quit() {
+    if (!prepareEditor.current()) { setMessage("请先完成当前输入法组合输入，再退出。"); await host.cancelClose(); return; }
     try {
       await Promise.allSettled([...inFlight.current.values()]);
       await host.persist(current.current);
@@ -368,6 +392,7 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
     }
   }
   async function closeWindow() {
+    if (!prepareEditor.current()) { setMessage("请先完成当前输入法组合输入，再关闭窗口。"); await host.cancelClose(); return; }
     if (closing.current) return;
     closing.current = true;
     try {
@@ -439,6 +464,7 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
     close,
     reopen,
     reload,
+    changeEncoding,
     quit,
     closeWindow,
   };

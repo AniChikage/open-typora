@@ -144,6 +144,7 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       let args = request["args"] as? [Any]
     else { return }
     #if WEBTEST
+      if ["registerDraft", "save", "persist", "exportConverted"].contains(name) { print("BRIDGE:", name) }
       if name == "progress" {
         print("TEST:", args.first ?? "")
         return
@@ -170,8 +171,12 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
     if name == "importDocument" || name == "exportConverted" {
       do {
         if name == "importDocument" {
+          #if WEBTEST
+          let file = store.dataDirectory.appendingPathComponent("native-converted." + (args.first as? String ?? "docx"))
+          #else
           let panel = NSOpenPanel(); panel.allowedContentTypes = ["docx", "doc", "rtf", "odt", "epub", "tex", "rst", "html", "txt"].compactMap { UTType(filenameExtension: $0) }
           guard panel.runModal() == .OK, let file = panel.url else { reply(id, ["ok": true, "value": NSNull()]); return }
+          #endif
           let directory = store.dataDirectory
           DispatchQueue.global(qos: .userInitiated).async {
             let result: [String: Any]
@@ -181,9 +186,14 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
           }
         } else {
           let doc = try store.require(arg(args, 0, String.self)), format = try arg(args, 1, String.self), source = try arg(args, 2, String.self), html = try arg(args, 3, String.self)
-          let panel = NSSavePanel(), ext = ["latex":"tex", "revealjs":"html", "mediawiki":"wiki"][format] ?? format
+          let ext = ["latex":"tex", "revealjs":"html", "mediawiki":"wiki"][format] ?? format
+          #if WEBTEST
+          let destination = store.dataDirectory.appendingPathComponent("native-converted." + ext)
+          #else
+          let panel = NSSavePanel()
           panel.allowedContentTypes = [UTType(filenameExtension: ext) ?? .data]; panel.nameFieldStringValue = (doc.name as NSString).deletingPathExtension + "." + ext
           guard panel.runModal() == .OK, let destination = panel.url else { reply(id, ["ok": true, "value": NSNull()]); return }
+          #endif
           let directory = store.dataDirectory, working = doc.path.map { URL(fileURLWithPath: $0).deletingLastPathComponent() } ?? directory
           DispatchQueue.global(qos: .userInitiated).async {
             let result: [String: Any]
@@ -238,9 +248,10 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       do {
         let query = try arg(args, 0, String.self), options = try arg(args, 1, [String: Bool].self)
         let files = try store.scan()["files"] as? [[String: String]] ?? []
+        let encodings = Dictionary(owner.hosts.flatMap { $0.store.records.values }.compactMap { record in record.path.map { ($0, record.encoding ?? "utf-8") } }, uniquingKeysWith: { first, _ in first })
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
           let result: [String: Any]
-          do { result = ["ok": true, "value": try Workspace.search(files, query: query, regex: options["regex"] == true, caseSensitive: options["caseSensitive"] == true)] }
+          do { result = ["ok": true, "value": try Workspace.search(files, query: query, regex: options["regex"] == true, caseSensitive: options["caseSensitive"] == true, encodings: encodings)] }
           catch { result = ["ok": false, "error": error.localizedDescription] }
           DispatchQueue.main.async { self?.reply(id, result) }
         }
@@ -252,7 +263,8 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
         let html = try arg(args, 0, String.self)
         guard html.utf8.count <= 50 * 1024 * 1024 else { throw NativeFailure("导出内容过大。") }
         #if WEBTEST
-          let destination = store.dataDirectory.appendingPathComponent((args.count > 1 && (args[1] as? [String: Any])?["testName"] as? String == "long") ? "native-test-long.pdf" : "native-test.pdf")
+          let settings = args.count > 1 ? args[1] as? [String: Any] ?? [:] : [:]
+          let destination = store.dataDirectory.appendingPathComponent(settings["testName"] as? String == "long" ? "native-test-long.pdf" : settings["title"] as? String == "复杂中文文档.md" ? "native-complex.pdf" : "native-test.pdf")
         #else
           let panel = NSSavePanel()
           panel.allowedContentTypes = [.pdf]
@@ -284,6 +296,8 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
     do {
       let value = try handle(name, args)
       reply(id, ["ok": true, "value": value ?? NSNull()])
+    } catch let error as NativeFailure where error.code == "CANCELLED" {
+      reply(id, ["ok": true, "value": NSNull()])
     } catch {
       reply(
         id,
@@ -304,6 +318,17 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       throw NativeFailure("请求参数无效。")
     }
     return value
+  }
+  static func openEncoded(_ file: URL, store: DocumentStore) throws -> DocumentRecord {
+    do { return try store.open(file) }
+    catch let error as NativeFailure where error.code == "INVALID_ENCODING" {
+      let alert = NSAlert(); alert.messageText = "选择文本编码"; alert.informativeText = "此文件没有可识别的 Unicode 编码。请选择创建文件时使用的编码，打开后可在底部更改。"
+      let selector = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 260, height: 26))
+      selector.addItems(withTitles: DocumentStore.encodings.map { $0.uppercased() }); selector.selectItem(at: 3)
+      alert.accessoryView = selector; alert.addButton(withTitle: "打开"); alert.addButton(withTitle: "取消")
+      guard alert.runModal() == .alertFirstButtonReturn else { throw NativeFailure("已取消打开。", "CANCELLED") }
+      return try store.open(file, encoding: DocumentStore.encodings[selector.indexOfSelectedItem])
+    }
   }
   func chooseFile(_ saving: Bool, name: String? = nil, folder: Bool = false) -> URL? {
     if saving {
@@ -394,7 +419,7 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       return try jsonValue(store.draft(record))
     case "open":
       guard let file = chooseFile(false) else { return nil }
-      let record = try store.open(file); try owner.workspace.remember(file, folder: false)
+      let record = try Self.openEncoded(file, store: store); try owner.workspace.remember(file, folder: false)
       if store.folder == nil { _ = try store.scan(file.deletingLastPathComponent()) }
       return try jsonValue(record)
     case "openFolder":
@@ -405,7 +430,7 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
     case "openToken":
       let token = try arg(args, 0, String.self)
       guard let file = store.tokens[token] else { throw NativeFailure("目录已更新，请刷新后重试。") }
-      let record = try store.open(file); try owner.workspace.remember(file, folder: false)
+      let record = try Self.openEncoded(file, store: store); try owner.workspace.remember(file, folder: false)
       return try jsonValue(record)
     case "reopen": return try jsonValue(store.reopen(arg(args, 0, String.self)))
     case "readResource":
@@ -466,7 +491,7 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       if force && !confirm("覆盖磁盘上的修改？", detail: "当前草稿将替换磁盘文件。也可以取消并另存为副本。", yes: "覆盖") {
         return nil
       }
-      let saved = try store.save(id, text: text, destination: destination, force: force)
+      let saved = try store.save(id, text: text, destination: destination, force: force, encoding: args.count > 4 ? (args[4] as? [String: Any])?["encoding"] as? String : nil, bom: args.count > 4 ? (args[4] as? [String: Any])?["bom"] as? Bool : nil)
       if let path = saved.path { try? owner.workspace.remember(URL(fileURLWithPath: path), folder: false) }
       return try jsonValue(saved)
     case "persist":
@@ -482,7 +507,7 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       let id = try arg(args, 0, String.self)
       let record = try store.require(id)
       guard let path = record.path else { return try jsonValue(record) }
-      return try jsonValue(store.open(URL(fileURLWithPath: path), id: id))
+      return try jsonValue(store.open(URL(fileURLWithPath: path), id: id, encoding: args.count > 1 ? args[1] as? String : record.encoding))
     case "acceptDisk":
       return try jsonValue(
         store.accept(
@@ -752,11 +777,12 @@ final class NativeApplication: NSObject, NSApplicationDelegate, NSMenuItemValida
     }
     let location = directory.appendingPathComponent("windows/" + UUID().uuidString)
     do {
-      let record = try DocumentStore(location).open(file)
+      let record = try NativeWindowHost.openEncoded(file, store: DocumentStore(location))
       try workspace.remember(file, folder: false)
       if let tabGroupID { try atomicWrite(location.appendingPathComponent("tab-group"), Data(tabGroupID.utf8)) }
       let host = makeWindow(directory: location, seed: SessionRecord(documents: [record], activeId: record.id, folder: file.deletingLastPathComponent().path))
       if let anchor { host.send("opened", record: record, anchor: anchor) }
+    } catch let error as NativeFailure where error.code == "CANCELLED" { return
     } catch {
       let alert = NSAlert()
       alert.messageText = error.localizedDescription

@@ -3,6 +3,7 @@ const call = (name, ...args) => ipcRenderer.invoke(`document:${name}`, ...args);
 contextBridge.exposeInMainWorld("desktop", {
   themes: () => call("themes"), installTheme: () => call("installTheme"), conversionSettings: choose => call("conversionSettings", choose), importDocument: () => call("importDocument"), exportConverted: (id, format, source, html) => call("exportConverted", id, format, source, html), imageAction: (id, sources, action, options) => call("imageAction", id, sources, action, options),
   ready: () => call("ready"),
+  cancelClose: () => call("cancelClose"),
   fileOperation: operation => call("fileOperation", operation),
   recent: () => call("recent"),
   recentAction: (action, path) => call("recentAction", action, path),
@@ -21,11 +22,11 @@ contextBridge.exposeInMainWorld("desktop", {
   writeClipboard: text => call("writeClipboard", text),
   readClipboard: () => call("readClipboard"),
   confirmClose: name => call("confirmClose", name),
-  save: (id, text, saveAs = false, force = false) =>
-    call("save", id, text, saveAs, force),
+  save: (id, text, saveAs = false, force = false, options) =>
+    call("save", id, text, saveAs, force, options),
   persist: (session) => call("persist", session),
   check: (id) => call("check", id),
-  reload: (id) => call("reload", id),
+  reload: (id, encoding) => call("reload", id, encoding),
   acceptDisk: (id, content, hash) => call("acceptDisk", id, content, hash),
   importImage: (id, bytes, name, options) => call("image", id, bytes, name, options),
   exportPdf: () => call("pdf"),

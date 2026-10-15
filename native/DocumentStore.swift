@@ -1,6 +1,7 @@
 import CryptoKit
 import Darwin
 import Foundation
+import CoreFoundation
 
 struct NativeFailure: Error, LocalizedError {
   let message: String
@@ -21,6 +22,7 @@ struct DocumentRecord: Codable {
   var lineEnding: String
   var conflict: Bool?
   var bom: Bool?
+  var encoding: String?
 }
 struct SessionRecord: Codable {
   var version: Int = 1
@@ -85,16 +87,42 @@ final class DocumentStore {
     guard let record = records[id] else { throw NativeFailure("文件已关闭，请重新打开。") }
     return record
   }
-  func decode(_ data: Data) throws -> (String, Bool) {
-    guard data.count <= Self.maxBytes else { throw NativeFailure("文件超过支持的 20 MB。") }
-    let bom = data.starts(with: [0xef, 0xbb, 0xbf])
-    let content = bom ? data.dropFirst(3) : data[...]
-    guard let text = String(data: content, encoding: .utf8) else {
-      throw NativeFailure("文件不是有效的 UTF-8 文本。")
+  static let encodings = ["utf-8", "utf-16le", "utf-16be", "gb18030", "gbk", "big5", "shift_jis", "windows-1252"]
+  static func stringEncoding(_ name: String) throws -> String.Encoding {
+    switch name {
+    case "utf-8": return .utf8
+    case "utf-16le": return .utf16LittleEndian
+    case "utf-16be": return .utf16BigEndian
+    case "gb18030": return String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(0x0632))
+    case "gbk": return String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(0x0631))
+    case "big5": return String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(0x0a03))
+    case "shift_jis": return String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(0x0a01))
+    case "windows-1252": return .windowsCP1252
+    default: throw NativeFailure("不支持的文本编码。")
     }
-    return (text, bom)
   }
-  func open(_ file: URL, id: String? = nil) throws -> DocumentRecord {
+  static func encode(_ text: String, encoding: String, bom: Bool) throws -> Data {
+    guard let bytes = text.data(using: try stringEncoding(encoding), allowLossyConversion: false),
+      let decoded = String(data: bytes, encoding: try stringEncoding(encoding)), decoded.utf8.elementsEqual(text.utf8) else {
+      throw NativeFailure("此编码无法无损保存部分字符，请改用 UTF-8。原文件未修改。", "ENCODING_LOSS")
+    }
+    let prefix: [UInt8] = bom ? ["utf-8": [0xef, 0xbb, 0xbf], "utf-16le": [0xff, 0xfe], "utf-16be": [0xfe, 0xff]][encoding] ?? [] : []
+    guard bytes.count + prefix.count <= maxBytes else { throw NativeFailure("编码后的文件超过 20 MB。") }
+    return Data(prefix) + bytes
+  }
+  func decode(_ data: Data, encoding requested: String? = nil) throws -> (String, Bool, String) {
+    guard data.count <= Self.maxBytes else { throw NativeFailure("文件超过支持的 20 MB。") }
+    let marker: (String, Int)? = data.starts(with: [0xef, 0xbb, 0xbf]) ? ("utf-8", 3) : data.starts(with: [0xff, 0xfe]) ? ("utf-16le", 2) : data.starts(with: [0xfe, 0xff]) ? ("utf-16be", 2) : nil
+    let encoding = requested ?? marker?.0 ?? "utf-8"
+    let bom = marker?.0 == encoding
+    let bytes = bom ? Data(data.dropFirst(marker!.1)) : data
+    guard let text = String(data: bytes, encoding: try Self.stringEncoding(encoding)),
+      !text.unicodeScalars.contains(where: { $0.value == 0 || ($0.value < 32 && ![9, 10, 12, 13].contains($0.value)) }) else {
+      throw NativeFailure("无法按 \(encoding.uppercased()) 读取文本，请选择文件的实际编码。", "INVALID_ENCODING")
+    }
+    return (text, bom, encoding)
+  }
+  func open(_ file: URL, id: String? = nil, encoding: String? = nil) throws -> DocumentRecord {
     let resolved = canonicalFileURL(file)
     if id == nil, let existing = records.values.first(where: { $0.path == resolved.path }) { return existing }
     guard ["md", "markdown", "mdown"].contains(resolved.pathExtension.lowercased()) else {
@@ -104,12 +132,12 @@ final class DocumentStore {
     guard values.isRegularFile == true, (values.fileSize ?? Self.maxBytes + 1) <= Self.maxBytes
     else { throw NativeFailure("文件内容无效或超过 20 MB。") }
     let bytes = try Data(contentsOf: resolved)
-    let (text, bom) = try decode(bytes)
+    let (text, bom, detected) = try decode(bytes, encoding: encoding)
     let record = DocumentRecord(
       id: id ?? records.values.first(where: { $0.path == resolved.path })?.id ?? UUID().uuidString,
       path: resolved.path, name: resolved.lastPathComponent, content: text, savedContent: text,
       diskHash: hashData(bytes), lineEnding: text.contains("\r\n") ? "\r\n" : "\n", conflict: false,
-      bom: bom)
+      bom: bom, encoding: detected)
     records[record.id] = record
     return record
   }
@@ -122,11 +150,11 @@ final class DocumentStore {
   }
   func reopen(_ id: String) throws -> DocumentRecord {
     guard let record = closedRecords[id] else { throw NativeFailure("最近关闭的文档已不可用。") }
-    let reopened = try record.path.map { try open(URL(fileURLWithPath: $0), id: id) } ?? draft(record)
+    let reopened = try record.path.map { try open(URL(fileURLWithPath: $0), id: id, encoding: record.encoding) } ?? draft(record)
     closedRecords.removeValue(forKey: id); closedOrder.removeAll { $0 == id }
     return reopened
   }
-  func save(_ id: String, text: String, destination: URL? = nil, force: Bool = false) throws
+  func save(_ id: String, text: String, destination: URL? = nil, force: Bool = false, encoding: String? = nil, bom: Bool? = nil) throws
     -> DocumentRecord
   {
     var record = try require(id)
@@ -135,6 +163,7 @@ final class DocumentStore {
       throw NativeFailure("请先为草稿选择保存位置。")
     }
     let same = record.path == target.path
+    if same && record.conflict == true && !force { throw NativeFailure("磁盘冲突尚未解决，请另存副本或确认覆盖。", "EXTERNAL_CHANGE") }
     let verify = {
       if same && !force {
         guard let bytes = try? Data(contentsOf: target), hashData(bytes) == record.diskHash else {
@@ -143,10 +172,12 @@ final class DocumentStore {
       }
     }
     try verify()
-    var bytes = Data()
-    if record.bom == true { bytes.append(contentsOf: [0xef, 0xbb, 0xbf]) }
-    bytes.append(contentsOf: text.utf8)
+    let selectedEncoding = encoding ?? record.encoding ?? "utf-8"
+    let selectedBOM = bom ?? record.bom ?? false
+    let bytes = try Self.encode(text, encoding: selectedEncoding, bom: selectedBOM)
     try atomicWrite(target, bytes, beforeCommit: verify)
+    record.encoding = selectedEncoding
+    record.bom = selectedBOM && selectedEncoding.hasPrefix("utf-")
     record.path = target.path
     record.name = target.lastPathComponent
     record.content = text
@@ -163,8 +194,8 @@ final class DocumentStore {
       let bytes = try Data(contentsOf: URL(fileURLWithPath: path))
       let digest = hashData(bytes)
       if digest == record.diskHash { return nil }
-      let (text, bom) = try decode(bytes)
-      return ["content": text, "diskHash": digest, "bom": bom]
+      let (text, bom, detected) = try decode(bytes, encoding: bytes.starts(with: [0xef, 0xbb, 0xbf]) || bytes.starts(with: [0xff, 0xfe]) || bytes.starts(with: [0xfe, 0xff]) ? nil : record.encoding)
+      return ["content": text, "diskHash": digest, "bom": bom, "encoding": detected]
     } catch {
       return ["missing": !FileManager.default.fileExists(atPath: path), "error": "磁盘文件暂时无法读取。"]
     }
@@ -173,7 +204,7 @@ final class DocumentStore {
     let record = try require(id)
     guard let path = record.path else { throw NativeFailure("草稿没有磁盘路径。") }
     let bytes = try Data(contentsOf: URL(fileURLWithPath: path))
-    let (text, bom) = try decode(bytes)
+    let (text, bom, detected) = try decode(bytes, encoding: bytes.starts(with: [0xef, 0xbb, 0xbf]) || bytes.starts(with: [0xff, 0xfe]) || bytes.starts(with: [0xfe, 0xff]) ? nil : record.encoding)
     guard hashData(bytes) == digest, text == content else {
       throw NativeFailure("磁盘文件又发生了变化。", "EXTERNAL_CHANGE")
     }
@@ -181,6 +212,7 @@ final class DocumentStore {
     updated.content = text
     updated.savedContent = text
     updated.bom = bom
+    updated.encoding = detected
     updated.diskHash = digest
     updated.lineEnding = text.contains("\r\n") ? "\r\n" : "\n"
     updated.conflict = false
@@ -320,7 +352,6 @@ final class DocumentStore {
   }
   func importImage(_ id: String, bytes: Data, name: String, options: [String: Any] = [:]) throws -> String {
     let record = try require(id)
-    guard let path = record.path else { throw NativeFailure("请先保存文档，再添加本地图片。") }
     guard bytes.count >= 12, bytes.count <= Self.maxBytes else { throw NativeFailure("图片大小无效。") }
     let values = [UInt8](bytes.prefix(12))
     var ext: String?
@@ -337,7 +368,7 @@ final class DocumentStore {
     }
     if ext == nil, let text = String(data: bytes.prefix(1024), encoding: .utf8), text.contains("<svg") { ext = "svg" }
     guard let ext else { throw NativeFailure("支持 PNG、JPEG、GIF、WebP 和 SVG 图片。") }
-    let parent = URL(fileURLWithPath: path).deletingLastPathComponent().resolvingSymlinksInPath()
+    let parent = record.path.map { URL(fileURLWithPath: $0).deletingLastPathComponent().resolvingSymlinksInPath() } ?? canonicalFileURL(dataDirectory.appendingPathComponent("DraftAssets/" + hashData(Data(record.id.utf8))))
     let source = options["source"] as? String ?? record.content
     let configured = yamlValue("typora-copy-images-to", source: source) ?? options["imageFolder"] as? String ?? ".assets"
     let folderName = configured.replacingOccurrences(of: "${filename}", with: (record.name as NSString).deletingPathExtension)
@@ -355,6 +386,6 @@ final class DocumentStore {
     var relative = (Array(repeating: "..", count: parentParts.count - common) + targetParts.dropFirst(common)).joined(separator: "/")
     if options["imagePrefix"] as? Bool == true, !relative.hasPrefix(".") { relative = "./" + relative }
     if options["imageEscape"] as? Bool != false { relative = relative.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: " ()#?"))) ?? relative }
-    return relative
+    return record.path == nil ? destination.path.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: " ()#?"))) ?? destination.path : relative
   }
 }

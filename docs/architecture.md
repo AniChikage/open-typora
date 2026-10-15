@@ -1,4 +1,4 @@
-# 编辑架构（0.4.0）
+# 编辑架构（0.5.0）
 
 macOS 的发布包使用 Swift/AppKit + WKWebView。Electron 保留为跨平台开发与 Chromium 回归测试宿主，不是 `package:mac` 或 `install:app` 的发布入口。
 
@@ -55,6 +55,7 @@ HTML 导出在请求时生成独立正文，等待公式和图表，通过本地
 - `npm run test:webkit`：隔离数据、隐藏 WebKit 实例中的实际渲染/桥/保存检查，未使用用户窗口。
 - `npm run test:desktop`：Electron/Chromium 下的编辑、保存、图片、PDF、冲突与恢复回归。
 - `npm run test:kernel-desktop`：实际键盘/DOM 下的代码和公式键入、模式历史、嵌套代码、查找及快捷键回归。
+- `npm run test:encoding`：编码状态/转换、不可表示字符、BOM 外部变化、合成组合输入与磁盘冲突、未命名源码多图粘贴。
 - `npm run test:features`：目录、标题、表格对话框、专注/打字机、偏好、快速打开、文件树及重新打开回归。
 - `npm run package:mac`：构建和签名原生 macOS 包。
 
@@ -69,3 +70,13 @@ HTML 导出在请求时生成独立正文，等待公式和图表，通过本地
 图片复制规则优先读取文档 YAML，再读取本机偏好。图片文件操作与文本撤销分开；移动使用先复制全部资源、再把旧文件移到废纸篓，避免中途失败后丢失尚未重写的引用。PicGo 接口使用原生 URLSession，显式上传与自动上传设置共用同一入口；不会把接口测试宣称为真实图床交付。
 
 `Interchange.swift` 在后台运行有时限的文档转换器。Pandoc 可配置；未安装时，macOS Word/RTF/ODT 转换使用系统 textutil。主题安装只打包选中 CSS 引用的本地字体和图片，限制目录与总大小，再将 Typora 的正文/侧栏选择器映射到本应用。
+
+## 0.5 编码与复杂转换
+
+文档记录新增可选 `encoding`，兼容原有恢复数据。Unicode 按 BOM 识别；其他编码显式选择。原生层使用 Foundation/CoreFoundation，开发宿主使用 TextDecoder/iconv-lite；保存前逐码点检查往返一致，编码失败不更改文件或归属记录。保存、复制、磁盘接受、恢复均保留编码与 BOM。转换编码不改变编辑内核的内容历史。
+
+输入法组词时跳过磁盘内容刷新，保存/关闭/重开须先完成组合；异步检查后若已开始组词则保留草稿并标记冲突。普通保存不能绕过未解决的冲突。
+
+导出时才准备转换用 Markdown，解析图片引用并读取实际资源，将 Mermaid SVG 转为高分辨率 PNG；正文 Markdown 与撤销历史保持不变。Pandoc 处理原生公式、脚注、表格，HTML 块通过本地 Lua 过滤器转为结构节点。包格式嵌入资源；文本格式写同名资源文件夹。导入使用 GFM 输出，避免把编辑器不支持的 simple/grid table 作为纯文本返回；媒体提取至应用持久目录。
+
+RTF 由 Cocoa 解析表格，提前保留 PNG/JPEG、脚注、语义标题和等宽代码，再恢复为 Markdown；解析器限制分组深度、数量与时间。无法保留的图片格式明确报错。发布仍是 AppKit/WebKit；Chromium 回归和合成 composition 检查不作为实体输入法成功的证据。

@@ -290,21 +290,21 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
             }),
             EditorView.domEventHandlers({
               paste(event) {
-                const image = [...(event.clipboardData?.files || [])].find(
+                const images = [...(event.clipboardData?.files || [])].filter(
                   (file) => file.type.startsWith("image/"),
                 );
-                if (!image) return false;
+                if (!images.length) return false;
                 event.preventDefault();
-                void insertImage(image);
+                for (const image of images) void insertImage(image);
                 return true;
               },
               drop(event) {
-                const image = [...(event.dataTransfer?.files || [])].find(
+                const images = [...(event.dataTransfer?.files || [])].filter(
                   (file) => file.type.startsWith("image/"),
                 );
-                if (!image) return false;
+                if (!images.length) return false;
                 event.preventDefault();
-                void insertImage(image);
+                for (const image of images) void insertImage(image);
                 return true;
               },
               compositionend() {

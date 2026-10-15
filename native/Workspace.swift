@@ -98,12 +98,11 @@ final class Workspace {
       guard descriptor >= 0 else { throw NativeFailure("无法创建文档。") }; Darwin.close(descriptor)
     } else if action == "duplicate" {
       guard (try source.resourceValues(forKeys: [.isRegularFileKey])).isRegularFile == true else { throw NativeFailure("请选择 Markdown 文件。") }
+      let owned = store.records.values.first(where: { $0.path == source.path })
+      let encoded = try owned.map { try DocumentStore.encode($0.content, encoding: $0.encoding ?? "utf-8", bom: $0.bom ?? false) }
       try fm.copyItem(at: source, to: destination)
       // The latest in-memory draft is the duplicate's content, without saving over the original.
-      if let record = store.records.values.first(where: { $0.path == source.path }) {
-        var data = Data(); if record.bom == true { data.append(contentsOf: [0xef, 0xbb, 0xbf]) }; data.append(contentsOf: record.content.utf8)
-        try atomicWrite(destination, data)
-      }
+      if let encoded { try atomicWrite(destination, encoded) }
     } else {
       try fm.moveItem(at: source, to: destination)
       undo = FileUndo(from: destination, to: source)
@@ -122,16 +121,17 @@ final class Workspace {
     }
     try writeRecent(items)
   }
-  static func search(_ files: [[String: String]], query: String, regex: Bool, caseSensitive: Bool) throws -> [String: Any] {
+  static func search(_ files: [[String: String]], query: String, regex: Bool, caseSensitive: Bool, encodings: [String: String] = [:]) throws -> [String: Any] {
     guard !query.isEmpty, query.utf8.count <= 1000 else { return ["matches": [], "truncated": false, "skipped": 0] }
     let expression = try NSRegularExpression(pattern: regex ? query : NSRegularExpression.escapedPattern(for: query), options: caseSensitive ? [] : [.caseInsensitive])
     var matches = [[String: Any]](), truncated = false, skipped = 0, totalBytes = 0
     for file in files where file["isDirectory"] != "true" {
       guard let path = file["path"], let size = try? URL(fileURLWithPath: path).resourceValues(forKeys: [.fileSizeKey]).fileSize,
         size <= 2 * 1024 * 1024, totalBytes + size <= 30 * 1024 * 1024,
-        let text = try? String(contentsOfFile: path, encoding: .utf8) else { skipped += 1; continue }
+        let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+        let decoded = try? DocumentStore(URL(fileURLWithPath: "/")).decode(data, encoding: data.starts(with: [0xef, 0xbb, 0xbf]) || data.starts(with: [0xff, 0xfe]) || data.starts(with: [0xfe, 0xff]) ? nil : encodings[path]) else { skipped += 1; continue }
       totalBytes += size
-      for (index, line) in text.components(separatedBy: "\n").enumerated() {
+      for (index, line) in decoded.0.components(separatedBy: "\n").enumerated() {
         let value = line as NSString
         for match in expression.matches(in: line, range: NSRange(location: 0, length: value.length)) {
           if matches.count >= 500 { truncated = true; break }

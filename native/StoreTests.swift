@@ -111,6 +111,55 @@ func runStoreTests() throws {
   try expect(try Data(contentsOf: word).starts(with: [0x50, 0x4b]), "Word export creates an actual DOCX archive")
   let imported = try Interchange.importFile(word, directory: store.dataDirectory)
   try expect((imported["html"] ?? imported["markdown"] ?? "").contains("中文"), "Word import retains Chinese document content")
+  let encodingStore = DocumentStore(directory.appendingPathComponent("encoding-data"))
+  // Actual byte fixtures exercise the same codecs and atomic saves as the installed host.
+  for encoding in DocumentStore.encodings {
+    let text = encoding == "windows-1252" ? "# Café €\r\n" : encoding == "shift_jis" ? "# 日本語\r\n" : "# 中文測試\r\n"
+    for bom in [false, true] where !bom || encoding.hasPrefix("utf-") {
+      let file = directory.appendingPathComponent("encoding-" + encoding + (bom ? "-bom" : "") + ".md")
+      let bytes = try DocumentStore.encode(text, encoding: encoding, bom: bom)
+      try atomicWrite(file, bytes)
+      let opened = try encodingStore.open(file, encoding: bom || encoding == "utf-8" ? nil : encoding)
+      let written = try encodingStore.save(opened.id, text: opened.content + "OK")
+      try expect(written.content == text + "OK" && written.encoding == encoding && written.bom == bom && Data(contentsOf: file) == DocumentStore.encode(text + "OK", encoding: encoding, bom: bom), "byte roundtrip " + encoding + (bom ? " BOM" : ""))
+    }
+  }
+  let imageDraft = DocumentRecord(id: "draft-image", name: "图片草稿.md", content: "", savedContent: "", lineEnding: "\n")
+  _ = try encodingStore.draft(imageDraft)
+  let draftImagePath = try encodingStore.importImage(imageDraft.id, bytes: png, name: "草稿图片.png")
+  try expect(draftImagePath.hasPrefix("/") && Data(contentsOf: encodingStore.asset(imageDraft.id, relative: draftImagePath)) == png, "untitled image insertion persists an owned asset before the first save")
+  let encodedFiles = try encodingStore.scan(directory)["files"] as! [[String: String]]
+  let codecSearch = try Workspace.search(encodedFiles, query: "中文測試", regex: false, caseSensitive: true, encodings: Dictionary(encodingStore.records.values.compactMap { record in record.path.map { ($0, record.encoding ?? "utf-8") } }, uniquingKeysWith: { a, _ in a }))
+  try expect((codecSearch["matches"] as? [[String: Any]] ?? []).count >= 8, "folder search reads BOM Unicode and explicitly opened legacy encodings")
+  let lossFile = directory.appendingPathComponent("loss.md"); try atomicWrite(lossFile, Data("original".utf8))
+  let lossRecord = try encodingStore.open(lossFile)
+  do { _ = try encodingStore.save(lossRecord.id, text: "中文😀", encoding: "windows-1252", bom: false); throw NativeFailure("lossy save") }
+  catch let error as NativeFailure { try expect(error.code == "ENCODING_LOSS" && Data(contentsOf: lossFile) == Data("original".utf8) && encodingStore.require(lossRecord.id).encoding == "utf-8", "unrepresentable conversion retains disk and owned metadata") }
+  let utf16 = try encodingStore.save(lossRecord.id, text: "中文😀\r\n", encoding: "utf-16be", bom: true)
+  try encodingStore.persist(SessionRecord(documents: [utf16], activeId: utf16.id))
+  let encodingRecovery = try DocumentStore(encodingStore.dataDirectory).restore()!
+  try expect(encodingRecovery.documents.first?.encoding == "utf-16be" && encodingRecovery.documents.first?.content == "中文😀\r\n", "encoding and Unicode survive recovery")
+  try atomicWrite(lossFile, try DocumentStore.encode("外部 GBK", encoding: "gbk", bom: false))
+  do { _ = try encodingStore.save(utf16.id, text: "overwrite", encoding: "gbk"); throw NativeFailure("overwrite") }
+  catch let error as NativeFailure { try expect(error.code == "EXTERNAL_CHANGE", "conversion still refuses external disk edits") }
+  let redecoded = try encodingStore.open(lossFile, id: utf16.id, encoding: "gbk")
+  try expect(redecoded.content == "外部 GBK" && redecoded.encoding == "gbk", "explicit reopen decodes the actual file without rewriting it")
+  if Interchange.pandoc() != nil {
+    let rtf = directory.appendingPathComponent("complex.rtf")
+    let base64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aNNsAAAAASUVORK5CYII="
+    let complex = "# 复杂标题\n\n| 项目 | 内容 |\n| --- | --- |\n| 中文甲 | 完整单元格 |\n\n脚注引用[^n]。\n\n[^n]: 中文脚注内容。\n\n![图片](data:image/png;base64," + base64 + ")\n\n```javascript\nconst message = \"中文代码\";\n```\n"
+    try Interchange.export("rtf", source: complex, html: "<p>中文</p>", destination: rtf, workingDirectory: directory, temporaryDirectory: store.dataDirectory)
+    let roundtrip = try Interchange.importFile(rtf, directory: store.dataDirectory)["markdown"] ?? ""
+    try expect(roundtrip.contains("中文甲") && roundtrip.contains("完整单元格"), "complex RTF import retains actual table contents")
+    try expect(roundtrip.contains("[^rtf-note-1]") && roundtrip.contains("中文脚注内容"), "complex RTF import retains note position and content")
+    try expect(roundtrip.contains("![导入图片]"), "complex RTF import extracts the actual PNG")
+    try expect(roundtrip.contains("中文代码"), "complex RTF import retains code")
+    if !roundtrip.contains("# 复杂标题") { print("RTF OUTPUT:", roundtrip) }
+    try expect(roundtrip.contains("# 复杂标题"), "complex RTF import retains semantic heading level")
+    let malformed = directory.appendingPathComponent("malformed.rtf"); try atomicWrite(malformed, Data("{\\rtf1 unclosed".utf8))
+    do { _ = try Interchange.importFile(malformed, directory: store.dataDirectory); throw NativeFailure("malformed RTF accepted") }
+    catch let error as NativeFailure { try expect(error.message.contains("闭合"), "malformed RTF fails explicitly without creating a partial imported document") }
+  }
   let css = directory.appendingPathComponent("owned-theme.css")
   try atomicWrite(css, Data("#write { color: #123456; }".utf8))
   let installedTheme = try Interchange.installTheme(css, directory: store.dataDirectory)

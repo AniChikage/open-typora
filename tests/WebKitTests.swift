@@ -22,7 +22,7 @@ final class WebKitTests: NSObject, NSApplicationDelegate, WKNavigationDelegate {
       owner.hosts.append(host)
       host.show(hidden: true)
       host.webView.navigationDelegate = self
-      DispatchQueue.main.asyncAfter(deadline: .now() + 70) {
+      DispatchQueue.main.asyncAfter(deadline: .now() + 180) {
         fputs("WebKit test timed out\n", stderr)
         exit(1)
       }
@@ -59,6 +59,10 @@ final class WebKitTests: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             guard let page = longPDF.page(at: number), abs(page.bounds(for: .mediaBox).width - 612) < 1, page.string?.contains("\(number + 1) / \(longPDF.pageCount)") == true else { throw NativeFailure("PDF paper or page counter is wrong.") }
           }
           print("PASS: long PDF has \(longPDF.pageCount) Letter pages, every paragraph and row once, and correct page counters")
+          let complexURL = self.owner.directory.appendingPathComponent("native-complex.pdf")
+          guard let complexPDF = PDFDocument(url: complexURL), complexPDF.pageCount >= 1,
+            let complexText = complexPDF.string?.precomposedStringWithCompatibilityMapping, complexText.contains("复杂中文文档"), complexText.contains("中文甲"), complexText.contains("中文脚注内容") else { throw NativeFailure("Complex native PDF lost Chinese content or table/footnote text.") }
+          print("PASS: complex PDF contains Chinese headings, table cells and footnotes across \(complexPDF.pageCount) pages")
           let html = try String(contentsOf: self.owner.directory.appendingPathComponent("native-test.html"), encoding: .utf8)
           guard html.contains("data:image/"), html.contains("data:font/"), !html.contains("<link rel=\"stylesheet\"") else { throw NativeFailure("HTML export retained live app assets.") }
           print("PASS: HTML export contains embedded fonts and the owned local image")

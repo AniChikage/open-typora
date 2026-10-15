@@ -60,9 +60,10 @@ const handlers = {
   exportConverted: async (_, id, format, source, html) => { const record = store.require(id), ext = { latex: "tex", revealjs: "html", mediawiki: "wiki" }[format] || format; const result = await dialog.showSaveDialog(window, { defaultPath: record.name.replace(/\.[^.]+$/, "." + ext) }); return result.canceled ? null : convertExport(store.dataDir, format, source, html, result.filePath); },
   imageAction: async (_, id, sources, action, options) => { if (action !== "upload") throw new Error("图片文件管理请使用原生安装版。"); const mapping = {}; for (const source of sources) { const file = await store.asset(id, source); const response = await fetch(options?.imageUploader || "http://127.0.0.1:36677/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ list: [file] }), signal: AbortSignal.timeout(30000) }); const result = await response.json(); if (!response.ok || !result.success || !/^https?:\/\//.test(result.result?.[0] || "")) throw new Error("PicGo 未返回有效图片地址。"); mapping[source] = result.result[0]; } return mapping; },
   ready: () => true,
+  cancelClose: () => { closing = false; },
   recent: () => workspace.recent(),
   recentAction: async (_, action, file) => { if (action !== "open") return workspace.recentAction(action, file); const item = (await workspace.recent()).find(item => item.path === file); if (!item) throw new Error("最近项目已移除。"); await workspace.remember(file, item.folder); return item.folder ? store.scan(file) : store.open(file); },
-  searchFiles: async (_, query, options) => workspace.search((await store.scan()).files, query, options),
+  searchFiles: async (_, query, options) => workspace.search((await store.scan()).files, query, { ...options, encodings: Object.fromEntries([...store.records.values()].filter(record => record.path).map(record => [record.path, record.encoding])) }),
   reveal: async (_, file) => shell.showItemInFolder(await workspace.authorize(file, store)),
   fileOperation: async (_, operation) => {
     if (operationRunning) throw new Error("另一个文件操作正在进行。"); operationRunning = true;
@@ -131,7 +132,7 @@ const handlers = {
     const result = await dialog.showMessageBox(window, { type: "question", message: `保存对“${String(name).slice(0,150)}”所做的修改？`, buttons: ["保存", "取消", "不保存"], defaultId: 0, cancelId: 1 });
     return ["save", "cancel", "discard"][result.response];
   },
-  save: async (_, id, text, saveAs, force) => {
+  save: async (_, id, text, saveAs, force, options) => {
     const record = store.require(id);
     let destination;
     if (!record.path || saveAs) {
@@ -154,16 +155,16 @@ const handlers = {
       });
       if (result.response !== 1) return null;
     }
-    return store.save(id, text, destination, force);
+    return store.save(id, text, destination, force, options);
   },
   persist: (_, value) => store.persist(value),
   check: (_, id) => store.check(id),
-  reload: (_, id) => store.reload(id),
+  reload: (_, id, encoding) => store.reload(id, encoding),
   acceptDisk: async (_, id, content, hash) => {
     const disk = await store.check(id);
     if (!disk || disk.content !== content || disk.diskHash !== hash)
       throw new Error("磁盘内容已再次变化。");
-    return store.acceptDisk(id, content, hash, disk.bom);
+    return store.acceptDisk(id, content, hash, disk.bom, disk.encoding);
   },
   image: (_, id, bytes, name, options) => store.importImage(id, bytes, name, options),
   pdf: async () => {
@@ -250,6 +251,7 @@ app
       });
     function createWindow() {
       window = new BrowserWindow({
+        show: process.env.OPEN_TYPORA_TEST_HIDDEN !== "1",
         width: 1380,
         height: 960,
         minWidth: 660,
@@ -259,6 +261,7 @@ app
         trafficLightPosition: { x: 12, y: 9 },
         backgroundColor: "#FFFFFF",
         webPreferences: {
+          backgroundThrottling: process.env.OPEN_TYPORA_TEST_HIDDEN !== "1",
           preload: path.join(root, "electron/preload.cjs"),
           contextIsolation: true,
           nodeIntegration: false,

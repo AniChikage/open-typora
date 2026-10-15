@@ -1,6 +1,6 @@
 import { readFile, realpath, stat, mkdir, copyFile, rename, open } from "node:fs/promises";
 import path from "node:path";
-import { atomicWrite } from "./store.mjs";
+import { atomicWrite, encodeText, decodeText } from "./store.mjs";
 const under = (base, file) => file === base || file.startsWith(base + path.sep);
 export class Workspace {
   constructor(directory) { this.directory = directory; this.undo = null; }
@@ -21,7 +21,7 @@ export class Workspace {
     await this.absent(destination); if (under(source, destination) && !["new-file", "new-folder"].includes(action)) throw new Error("目标位于自身内部。");
     if (action === "new-folder") await mkdir(destination);
     else if (action === "new-file") { if (!/\.(md|markdown|mdown)$/i.test(destination)) throw new Error("需要 Markdown 扩展名。"); const handle = await open(destination, "wx", 0o600); await handle.close(); }
-    else if (action === "duplicate") { await copyFile(source, destination, 1); const record = [...store.records.values()].find(item => item.path === source); if (record) await atomicWrite(destination, (record.bom ? "\uFEFF" : "") + record.content); }
+    else if (action === "duplicate") { const record = [...store.records.values()].find(item => item.path === source), bytes = record && encodeText(record.content, record.encoding, record.bom); await copyFile(source, destination, 1); if (bytes) await atomicWrite(destination, bytes); }
     else if (["move", "rename"].includes(action)) { await rename(source, destination); this.undo = { from: destination, to: source }; return { fromPath: source, toPath: destination }; }
     else throw new Error("文件操作无效。");
     return { newPath: destination };
@@ -33,7 +33,7 @@ export class Workspace {
     const expression = new RegExp(options.regex ? query : query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), options.caseSensitive ? "g" : "gi");
     const matches = []; let skipped = 0, total = 0;
     for (const file of files.filter(item => item.isDirectory !== "true")) {
-      try { const size = (await stat(file.path)).size; if (size > 2 * 1024 * 1024 || (total += size) > 30 * 1024 * 1024) { skipped++; continue; } const lines = (await readFile(file.path, "utf8")).split("\n"); for (let line = 0; line < lines.length; line++) { for (const match of lines[line].matchAll(expression)) { if (matches.length >= 500) return { matches, skipped, truncated: true }; matches.push({ token: file.token, path: file.path, name: file.relative, line: line + 1, column: match.index + 1, length: match[0].length, preview: lines[line].slice(Math.max(0, match.index - 70), Math.max(match.index + match[0].length, match.index + 110)) }); } } } catch { skipped++; }
+      try { const size = (await stat(file.path)).size; if (size > 2 * 1024 * 1024 || (total += size) > 30 * 1024 * 1024) { skipped++; continue; } const bytes = await readFile(file.path), lines = decodeText(bytes, options.encodings?.[file.path]).content.split("\n"); for (let line = 0; line < lines.length; line++) { for (const match of lines[line].matchAll(expression)) { if (matches.length >= 500) return { matches, skipped, truncated: true }; matches.push({ token: file.token, path: file.path, name: file.relative, line: line + 1, column: match.index + 1, length: match[0].length, preview: lines[line].slice(Math.max(0, match.index - 70), Math.max(match.index + match[0].length, match.index + 110)) }); } } } catch { skipped++; }
     }
     return { matches, skipped, truncated: false };
   }

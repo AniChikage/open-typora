@@ -25,6 +25,7 @@ function download(name: string, text: string, type = "text/markdown;charset=utf-
 }
 const browser: Host = {
   native: false,
+  async cancelClose() {},
   async windowAction() { return false; },
   async imageAction() { throw new Error("图片文件操作请使用桌面应用。"); },
   async themes() { return []; }, async installTheme() { throw new Error("安装主题请使用桌面应用。"); },

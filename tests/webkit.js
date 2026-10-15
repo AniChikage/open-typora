@@ -54,8 +54,8 @@ const sourceMode = async (value) => {
     button.click();
   await wait(() =>
     value
-      ? !!document.querySelector(".source-surface:not([hidden]) .cm-line")
-      : !document.querySelector(".rich-scroller[hidden]"),
+      ? !!document.querySelector(".document-editor:not([hidden]) .source-surface:not([hidden]) .cm-line")
+      : !document.querySelector(".document-editor:not([hidden]) .rich-scroller[hidden]"),
   );
   await new Promise((resolve) => setTimeout(resolve, 100));
 };
@@ -195,6 +195,53 @@ try {
   window.__openTypora.command({ action: "html" });
   await wait(() => document.querySelector(".toast")?.textContent.includes("HTML 已导出"));
   check(true, "native HTML export embeds local fonts and images without live app links");
+  window.webkit.messageHandlers.opentypora.postMessage({id:"phase",name:"progress",args:["phase: encoding dialog"]});
+  // Drive the new encoding dialog through its real native bridge and byte writer.
+  for (const encoding of ['gb18030', 'utf-16be', 'utf-8']) {
+    document.querySelector('[aria-label="更改文本编码"]').click(); await wait(() => document.querySelector('[aria-label="文本编码"]'));
+    const select = document.querySelector('select[aria-label="文本编码"]'); select.value = encoding; select.dispatchEvent(new Event('change', { bubbles: true }));
+    await new Promise(resolve => setTimeout(resolve, 20));
+    [...document.querySelectorAll('[role="dialog"] button')].find(button => button.textContent === '转换并保存').click();
+    await wait(() => !document.querySelector('[role="dialog"]'));
+    check(document.querySelector('[aria-label="更改文本编码"]').textContent.includes(({gb18030:"GB18030", "utf-16be":"UTF-16 BE", "utf-8":"UTF-8"})[encoding]), 'native encoding dialog converts and updates metadata: ' + encoding);
+  }
+  window.webkit.messageHandlers.opentypora.postMessage({id:"phase",name:"progress",args:["phase: complex source mode"]});
+  await sourceMode(false);
+  window.webkit.messageHandlers.opentypora.postMessage({id:"phase",name:"progress",args:["phase: complex canvas"]});
+  const canvas = document.createElement('canvas'); canvas.width = 360; canvas.height = 120; const context = canvas.getContext('2d'); context.fillStyle = '#eef3f8'; context.fillRect(0, 0, 360, 120); context.fillStyle = '#375576'; context.fillRect(20, 20, 80, 80); context.font = '22px sans-serif'; context.fillText('中文图片验收', 120, 68);
+  const complexImage = await window.desktop.importImage('webkit-fixture', Uint8Array.from(atob(canvas.toDataURL('image/png').split(',')[1]), c => c.charCodeAt(0)), 'complex.png'); if (!complexImage.ok) throw new Error(complexImage.error);
+  const imagePath = saved.value.path.slice(0, saved.value.path.lastIndexOf("/") + 1) + complexImage.value;
+  const complexSource = '# 复杂中文文档\n\n## 结构与内容\n\n中文段落 **粗体**、*斜体*、[参考链接](https://example.com/document)。\n\n1. 一级列表\n   - 嵌套子项\n   - 第二子项\n2. 第二项\n\n| 项目 | 数量 | 说明 |\n| :--- | ---: | :---: |\n| 中文甲 | 12 | 单元格内容 |\n| 中文乙 | 34 | 第二行 |\n\n脚注引用[^note]。\n\n[^note]: 中文脚注内容。\n\n行内公式 $E=mc^2$。\n\n$$\n\\int_0^1 x^2 \\,dx=\\frac{1}{3}\n$$\n\n![中文图片](<' + imagePath + '>)\n\n<img src="' + imagePath + '" alt="带尺寸图片" width="120" />\n\n![引用图片][figure]\n\n[figure]: <' + imagePath + '>\n\n```mermaid\nflowchart LR\n  A[中文开始] --> B[检查完成]\n```\n\n```javascript\nconst message = "中文代码";\n```\n';
+  const complexRecord = { id: 'complex-fixture', path: null, name: '复杂中文文档.md', content: complexSource, savedContent: '', diskHash: null, lineEnding: '\n' };
+  window.webkit.messageHandlers.opentypora.postMessage({id:"phase",name:"progress",args:["phase: complex register"]});
+  const complexRegistered = await window.desktop.registerDraft(complexRecord); if (!complexRegistered.ok) throw new Error(complexRegistered.error);
+  window.__openTypora.command({ action: 'opened', document: complexRecord });
+  await wait(() => document.querySelector('.document-title')?.textContent.startsWith(complexRecord.name));
+  window.webkit.messageHandlers.opentypora.postMessage({id:"phase",name:"progress",args:["phase: complex diagram"]});
+  await wait(() => root()?.querySelector('.mermaid-block svg'));
+  check(true, 'complex Chinese fixture renders nested lists, tables, images, footnotes, math and Mermaid');
+  window.__openTypora.command({ action: 'pdf' }); await wait(() => document.querySelector('.toast')?.textContent.includes('PDF 已导出'));
+  check(true, 'complex native PDF export includes rendered Chinese tables, math, images, diagrams and footnotes');
+  for (const format of ['docx', 'odt', 'rtf', 'epub', 'latex', 'rst', 'mediawiki', 'textile', 'opml', 'revealjs']) {
+    window.__openTypora.command({ action: format });
+    await wait(() => { const message = document.querySelector('.toast')?.textContent || ''; if (/失败|无法|无效|不能|超时|需要 Pandoc/.test(message)) throw new Error(format + ': ' + message); return message.includes(format.toUpperCase() + ' 已导出'); });
+    check(true, 'real Pandoc ' + format + ' export completes from the rendered complex document');
+  }
+  const convertedImports = {};
+  for (const format of ['docx', 'odt', 'rtf', 'epub']) {
+    const response = await window.desktop.importDocument(format); if (!response.ok) throw new Error(format + ': ' + response.error);
+    const markdown = response.value.markdown;
+    check(markdown.includes('复杂中文文档') && markdown.includes('中文甲') && markdown.includes('中文脚注内容') && markdown.includes('中文代码'), 'real ' + format + ' reimport retains Chinese headings, table text, footnotes and code');
+    if (['docx', 'odt', 'epub'].includes(format)) check((markdown.includes('![') || markdown.includes('<img')) && markdown.includes('mc'), format + ' reimport retains extracted images and mathematical content');
+    convertedImports[format] = markdown;
+  }
+  const importedRecord = { ...complexRecord, id: 'converted-import', name: '导入的复杂文档.md', content: convertedImports.docx };
+  const importRegistration = await window.desktop.registerDraft(importedRecord); if (!importRegistration.ok) throw new Error(importRegistration.error);
+  window.__openTypora.command({ action: 'opened', document: importedRecord });
+  await wait(() => document.querySelector('.document-title')?.textContent.startsWith(importedRecord.name) && root()?.querySelectorAll('table tr').length === 3 && [...root().querySelectorAll('img')].some(image => image.naturalWidth > 0));
+  check(true, 'reimported DOCX is editable and its persistent extracted media loads in native WebKit');
+  window.__openTypora.command({ action: 'opened', document: saved.value });
+  await wait(() => document.querySelector('.document-title')?.textContent === saved.value.name);
   const reopenDraft = {id:'reopen-draft',path:null,name:'Reopen-draft.md',content:'',savedContent:'',diskHash:null,lineEnding:'\n'};
   const registeredDraft = await window.desktop.registerDraft(reopenDraft); if (!registeredDraft.ok) throw new Error(registeredDraft.error);
   window.__openTypora.command({action:'opened',document:reopenDraft}); await wait(() => document.querySelector('.document-title')?.textContent === 'Reopen-draft.md');
@@ -212,7 +259,7 @@ try {
     "cancelled native close retains the dirty document and live editor",
   );
   check(errors.length === 0, "no WebKit runtime error or rejected promise");
-  return { passed, errors, source };
+  return { passed, errors, source, convertedImports };
 } catch (error) {
   return {
     passed,

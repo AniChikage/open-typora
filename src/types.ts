@@ -8,6 +8,7 @@ export interface DocumentRecord {
   lineEnding: string;
   conflict?: boolean;
   bom?: boolean;
+  encoding?: string;
 }
 export interface FileEntry {
   token: string;
@@ -53,6 +54,7 @@ export interface Command {
 }
 export interface Host {
   native: boolean;
+  cancelClose(): Promise<unknown>;
   windowAction(action: string): Promise<unknown>;
   imageAction(id: string, sources: string[], action: string, options?: Record<string, unknown>): Promise<Record<string, string> | null>;
   themes(): Promise<{ id: string; name: string; css: string }[]>;
@@ -79,10 +81,11 @@ export interface Host {
     text: string,
     saveAs?: boolean,
     force?: boolean,
+    options?: { encoding: string; bom: boolean },
   ): Promise<DocumentRecord | null>;
   persist(session: SessionSnapshot): Promise<unknown>;
   check(id: string): Promise<DiskChange | null>;
-  reload(id: string): Promise<DocumentRecord>;
+  reload(id: string, encoding?: string): Promise<DocumentRecord>;
   acceptDisk(
     id: string,
     content: string,
