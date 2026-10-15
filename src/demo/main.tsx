@@ -1,0 +1,10 @@
+import ReactDOM from "react-dom/client";
+import DemoApp from "./DemoApp";
+import "@fontsource/open-sans/latin-400.css";
+import "@fontsource/open-sans/latin-700.css";
+import "@fontsource/open-sans/latin-400-italic.css";
+import "@fontsource/open-sans/latin-700-italic.css";
+import "../styles.css";
+import "../features.css";
+import "./demo.css";
+ReactDOM.createRoot(document.getElementById("root")!).render(<DemoApp />);

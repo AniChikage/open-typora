@@ -8,7 +8,7 @@
 
 <p align="center">
   English · <a href="README.zh-CN.md">简体中文</a><br>
-  <a href="https://github.com/AniChikage/open-typora/releases/latest">Download</a> · <a href="#features">Features</a> · <a href="#getting-started">Getting started</a> · <a href="CONTRIBUTING.md">Contributing</a> · <a href="LICENSE">MIT License</a>
+  <a href="https://open-typora.comicyueyu.chatgpt.site">Try in your browser</a> · <a href="https://github.com/AniChikage/open-typora/releases/latest">Download</a> · <a href="#features">Features</a> · <a href="CONTRIBUTING.md">Contributing</a> · <a href="LICENSE">MIT License</a>
 </p>
 
 ![Open Typora — live Markdown editing in the native macOS app](docs/images/hero.png)
@@ -33,6 +33,12 @@ See the [feature checklist](docs/feature-parity.md) for coverage and known diffe
 Trying the preview? [Report a problem](https://github.com/AniChikage/open-typora/issues/new?template=bug_report.yml) or [suggest a feature](https://github.com/AniChikage/open-typora/issues/new?template=feature_request.yml). Include your platform, app version, and a small reproducible example.
 
 ## Getting started
+
+### Try without installing
+
+**[Open the web demo](https://open-typora.comicyueyu.chatgpt.site)** to edit a sample, switch between live and source modes, open a UTF-8 Markdown file, and download your work. It uses the same editing kernel as the desktop app.
+
+The demo keeps documents in the current tab's memory; it does not upload or persist their contents. Refreshing clears edits, so download a copy before leaving. Imports are limited to 1 MB and external embedded media are blocked. Local folders, recovery, other encodings, and PDF / HTML export are available in the desktop app.
 
 ### Downloads
 
@@ -108,6 +114,8 @@ Open a Markdown file or a folder, or try [the example document](examples/a-quiet
 npm ci
 npm run dev:app
 ```
+
+To work on the standalone browser demo, use `npm run dev:demo`; `npm run build:demo` writes the static site to `dist-demo/`. Its entry point is `src/demo/`, with a separate content security policy in `web/index.html`.
 
 The Windows app and development host use **Electron/Chromium**. The macOS app uses **Swift/AppKit + WKWebView**. Both share the same TypeScript/React interface and independently implemented editing model.
 

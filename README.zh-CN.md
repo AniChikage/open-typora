@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="README.md">English</a> · 简体中文<br>
-  <a href="https://github.com/AniChikage/open-typora/releases/latest">下载安装包</a> · <a href="#功能">功能</a> · <a href="#开始使用">开始使用</a> · <a href="CONTRIBUTING.md">参与贡献</a> · <a href="LICENSE">MIT 许可证</a>
+  <a href="https://open-typora.comicyueyu.chatgpt.site">在线试玩</a> · <a href="https://github.com/AniChikage/open-typora/releases/latest">下载安装包</a> · <a href="#功能">功能</a> · <a href="CONTRIBUTING.md">参与贡献</a> · <a href="LICENSE">MIT 许可证</a>
 </p>
 
 ![Open Typora 产品展示：macOS 原生窗口中的 Markdown 编辑界面](docs/images/hero.png)
@@ -33,6 +33,12 @@ Open Typora 是一款开源 Markdown 编辑器，受 Typora 的行内编辑体�
 试用中遇到问题，可以[报告问题](https://github.com/AniChikage/open-typora/issues/new?template=bug_report.yml)或[提出功能建议](https://github.com/AniChikage/open-typora/issues/new?template=feature_request.yml)。请附上系统、应用版本和最小复现示例。
 
 ## 开始使用
+
+### 免安装试玩
+
+**[打开网页试玩](https://open-typora.comicyueyu.chatgpt.site)**，直接编辑示例、切换正文与源码、打开 UTF-8 Markdown 文件，并下载修改结果。试玩与桌面版复用同一套编辑内核。
+
+文档只保留在当前标签页内存中，不上传或持久保存内容；刷新会清空修改，请先下载保留。试玩导入上限为 1 MB，阻止加载外部嵌入媒体。文件夹、自动恢复、其他编码和 PDF／HTML 导出请使用桌面版。
 
 ### 下载
 
@@ -108,6 +114,8 @@ npm run package:win
 npm ci
 npm run dev:app
 ```
+
+运行 `npm run dev:demo` 开发独立网页试玩，`npm run build:demo` 将静态站点输出到 `dist-demo/`。入口在 `src/demo/`，独立内容安全策略位于 `web/index.html`。
 
 Windows 发布应用和开发宿主采用 **Electron/Chromium**；macOS 发布应用采用 **Swift/AppKit + WKWebView**。二者共用 TypeScript/React 界面及独立实现的编辑模型。
 
