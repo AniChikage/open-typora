@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Download the latest release
+    url: https://github.com/AniChikage/open-typora/releases/latest
+    about: Installers for macOS Apple Silicon and Windows x64, with checksums.
+  - name: Supported features and known differences
+    url: https://github.com/AniChikage/open-typora/blob/main/docs/feature-parity.md
+    about: Check the current workflow coverage before requesting a feature.

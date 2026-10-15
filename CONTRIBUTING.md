@@ -6,7 +6,7 @@ Thanks for helping improve Open Typora. Small, focused contributions are easier 
 
 Search [existing issues](https://github.com/AniChikage/open-typora/issues) first. A useful report includes:
 
-- Open Typora version, macOS version, and CPU architecture.
+- Open Typora version, operating system version, and CPU architecture.
 - Steps to reproduce, expected behavior, and actual behavior.
 - A minimal Markdown document and a screenshot when they help explain the problem.
 - For input problems: input method, rich/source mode, editing location, and the key sequence.

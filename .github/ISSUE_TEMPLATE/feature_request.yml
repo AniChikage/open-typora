@@ -1,0 +1,23 @@
+name: Feature request
+description: Describe a writing workflow you want Open Typora to support.
+title: "[Feature]: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the writing task and where the current workflow gets in the way.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Suggested behavior
+      description: A concrete example helps. Link to public documentation when comparing another editor.
+    validations:
+      required: true
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Current workaround and platform
+      description: How do you handle this today, and on which operating system?

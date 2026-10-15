@@ -28,6 +28,8 @@ Open Typora 是一款开源 Markdown 编辑器，受 Typora 的行内编辑体�
 
 具体覆盖范围与已知差异见[功能清单](docs/feature-parity.md)。
 
+试用中遇到问题，可以[报告问题](https://github.com/AniChikage/open-typora/issues/new?template=bug_report.yml)或[提出功能建议](https://github.com/AniChikage/open-typora/issues/new?template=feature_request.yml)。请附上系统、应用版本和最小复现示例。
+
 ## 开始使用
 
 ### 下载

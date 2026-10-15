@@ -1,0 +1,65 @@
+name: Bug report
+description: Report an editing, file, input-method, or import/export problem.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for trying Open Typora. Please search existing issues first.
+        Share a small example with personal information removed. Reports are public.
+  - type: input
+    id: version
+    attributes:
+      label: Open Typora version
+      placeholder: "e.g. 0.5.2"
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Operating system and architecture
+      placeholder: "e.g. Windows 11 x64 or macOS 15.6 Apple Silicon"
+    validations:
+      required: true
+  - type: dropdown
+    id: workflow
+    attributes:
+      label: Affected workflow
+      options:
+        - Editing and keyboard interaction
+        - Chinese or other input methods
+        - Opening, saving, encoding, or recovery
+        - Tables, images, math, or diagrams
+        - Import or export
+        - Installation or startup
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Include the editing mode and exact key sequence when relevant.
+      placeholder: |
+        1. Open a document containing ...
+        2. In rich/source mode, ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+      description: What should happen, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: Minimal example or screenshot
+      description: Paste a short Markdown sample or attach a sanitized file if it helps. Keep the original file when investigating a save or conversion problem.
+  - type: textarea
+    id: environment
+    attributes:
+      label: Relevant input method or conversion settings
+      description: For input issues, include the input method and version. For conversion, include source/target formats and the Pandoc version, if used.
