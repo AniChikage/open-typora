@@ -1,70 +1,100 @@
-# Open Typora
+<p align="center">
+  <img src="design/icon.svg" alt="Open Typora" width="88" height="88">
+</p>
 
-本地 Markdown 编辑器，macOS 发布版采用 AppKit/WebKit，正文直接编辑并保留 Markdown 源码与撤销历史。
+<h1 align="center">Open Typora</h1>
 
-当前版本 **0.5.1**。支持其他文本编码的打开、无损转换与恢复，未命名草稿图片，以及复杂文档导出/重新导入；继续保留文件管理、搜索、表格、图片、公式、图表和主题功能。[对齐清单与边界](docs/feature-parity.md)。安装流程只保留当前应用版本；M 图标保持不变。
+<p align="center">Write in Markdown. Work directly on the page. Keep your files.</p>
 
-## 使用
+<p align="center">
+  English · <a href="README.zh-CN.md">简体中文</a><br>
+  <a href="#features">Features</a> · <a href="#getting-started">Getting started</a> · <a href="CONTRIBUTING.md">Contributing</a> · <a href="LICENSE">MIT License</a>
+</p>
 
-- 直接在排版后的正文输入；光标进入粗体、链接等行内格式时展开对应符号。
-- Enter 创建段落或继续列表，Shift-Enter 换行；表格单元格可以直接输入和用 Tab 导航。
-- 键入代码围栏或 `$$` 后回车进入局部编辑器。⌘/ 切换完整源码，正文与代码块共用历史；源码模式独立撤销，返回正文时作为一次事务提交。
-- 文件树右键可新建、复制、重命名、移动或移到废纸篓，文件夹支持拖动移动和方向键导航；文件操作可撤销。⌘⇧F 搜索文件夹内容，⌘⇧O 快速打开，最近文件/置顶文件夹可跨重启使用。
-- 图片右键打开编辑面板，可改路径、尺寸、移动、复制、下载或通过 PicGo Server 上传；YAML 支持 `typora-copy-images-to`、`typora-root-url`，偏好可设置复制目录和路径格式。
-- 点击底部编码或“文件 → 文本编码”，重新打开或转换保存 UTF-8、UTF-16 LE/BE、GB18030、GBK/GB2312、Big5、Shift JIS、Windows-1252；保留 BOM 与换行，不可表示的字符会阻止保存。
-- PDF 支持 A4/Letter、页边距、页眉页脚变量和按行/表格行分页。复杂 Word/ODT/RTF/EPUB 使用 Pandoc；图表与图片会内嵌，公式保留目标格式可支持的结构。没有 Pandoc 时只提供系统 Word/RTF/ODT 基础转换。
-- 偏好中可安装本地 CSS 主题，主题字体/图片会一并内嵌保存。
-- ⌘F 查找替换，⌘S 保存，⌘N/⌘O 原生菜单创建或打开独立窗口。
-- 已有文件停止输入 1.2 秒后自动保存；草稿先选择保存位置。外部修改触发冲突并保留草稿。
-- 支持任务列表、代码高亮、MathJax 4 SVG、Mermaid、粘贴/拖入图片、大纲、主题、专注模式与 PDF。
-- ⌘1–6 设置标题，⌘0 恢复段落；引用、列表、任务、缩进、表格行列增删/移动共用文档事务和撤销。菜单和键盘使用同一份命令定义。
-- 支持正文目录、脚注、YAML 前言、高亮、上下标、Emoji、下划线与注释；偏好设置可以调整字体、缩进、拼写检查、自动配对和扩展。
-- F8 淡化非活动正文，F9 将输入位置保持在窗口中部；⌘⇧O 快速打开，⌘⌃3 显示文件树。
-- ⌘T 创建原生标签页，⌘⇧T 重新打开关闭的文件；会话恢复保留标签组。可导出带内嵌字体和本地图片的独立 HTML。
+![Open Typora running on macOS with a Markdown document, table, and code block](docs/images/editor.png)
 
-保留 0.1.1 按本机 Typora GitHub 主题观察实现的 Open Sans、正文/标题尺寸、灰白侧栏与底部小图标入口。界面基准见 [design/spec.md](design/spec.md)。
+Open Typora is an open-source Markdown editor inspired by Typora's inline editing experience. Write directly in the rendered document, switch to source when you need it, and save ordinary `.md` files in your own folders.
 
-## 构建与安装
+**Status:** early development, version **0.5.1**. The supported build target is **macOS 14+ on Apple Silicon**. The interface is currently in Simplified Chinese. This is an independent project, unaffiliated with Typora; full feature and behavior parity is still in progress.
 
-macOS 14+ arm64，Node.js 22.12+，npm 和 Xcode Command Line Tools（Swift）；此次验证使用 Node 26.7 和 Swift 6.2。
+## Features
+
+- **Live Markdown editing** — headings, inline formatting, lists, tasks, tables, links, footnotes, and YAML front matter. Edit code and formulas in place, or switch to the full source view.
+- **A focused writing space** — outline navigation, focus and typewriter modes, word counts, find and replace, and local CSS themes.
+- **Files you control** — folder tree, full-text search, quick open, recent files, autosave, session recovery, and external-change conflict detection.
+- **Images, math, and diagrams** — local and pasted images, path and size controls, offline MathJax, and Mermaid rendering. Optional image uploads use a configured PicGo Server.
+- **More than UTF-8** — UTF-16 LE/BE, GB18030, GBK, Big5, Shift JIS, and Windows-1252. Preserve BOM and line endings; reject saves that would lose characters.
+- **Import and export** — built-in HTML and PDF export; additional formats such as DOCX, ODT, RTF, and EPUB through [Pandoc](https://pandoc.org/).
+
+See the [feature checklist](docs/feature-parity.md) for coverage and known differences.
+
+## Getting started
+
+Build the macOS application from source. You need **Node.js 26**, npm, and the **Xcode Command Line Tools** (`xcode-select --install`). A Typora installation is not required.
+
+```sh
+git clone https://github.com/AniChikage/open-typora.git
+cd open-typora
+npm ci
+npm run package:mac
+```
+
+Open `release/native/Open Typora.app`, or install it in `~/Applications`:
+
+```sh
+node scripts/install.mjs
+```
+
+Quit a running Open Typora before replacing it. The installer preserves application data and removes the previous application after verifying the replacement. The build also produces a ZIP in `release/native/`.
+
+Builds use a local ad hoc signature and are **not Apple-notarized**. Intel Macs, Windows, and Linux do not yet have verified release builds.
+
+For additional document formats, install [Pandoc](https://pandoc.org/installing.html), then select its executable in Preferences if it is not detected. Pandoc is optional for writing Markdown and exporting HTML/PDF.
+
+### First steps
+
+Open a Markdown file or a folder, or try [the example document](examples/welcome.md). Click the text to edit it. Enter continues a list or creates a paragraph; Tab moves through table cells.
+
+| Action | macOS shortcut |
+| --- | --- |
+| New document | `⌘N` |
+| Open a file | `⌘O` |
+| Save | `⌘S` |
+| Toggle source view | `⌘/` |
+| Find in the document | `⌘F` |
+| Search the folder | `⌘⇧F` |
+| Quick open | `⌘⇧O` |
+
+## Development
 
 ```sh
 npm ci
-npm test
-npm run test:native
-npm run test:webkit
-npm run test:desktop
-npm run test:kernel-desktop
-npm run test:features
-npm run test:alignment
-npm run test:encoding
-npm run package:mac
-npm run install:app
+npm run dev:app
 ```
 
-原生包输出到 `release/native/Open Typora.app`；打包只保留最新版本归档。安装脚本以临时回滚副本替换 `~/Applications/Open Typora.app`，签名验证成功后移除旧应用；失败则恢复原应用，不累积历史安装备份，也不改动 Application Support 文档数据。安装前应正常退出旧应用。`npm run package:preview` 使用独立应用标识和 `Open Typora Preview` 数据目录，仅用于需要隔离数据的验收。
+The development host uses Electron. The packaged macOS app uses **Swift/AppKit + WKWebView** with a TypeScript/React interface and an independently implemented editing model.
 
-`npm run dev:app` 与 `npm start` 使用 Electron 开发/回归宿主；`npm run dev` 是浏览器预览，其保存会下载文件。它们不代表 macOS 原生包已经通过窗口验收。
+```sh
+npm test                  # Editor and file-layer unit tests
+npm run build             # Type checking and production frontend build
+npm run test:native       # macOS filesystem tests
+npm run test:webkit       # Native WebKit integration tests; requires Pandoc
+```
 
-## 实现与研究
+More editor and desktop suites, test isolation, and build details are in [CONTRIBUTING.md](CONTRIBUTING.md). See [the architecture](docs/architecture.md) for the document model, editing history, and native bridge.
 
-[架构](docs/architecture.md)说明原生桥、文档树、DOM 正文、源码/代码块视图与事务层。[REA 研究](docs/research.md)和[来源元数据](docs/rea-provenance.json)保留官方静态证据、运行观察与 unknown。
+## Current limitations
 
-[0.2.0 验收记录](docs/verification.md)区分自动化检查、官方行为观察与安装版真窗口结果。
+- Documents are limited to 20 MB. Files over 300,000 characters open in source mode.
+- Legacy encodings without a BOM require an explicit encoding choice.
+- Rich editing and source editing have separate undo histories; changes made in source mode join the rich history as one transaction when returning.
+- Format conversion can change layout or unsupported document structures. Some RTF image formats are rejected explicitly. Keep the original file when importing.
+- Third-party themes, embedded media, input methods, and image-host integrations vary in compatibility. Consult the [checklist](docs/feature-parity.md) before depending on a specific workflow.
 
-[功能对齐清单](docs/feature-parity.md)记录当前版本的实现范围、验证方式和剩余差异；它是后续功能工作的依据。
+## Contributing
 
-实现使用独立代码及开源依赖，没有包含 Typora 的代码或素材。已按确认的架构分层重做，尚不能宣称内部实现或全部交互与官方完全一致。
+Bug reports, focused fixes, documentation, and reproducible compatibility examples are welcome. Start with [the contribution guide](CONTRIBUTING.md), then open an [issue](https://github.com/AniChikage/open-typora/issues) or a pull request.
 
-## 当前边界
+## License
 
-- macOS arm64 是当前发布目标；Windows/Linux 没有发布验收，应用仍为 ad hoc 签名，未做 Apple 公证。
-- 输入法组合、模式切换、外部修改与无损编码保存有回归检查；本机搜狗人工输入“你好，中国”后，已检查正文显示、单次撤销/重做、源码往返及 UTF-8 保存。修复了空段落元素光标导致组合提交丢字的问题，并增加原生 WebKit 回归；其他输入法及列表/表格/局部代码的全部候选组合尚未穷尽。合成 composition 事件单独记录。
-- 20 MB 文件上限；超过 300,000 字符使用源码模式。未带 BOM 的传统编码不能可靠自动识别，需要手动选择。
-- 本地图片支持相对/绝对路径与 YAML 根目录；另存到其他目录不自动搬移已有相对图片。草稿图片保存在应用数据中，导出时嵌入。
-- 此机已安装 Pandoc 3.12.1。其他机器需按[官方说明](https://pandoc.org/installing.html)安装或在偏好里指定路径。复杂样本覆盖中文、标题、嵌套列表、表格、脚注、公式、图片与 Mermaid，不能据此承诺任意文档无损转换。RTF 的 WMF/EMF 图片或脚注内图片会明确拒绝，建议先转 DOCX。
-- LaTeX/RST/MediaWiki/Textile 的图片放在同名 `.assets` 文件夹，移动时需一起保留。OPML 主要承载大纲；Reveal.js 播放依赖其网页运行库。
-- HTML/媒体为清理后的预览，脚本不会执行；第三方图床需配置并另做真实上传。第三方主题选择器和所有扩展组合尚未穷尽。
-- 内核为独立的源码块树与快照事务，不能宣称与 Typora 的内部实现或完整功能完全一致。
-
-项目采用 MIT；Open Sans 保留 OFL，MathJax 与字体保留 Apache-2.0 声明。
+[MIT](LICENSE). Third-party dependencies retain their own licenses; the packaged application includes their notices. Open Sans is licensed under OFL, and MathJax and its bundled fonts use Apache-2.0.

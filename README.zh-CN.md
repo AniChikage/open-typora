@@ -1,0 +1,100 @@
+<p align="center">
+  <img src="design/icon.svg" alt="Open Typora" width="88" height="88">
+</p>
+
+<h1 align="center">Open Typora</h1>
+
+<p align="center">直接在正文中写 Markdown，让文件始终属于你。</p>
+
+<p align="center">
+  <a href="README.md">English</a> · 简体中文<br>
+  <a href="#功能">功能</a> · <a href="#开始使用">开始使用</a> · <a href="CONTRIBUTING.md">参与贡献</a> · <a href="LICENSE">MIT 许可证</a>
+</p>
+
+![Open Typora 的 macOS 窗口，展示 Markdown 正文、表格和代码块](docs/images/editor.png)
+
+Open Typora 是一款开源 Markdown 编辑器，受 Typora 的行内编辑体验启发。直接修改排版后的正文，需要时切换源码，文档以普通 `.md` 文件保存在自己的文件夹中。
+
+**项目状态：**当前为早期开发版本 **0.5.1**，支持的构建目标为 **macOS 14+、Apple Silicon**，界面目前为简体中文。本项目独立实现，与 Typora 无隶属关系；功能和交互仍在持续完善。
+
+## 功能
+
+- **即时渲染编辑**：标题、行内格式、列表、任务、表格、链接、脚注和 YAML 前言；代码与公式支持局部编辑，也可切换完整源码。
+- **专注写作**：大纲导航、专注和打字机模式、字数统计、查找替换，以及本地 CSS 主题。
+- **本地文件管理**：文件树、全文搜索、快速打开、最近文件、自动保存、会话恢复和外部修改冲突检测。
+- **图片、公式与图表**：本地图片与粘贴插图、路径和尺寸设置、离线 MathJax、Mermaid；可选配置 PicGo Server 上传图片。
+- **多种文本编码**：UTF-8、UTF-16 LE/BE、GB18030、GBK、Big5、Shift JIS 和 Windows-1252；保留 BOM 与换行，阻止会丢失字符的保存。
+- **导入与导出**：内置 HTML、PDF 导出；通过 [Pandoc](https://pandoc.org/) 支持 DOCX、ODT、RTF、EPUB 等格式。
+
+具体覆盖范围与已知差异见[功能清单](docs/feature-parity.md)。
+
+## 开始使用
+
+从源码构建 macOS 应用。需要 **Node.js 26**、npm 和 **Xcode Command Line Tools**（`xcode-select --install`），无需安装 Typora。
+
+```sh
+git clone https://github.com/AniChikage/open-typora.git
+cd open-typora
+npm ci
+npm run package:mac
+```
+
+打开 `release/native/Open Typora.app`，或安装到 `~/Applications`：
+
+```sh
+node scripts/install.mjs
+```
+
+替换前请先退出正在运行的 Open Typora。安装器保留应用数据，验证新应用后删除旧应用；构建同时在 `release/native/` 生成 ZIP 包。
+
+当前构建采用本地 ad hoc 签名，**尚未经过 Apple 公证**。Intel Mac、Windows 和 Linux 暂无经过验收的发布构建。
+
+需要额外文档格式时，请安装 [Pandoc](https://pandoc.org/installing.html)。若未自动识别，可在偏好设置中指定可执行文件。Markdown 写作与 HTML/PDF 导出不依赖 Pandoc。
+
+### 基本操作
+
+打开 Markdown 文件或文件夹，也可以试用[示例文档](examples/welcome.md)。点击正文开始编辑；Enter 继续列表或创建段落，Tab 在表格单元格间移动。
+
+| 操作 | macOS 快捷键 |
+| --- | --- |
+| 新建文档 | `⌘N` |
+| 打开文件 | `⌘O` |
+| 保存 | `⌘S` |
+| 切换源码 | `⌘/` |
+| 文档内查找 | `⌘F` |
+| 搜索文件夹 | `⌘⇧F` |
+| 快速打开 | `⌘⇧O` |
+
+## 开发
+
+```sh
+npm ci
+npm run dev:app
+```
+
+开发宿主使用 Electron。macOS 发布应用采用 **Swift/AppKit + WKWebView**，界面使用 TypeScript/React，编辑模型为独立实现。
+
+```sh
+npm test                  # 编辑内核与文件层单元测试
+npm run build             # 类型检查与前端生产构建
+npm run test:native       # macOS 文件系统测试
+npm run test:webkit       # 原生 WebKit 集成测试，需要 Pandoc
+```
+
+其他桌面测试、数据隔离与构建说明见[贡献指南](CONTRIBUTING.md)；文档模型、撤销历史和原生桥见[架构文档](docs/architecture.md)。
+
+## 当前限制
+
+- 文件上限为 20 MB；超过 300,000 字符的文档进入源码模式。
+- 没有 BOM 的传统编码需要手动选择。
+- 正文和源码具有独立撤销历史；返回正文时，源码修改合并为一次事务。
+- 格式转换可能改变排版或不支持的文档结构；部分 RTF 图片格式会明确拒绝。导入时请保留原文件。
+- 第三方主题、嵌入媒体、输入法和图床服务存在兼容性差异，具体工作流请先查阅[功能清单](docs/feature-parity.md)。
+
+## 参与贡献
+
+欢迎提交可复现的问题、范围明确的修复、文档和兼容性样本。请先阅读[贡献指南](CONTRIBUTING.md)，再提交 [Issue](https://github.com/AniChikage/open-typora/issues) 或 Pull Request。
+
+## 许可证
+
+项目采用 [MIT 许可证](LICENSE)。第三方依赖保留各自许可证，应用包内包含相关声明；Open Sans 使用 OFL，MathJax 及其打包字体使用 Apache-2.0。
