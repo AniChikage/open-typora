@@ -85,3 +85,7 @@ Use `npm run package:preview` for a separate preview application and data direct
 Read [the architecture](docs/architecture.md) before changing the editor or native bridge. The [feature checklist](docs/feature-parity.md) records supported workflows and remaining differences.
 
 Do not commit generated bundles, test output, credentials, personal documents, or third-party proprietary source/assets. Contributions are licensed under the project's [MIT license](LICENSE); preserve existing third-party notices.
+
+## Publish a release
+
+Set the package version, commit the change, and push a matching `v<version>` tag. The [release workflow](.github/workflows/release.yml) runs on an Apple Silicon macOS runner, checks the version, runs unit/native tests, and publishes the DMG, ZIP, and SHA-256 checksums. An existing draft keeps its curated release notes. Published assets are never overwritten by a rerun.

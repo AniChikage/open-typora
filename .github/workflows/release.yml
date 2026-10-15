@@ -1,0 +1,63 @@
+name: macOS release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing version tag, for example v0.5.1"
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-15
+    timeout-minutes: 25
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Check version and architecture
+        run: |
+          node --input-type=module - <<'JS'
+          import pkg from './package.json' with {type:'json'};
+          if (process.platform !== 'darwin' || process.arch !== 'arm64') throw new Error('Expected macOS arm64');
+          if (process.env.RELEASE_TAG !== `v${pkg.version}`) throw new Error('Tag and package version differ');
+          JS
+      - run: npm ci
+      - run: npm test
+      - run: npm run test:native
+      - name: Build native app, DMG, ZIP, and checksums
+        run: npm run package:release
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft > "$RUNNER_TEMP/release-draft.txt"; then
+            if [ "$(cat "$RUNNER_TEMP/release-draft.txt")" != "true" ]; then
+              echo 'This release is already published; refusing to replace its assets.' >&2
+              exit 1
+            fi
+          else
+            gh release create "$RELEASE_TAG" --draft --verify-tag --title "Open Typora ${RELEASE_TAG#v} · macOS" --generate-notes
+          fi
+          gh release upload "$RELEASE_TAG" release/native/*.dmg release/native/*.zip release/native/SHA256SUMS.txt
+          gh release edit "$RELEASE_TAG" --draft=false --latest
