@@ -9,7 +9,6 @@ import {
   shell,
   session,
   clipboard,
-  nativeImage,
 } from "electron";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -84,9 +83,16 @@ const handlers = {
     if (result.canceled || !result.filePaths[0]) return null;
     const file = result.filePaths[0];
     if ((await stat(file)).size > 8 * 1024 * 1024) throw new Error("背景图片须小于 8 MB。");
-    return saveBackground(store.dataDir,await readFile(file),path.basename(file),bytes => {
-      const image = nativeImage.createFromBuffer(bytes), size = image.getSize();
-      if (image.isEmpty() || !size.width || !size.height || size.width * size.height > 40_000_000) throw new Error("图片无效或分辨率超过 4000 万像素，请选择较小的图片。");
+    return saveBackground(store.dataDir,await readFile(file),path.basename(file),async (_bytes,dataUrl) => {
+      // Chromium supports WebP consistently; nativeImage's supported codecs differ by host.
+      const size = await window.webContents.executeJavaScript(`(async () => {
+        const image = new Image(); image.src = ${JSON.stringify(dataUrl)};
+        let timer;
+        try { await Promise.race([image.decode(),new Promise((_,reject) => {timer = setTimeout(() => reject(new Error('decode timeout')),10000);})]); return {width:image.naturalWidth,height:image.naturalHeight}; }
+        catch { return {width:0,height:0}; }
+        finally {clearTimeout(timer);image.src='';}
+      })()`);
+      if (!size.width || !size.height || size.width * size.height > 40_000_000) throw new Error("图片无效或分辨率超过 4000 万像素，请选择较小的图片。");
     });
   },
   plugins: async () => (await plugins(store.dataDir)).map(authorizedPlugin),

@@ -12,8 +12,8 @@ export async function readBackground(directory) {
 }
 export async function saveBackground(directory, bytes, name, validate) {
   const mime = backgroundMime(bytes);
-  await validate(bytes);
   const value = { name: path.basename(name).slice(0,160), dataUrl: `data:${mime};base64,${bytes.toString("base64")}` };
+  await validate(bytes,value.dataUrl);
   await mkdir(directory, { recursive: true });
   await atomicWrite(path.join(directory,"background.json"), JSON.stringify(value));
   return value;

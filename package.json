@@ -27,7 +27,8 @@
     "package:win": "npm run build && node scripts/icon.mjs && node scripts/package-windows.mjs",
     "test:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File tests/windows-install.ps1",
     "dev:demo": "vite --config vite.demo.config.ts --host 127.0.0.1 --port 5187",
-    "build:demo": "tsc -b && vite build --config vite.demo.config.ts"
+    "build:demo": "tsc -b && vite build --config vite.demo.config.ts",
+    "test:background-desktop": "node tests/background-desktop.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "6.20.3",
