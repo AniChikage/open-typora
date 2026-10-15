@@ -1,6 +1,6 @@
 /* Independently implemented from the observed macOS Typora GitHub theme. */
 :root {
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
   font-synthesis: none;
   -webkit-font-smoothing: antialiased;
   --paper: #fff;
@@ -336,7 +336,7 @@ svg {
 }
 .cm-scroller {
   font-family:
-    "Open Sans", "Helvetica Neue", Helvetica, "PingFang SC", Arial, sans-serif !important;
+    "Open Sans", "Helvetica Neue", Helvetica, "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", Arial, sans-serif !important;
   font-size: 16px !important;
   line-height: 1.6 !important;
   overflow: auto !important;

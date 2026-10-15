@@ -57,6 +57,10 @@ try {
     path.join(dataDir, "示例笔记/欢迎.md"),
     "utf-8",
   );
+  if (process.platform === "win32") {
+    assert.ok(original.includes("Ctrl+S"));
+    assert.ok(!original.includes("⌘"));
+  }
   await mode(page, false);
   const editor = page.locator(".document-editor:not([hidden]) .cm-content");
   await expect(editor).toContainText("# 让文字，回到文字。");

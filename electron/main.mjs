@@ -107,7 +107,7 @@ const handlers = {
       try {
         await readFile(file);
       } catch (error) {
-        if (error.code === "ENOENT") await atomicWrite(file, sample.content);
+        if (error.code === "ENOENT") await atomicWrite(file, process.platform === "win32" ? sample.content.replace(/⌘\s*/g, "Ctrl+") : sample.content);
         else throw error;
       }
       documents.push(await store.open(file));

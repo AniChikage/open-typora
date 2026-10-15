@@ -14,6 +14,7 @@ import type { Heading } from "../editor/markdown";
 import { FileTree, sortFiles } from "./FileTree";
 import type { FileSort } from "./FileTree";
 import { host } from "../host";
+import { shortcutLabel } from "../commands";
 interface Props {
   documents: DocumentRecord[];
   activeId: string;
@@ -109,7 +110,7 @@ export function Sidebar(props: Props) {
                 <button
                   className="icon-button"
                   aria-label="新建文档"
-                  title="新建文档 ⌘N"
+                  title={`新建文档 ${shortcutLabel("Mod-N")}`}
                   onClick={props.create}
                 >
                   <Plus size={16} />
@@ -208,7 +209,7 @@ export function Sidebar(props: Props) {
         {menu.file && <><hr />{menu.file.isDirectory !== "true" && <button role="menuitem" onClick={() => operate("duplicate")}>创建副本…</button>}<button role="menuitem" onClick={() => operate("rename")}>重命名…</button><button role="menuitem" onClick={() => operate("move")}>移动到…</button><button role="menuitem" onClick={() => operate("trash")}>移到废纸篓</button><button role="menuitem" onClick={() => { void host.writeClipboard(menu.file!.path); setMenu(null); }}>复制路径</button><button role="menuitem" onClick={() => { void host.reveal(menu.file!.path).catch(e => props.notify(e.message)); setMenu(null); }}>在 Finder 中显示</button></>}
         <hr /><button role="menuitem" onClick={() => operate("undo")}>撤销上次文件操作</button><hr /><label>排序<select aria-label="文件排序" value={sort} onChange={e => setSort(e.target.value as FileSort)}><option value="natural">自然名称</option><option value="name">字母顺序</option><option value="modified">修改时间</option><option value="created">创建时间</option></select></label><label><input type="checkbox" checked={descending} onChange={e => setDescending(e.target.checked)} />降序</label><label><input type="checkbox" checked={foldersFirst} onChange={e => setFoldersFirst(e.target.checked)} />文件夹优先</label>
       </div>}
-      <div className="sidebar-footer"><button className="icon-button" aria-label="搜索文件夹" title="搜索文件夹 ⌘⇧F" onClick={props.search}><Search size={16} /></button><button className="icon-button" aria-label="最近项目" onClick={props.recent}><History size={16} /></button>
+      <div className="sidebar-footer"><button className="icon-button" aria-label="搜索文件夹" title={`搜索文件夹 ${shortcutLabel("Mod-Shift-F")}`} onClick={props.search}><Search size={16} /></button><button className="icon-button" aria-label="最近项目" onClick={props.recent}><History size={16} /></button>
         <button
           className="icon-button"
           aria-label="打开文件夹"
