@@ -1,6 +1,6 @@
-# 编辑架构（0.5.1）
+# 编辑架构（0.5.2）
 
-macOS 的发布包使用 Swift/AppKit + WKWebView。Electron 保留为跨平台开发与 Chromium 回归测试宿主，不是 `package:mac` 或 `install:app` 的发布入口。
+macOS 的发布包使用 Swift/AppKit + WKWebView。Windows 发布包使用 Electron/Chromium，并保留为跨平台开发与回归测试宿主；macOS 的 `package:mac` 与 `install:app` 仍使用原生宿主。Windows 使用系统标题栏、Ctrl 快捷键与单实例文件打开，`package:win` 生成 NSIS 安装包与 ZIP。
 
 ```mermaid
 flowchart TD

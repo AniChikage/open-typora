@@ -1,6 +1,6 @@
 # Typora 功能对齐清单
 
-当前交付版本：**0.5.1，macOS arm64**。基准为本机 Typora 1.14.10 的菜单、实际交互和官方公开文档。功能存在、自动化通过与完整等价是不同结论；未验证的组合不写成已对齐。
+当前交付版本：**0.5.2，macOS arm64 / Windows x64**。基准为本机 Typora 1.14.10 的菜单、实际交互和官方公开文档。功能存在、自动化通过与完整等价是不同结论；未验证的组合不写成已对齐。
 
 公开依据：[Markdown](https://support.typora.io/Markdown-Reference/)、[文件管理](https://support.typora.io/File-Management/)、[图片](https://support.typora.io/Images/)、[导出](https://support.typora.io/Export/)、[HTML](https://support.typora.io/HTML/)、[快捷键](https://support.typora.io/Shortcut-Keys/)。REA 的静态证据及覆盖边界见 [research.md](research.md)。
 
@@ -31,6 +31,6 @@
 | Word/RTF/ODT 与 Pandoc | 已实现，有依赖边界 | 本机 Pandoc 3.12.1 实际生成 10 种格式，DOCX/ODT/RTF/EPUB 中文复杂样本重新导入；DOCX 原生公式、表格、脚注、图片结构已检查。导出嵌入图表与图片；文本格式保留同名资源目录。RTF 额外保留表格/脚注/PNG/JPEG/标题/代码；WMF/EMF、脚注内图片拒绝而非静默丢失。其他任意格式组合未穷尽 |
 | CSS 主题安装 | 已实现并回归 | 导入本地 CSS、内嵌引用字体/图片、正文/侧栏选择器映射；不是所有第三方主题内部选择器都与本内核兼容 |
 | 安装更新与旧版本清理 | 已实现并回归 | M 图标保留；验证新包后替换安装版并删除临时回滚包；只保留当前版本归档。用户文档/草稿不属于版本清理对象 |
-| Windows/Linux、签名公证 | 未交付 | 本轮安装目标为此台 Mac；Electron 用作开发/回归宿主。跨平台发布及 Developer ID 公证需要单独发布环境 |
+| Windows、其他平台与签名 | 部分交付 | Windows x64 提供 NSIS EXE / ZIP，由 Windows runner 安装后验证编辑、保存、PDF、图片、恢复、单实例与文件关联；Windows 10/11 实体候选交互尚未人工验收。Windows ARM / Linux / Intel Mac 未交付；Windows 无代码签名证书，macOS 未公证 |
 
-剩余项为其他输入法及列表/表格/局部代码的完整候选组合、未覆盖的跨应用剪贴板/复杂跨块编辑、第三方主题与图形扩展，以及其他操作系统发布。复杂转换覆盖已列样本和目标格式，无法代表任意格式无损往返。**0.5.1 仍不能标为 Typora 全功能完全等价**；外部图床真实上传仍需独立配置与验收。
+剩余项为其他输入法及列表/表格/局部代码的完整候选组合、未覆盖的跨应用剪贴板/复杂跨块编辑、第三方主题与图形扩展，以及 Windows 实体输入法、旧 DOC/RTF 导入和批量图片操作，其他操作系统发布。复杂转换覆盖已列样本和目标格式，无法代表任意格式无损往返。**0.5.2 仍不能标为 Typora 全功能完全等价**；外部图床真实上传仍需独立配置与验收。

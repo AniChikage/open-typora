@@ -8,14 +8,14 @@
 
 <p align="center">
   English · <a href="README.zh-CN.md">简体中文</a><br>
-  <a href="https://github.com/AniChikage/open-typora/releases/latest">Download for macOS</a> · <a href="#features">Features</a> · <a href="#getting-started">Getting started</a> · <a href="CONTRIBUTING.md">Contributing</a> · <a href="LICENSE">MIT License</a>
+  <a href="https://github.com/AniChikage/open-typora/releases/latest">Download</a> · <a href="#features">Features</a> · <a href="#getting-started">Getting started</a> · <a href="CONTRIBUTING.md">Contributing</a> · <a href="LICENSE">MIT License</a>
 </p>
 
 ![Open Typora — live Markdown editing in the native macOS app](docs/images/hero.png)
 
 Open Typora is an open-source Markdown editor inspired by Typora's inline editing experience. Write directly in the rendered document, switch to source when you need it, and save ordinary `.md` files in your own folders.
 
-**Status:** early development, version **0.5.1**. The supported build target is **macOS 14+ on Apple Silicon**. The interface is currently in Simplified Chinese. This is an independent project, unaffiliated with Typora; full feature and behavior parity is still in progress.
+**Status:** early development, version **0.5.2**. Release builds support **macOS 14+ on Apple Silicon** and **Windows 10/11 x64**. The interface is currently in Simplified Chinese. This is an independent project, unaffiliated with Typora; full feature and behavior parity is still in progress.
 
 ## Features
 
@@ -30,9 +30,24 @@ See the [feature checklist](docs/feature-parity.md) for coverage and known diffe
 
 ## Getting started
 
+### Downloads
+
+| Platform | Installer | Alternative |
+| --- | --- | --- |
+| Windows 10/11 · x64 | **[Download Setup.exe](https://github.com/AniChikage/open-typora/releases/download/v0.5.2/Open-Typora-0.5.2-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.5.2/Open-Typora-0.5.2-windows-x64.zip) |
+| macOS 14+ · Apple Silicon | **[Download DMG](https://github.com/AniChikage/open-typora/releases/download/v0.5.2/Open-Typora-0.5.2-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.5.2/Open-Typora-0.5.2-arm64.zip) |
+
+[SHA-256 checksums](https://github.com/AniChikage/open-typora/releases/download/v0.5.2/SHA256SUMS.txt) · [All releases](https://github.com/AniChikage/open-typora/releases)
+
+### Install on Windows
+
+Run **Setup.exe**, choose an installation folder, and launch Open Typora from the Start menu. The installer also provides an optional desktop shortcut and Markdown file associations. Updates install into the same application folder; uninstalling preserves your recovery data.
+
+The Windows build is currently **not code-signed**. Windows may display an unknown-publisher or SmartScreen notice. Only use downloads from this repository's Releases page and verify the checksum if needed.
+
 ### Install on macOS
 
-1. Download **[Open-Typora-0.5.1-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.5.1/Open-Typora-0.5.1-arm64.dmg)** from [Releases](https://github.com/AniChikage/open-typora/releases/latest).
+1. Download **[Open-Typora-0.5.2-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.5.2/Open-Typora-0.5.2-arm64.dmg)** from [Releases](https://github.com/AniChikage/open-typora/releases/latest).
 2. Open the DMG and drag **Open Typora** into **Applications**.
 3. Launch Open Typora from Applications.
 
@@ -42,7 +57,7 @@ The application is locally signed and **not Apple-notarized**. macOS may ask you
 
 ### Build from source
 
-Build the macOS application from source. You need **Node.js 26**, npm, and the **Xcode Command Line Tools** (`xcode-select --install`). A Typora installation is not required.
+Both platforms need **Node.js 26** and npm. A Typora installation is not required. On macOS, also install the **Xcode Command Line Tools** (`xcode-select --install`).
 
 ```sh
 git clone https://github.com/AniChikage/open-typora.git
@@ -59,23 +74,29 @@ node scripts/install.mjs
 
 Quit a running Open Typora before replacing it. The installer preserves application data and removes the previous application after verifying the replacement. The build also produces a ZIP in `release/native/`; `npm run package:release` builds the DMG and checksum file too.
 
-Builds use a local ad hoc signature and are **not Apple-notarized**. Intel Macs, Windows, and Linux do not yet have verified release builds.
+On Windows, use the same clone and install steps, then build the installer:
+
+```sh
+npm run package:win
+```
+
+The EXE installer and ZIP are written to `release/windows/`. Build Windows releases on Windows x64. Intel Macs, Windows ARM, and Linux do not yet have verified release builds.
 
 For additional document formats, install [Pandoc](https://pandoc.org/installing.html), then select its executable in Preferences if it is not detected. Pandoc is optional for writing Markdown and exporting HTML/PDF.
 
 ### First steps
 
-Open a Markdown file or a folder, or try [the example document](examples/welcome.md). Click the text to edit it. Enter continues a list or creates a paragraph; Tab moves through table cells.
+Open a Markdown file or a folder, or try [the example document](examples/a-quiet-morning.md). Click the text to edit it. Enter continues a list or creates a paragraph; Tab moves through table cells.
 
-| Action | macOS shortcut |
-| --- | --- |
-| New document | `⌘N` |
-| Open a file | `⌘O` |
-| Save | `⌘S` |
-| Toggle source view | `⌘/` |
-| Find in the document | `⌘F` |
-| Search the folder | `⌘⇧F` |
-| Quick open | `⌘⇧O` |
+| Action | macOS | Windows |
+| --- | --- | --- |
+| New document | `⌘N` | `Ctrl+N` |
+| Open a file | `⌘O` | `Ctrl+O` |
+| Save | `⌘S` | `Ctrl+S` |
+| Toggle source view | `⌘/` | `Ctrl+/` |
+| Find in the document | `⌘F` | `Ctrl+F` |
+| Search the folder | `⌘⇧F` | `Ctrl+Shift+F` |
+| Quick open | `⌘⇧O` | `Ctrl+Shift+O` |
 
 ## Development
 
@@ -84,7 +105,7 @@ npm ci
 npm run dev:app
 ```
 
-The development host uses Electron. The packaged macOS app uses **Swift/AppKit + WKWebView** with a TypeScript/React interface and an independently implemented editing model.
+The Windows app and development host use **Electron/Chromium**. The macOS app uses **Swift/AppKit + WKWebView**. Both share the same TypeScript/React interface and independently implemented editing model.
 
 ```sh
 npm test                  # Editor and file-layer unit tests
@@ -101,6 +122,7 @@ More editor and desktop suites, test isolation, and build details are in [CONTRI
 - Legacy encodings without a BOM require an explicit encoding choice.
 - Rich editing and source editing have separate undo histories; changes made in source mode join the rich history as one transaction when returning.
 - Format conversion can change layout or unsupported document structures. Some RTF image formats are rejected explicitly. Keep the original file when importing.
+- Windows legacy DOC/RTF import and bulk image file operations are not yet supported. Windows input-method candidate interaction still needs manual acceptance; automated text input is not equivalent to that check.
 - Third-party themes, embedded media, input methods, and image-host integrations vary in compatibility. Consult the [checklist](docs/feature-parity.md) before depending on a specific workflow.
 
 ## Contributing

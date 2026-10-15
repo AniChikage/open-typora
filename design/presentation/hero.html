@@ -1,25 +1,24 @@
 <!doctype html>
 <html lang="en">
 <meta charset="utf-8">
-<title>Open Typora · Product image</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Open Typora — A quiet place for your words</title>
 <style>
-*{box-sizing:border-box}html,body{margin:0;width:1800px;height:1160px;overflow:hidden}body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue","PingFang SC",sans-serif;color:#243247;background:#e9edf0}.canvas{width:1800px;height:1160px;position:relative;padding:65px 112px}.brand{display:flex;align-items:center;gap:14px;font-size:23px;font-weight:600;letter-spacing:-.5px}.brand img{width:48px;height:48px}.platform{position:absolute;right:112px;top:86px;color:#5f6c7a;font-size:18px;letter-spacing:1px}.title{font-size:76px;line-height:1.1;letter-spacing:-3px;font-weight:650;margin:42px 0 16px}.subtitle{margin:0;color:#5e6c7c;font-size:24px;line-height:1.5}.window{position:absolute;left:142px;top:326px;width:1516px;height:742px;border-radius:16px;overflow:hidden;background:#fff;box-shadow:0 22px 54px #24324722,0 0 0 1px #24324712}.window img{display:block;width:100%;height:auto}.footer{position:absolute;bottom:36px;left:112px;color:#667485;font-size:17px;letter-spacing:.2px}.footer-right{left:auto;right:112px}.zh .title{font-size:75px;letter-spacing:1px;font-weight:600}
+*{box-sizing:border-box}html,body{margin:0;width:1800px;height:1000px;overflow:hidden}body{font-family:"Avenir Next",Avenir,"Segoe UI",sans-serif;color:#262626;background:#fff}.canvas{position:relative;width:1800px;height:1000px}.brand{position:absolute;top:78px;left:110px;display:flex;align-items:center;gap:13px;font-size:29px;font-weight:500;letter-spacing:-.9px}.brand img{width:43px;height:43px}.copy{position:absolute;left:112px;top:302px;width:558px}.copy h1{font-size:59px;line-height:1.18;letter-spacing:-2.1px;font-weight:500;margin:0 0 28px}.description{font-size:23px;line-height:1.65;letter-spacing:-.25px;color:#737373;margin:0;max-width:475px}.features{margin:37px 0 0;padding:0;list-style:none;display:grid;gap:18px;font-size:21px;color:#494949}.features li{display:flex;align-items:center;gap:14px}.features svg{width:23px;height:23px;fill:none;stroke:#727272;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}.window{position:absolute;left:750px;top:156px;width:950px;height:700px;border-radius:10px;overflow:hidden;background:white;border:1px solid #e7e7e7;box-shadow:0 14px 48px #0000000e,0 2px 7px #00000008}.window img{display:block;width:100%;height:auto}.platform{position:absolute;left:114px;bottom:91px;font-size:17px;color:#858585;letter-spacing:.25px}.platform span{padding:0 11px;color:#c4c4c4}.credit{position:absolute;right:103px;bottom:91px;font:16px "Avenir Next",Avenir,sans-serif;color:#999;letter-spacing:.1px}
 </style>
 <main class="canvas">
   <div class="brand"><img src="../icon.svg" alt="">Open Typora</div>
-  <div class="platform">macOS · APPLE SILICON</div>
-  <h1 class="title">Your words. Your files.</h1>
-  <p class="subtitle">Live Markdown editing, in a space made for writing.</p>
-  <div class="window"><img src="editor-window.png" alt="Actual Open Typora macOS application showing outline navigation, live Markdown, a table and a code block."></div>
-  <div class="footer">Local files. Live editing. Open source.</div>
-  <div class="footer footer-right">open-typora</div>
+  <section class="copy">
+    <h1>A quiet place<br>for your words.</h1>
+    <p class="description">Write and read on the same page.<br>Simple Markdown. A little less distraction.</p>
+    <ul class="features">
+      <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L20 8l-4-4L4 16v4Z M14 6l4 4"/></svg>Live Markdown editing</li>
+      <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h6l2 2h8v12H4V5Z M4 10h16"/></svg>Your files, in your folders</li>
+      <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 7-5 5 5 5m8-10 5 5-5 5m-3-13-2 16"/></svg>Open source, from the start</li>
+    </ul>
+  </section>
+  <div class="window"><img src="editor-window.jpg" alt="The actual Open Typora macOS app editing an English Markdown document, with formatted text, tasks and a table."></div>
+  <div class="platform">macOS<span>·</span>Windows</div>
+  <div class="credit">github.com/AniChikage/open-typora</div>
 </main>
-<script>
-if(new URLSearchParams(location.search).get('lang')==='zh'){
- document.documentElement.lang='zh-CN';document.body.classList.add('zh');
- document.querySelector('.title').textContent='让文字，回到文字。';
- document.querySelector('.subtitle').textContent='直接编辑 Markdown 正文，让写作自然发生。';
- document.querySelector('.footer').textContent='本地文件 · 即时编辑 · 开源';
-}
-</script>
 </html>
