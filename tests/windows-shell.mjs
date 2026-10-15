@@ -22,10 +22,11 @@ const pluginFile = path.join(data, "Win-plugin-fixture.js");
 await writeFile(pluginFile, "class WindowsFixture extends BasePlugin { style() { return '#write { --plugin-fixture: loaded; }' }; call() { this.utils.insertText('插件验收') } }; module.exports = {plugin: WindowsFixture};");
 await installPlugin(pluginFile, env.OPEN_TYPORA_DATA_DIR);
 delete env.ELECTRON_RUN_AS_NODE;
-let application;
+let application, currentPage;
 try {
   application = await electron.launch({ executablePath, args: [first], env, timeout: 30000 });
   const page = await application.firstWindow();
+  currentPage = page;
   await expect(page.getByRole("button", { name: path.basename(first), exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "A quiet place for your words" })).toBeVisible();
   const identity = await application.evaluate(({ app, BrowserWindow }) => ({
@@ -66,4 +67,8 @@ try {
   await page.screenshot({path:path.join(qa,'windows-plugins.png')});
   await writeFile(path.join(qa, "windows-shell-results.json"), JSON.stringify({ ...identity, commandLineOpen: true, secondInstanceOpen: true, unicodePaths: true, themes:6, installedPluginModule:true, pluginEditUndo:true, readOnlyLiveAndSource:true, pluginCleanup:true }, null, 2));
   console.log("PASS: installed Windows executable, command-line documents, single instance and Unicode paths");
+} catch (error) {
+  console.error(JSON.stringify({ error: String(error), alerts: await currentPage?.getByRole('alert').allTextContents().catch(() => []) }));
+  await currentPage?.screenshot({path:path.join(qa,'windows-shell-failure.png')}).catch(() => {});
+  throw error;
 } finally { await application?.close(); }

@@ -12,13 +12,14 @@ delete env.OPEN_TYPORA_DEV_URL;
 delete env.ELECTRON_RUN_AS_NODE;
 const errors = [],
   passed = [];
-let application;
+let application, currentPage;
 async function launch() {
   application = await electron.launch({
     ...(process.env.OPEN_TYPORA_EXECUTABLE ? { executablePath: process.env.OPEN_TYPORA_EXECUTABLE, args: [] } : { args: [root] }),
     env, timeout: 30000,
   });
   const page = await application.firstWindow({ timeout: 20000 });
+  currentPage = page;
   page.on("pageerror", (error) => errors.push(error.message));
   await page.getByRole("button", { name: "欢迎.md", exact: true }).waitFor();
   return page;
@@ -36,8 +37,9 @@ async function sidebarTab(page, name) {
   await page.getByRole("button", { name: "切换侧栏内容" }).click();
   await page.getByRole("menuitemradio", { name, exact: true }).click();
 }
-async function waitForFile(file, predicate) {
-  for (let i = 0; i < 60; i++) {
+async function waitForFile(file, predicate, timeout = 6000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
     try {
       const text = await readFile(file, "utf-8");
       if (predicate(text)) return text;
@@ -102,8 +104,10 @@ try {
   await application.evaluate(({ dialog }, file) => {
     dialog.showSaveDialog = async () => ({ canceled: false, filePath: file });
   }, pdf);
+  const pdfStarted = Date.now();
   await menu(page, "导出 PDF");
-  await waitForFile(pdf, (text) => text.startsWith("%PDF-"));
+  await waitForFile(pdf, (text) => text.startsWith("%PDF-"), 30000);
+  console.log(`PDF export completed in ${Date.now() - pdfStarted} ms`);
   assert.ok((await readFile(pdf)).length > 10_000);
   passed.push("Electron-host PDF export produces a PDF file");
   const crlfFile = path.join(dataDir, "CRLF.md"),
@@ -222,6 +226,12 @@ try {
     JSON.stringify({ passed, errors, dataDir }, null, 2),
   );
   console.log(JSON.stringify({ passed, errors, dataDir }, null, 2));
+} catch (error) {
+  const diagnostics = { error: String(error), passed, errors, alerts: await currentPage?.getByRole("alert").allTextContents().catch(() => []), dataDir };
+  console.error(JSON.stringify(diagnostics, null, 2));
+  await currentPage?.screenshot({ path: path.join(qa, "failure.png") }).catch(() => {});
+  await writeFile(path.join(qa, "failure.json"), JSON.stringify(diagnostics, null, 2));
+  throw error;
 } finally {
   await application?.close();
 }

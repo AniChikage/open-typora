@@ -15,7 +15,7 @@
 
 Open Typora is an open-source Markdown editor inspired by Typora's inline editing experience. Write directly in the rendered document, switch to source when you need it, and save ordinary `.md` files in your own folders.
 
-**Status:** early development, version **0.6.0**. Release builds support **macOS 14+ on Apple Silicon** and **Windows 10/11 x64**. The interface is currently in Simplified Chinese. This is an independent project, unaffiliated with Typora; full feature and behavior parity is still in progress.
+**Status:** early development, version **0.6.1**. Release builds support **macOS 14+ on Apple Silicon** and **Windows 10/11 x64**. The interface is currently in Simplified Chinese. This is an independent project, unaffiliated with Typora; full feature and behavior parity is still in progress.
 
 ## Features
 
@@ -45,10 +45,10 @@ The demo keeps documents in the current tab's memory; it does not upload or pers
 
 | Platform | Installer | Alternative |
 | --- | --- | --- |
-| Windows 10/11 · x64 | **[Download Setup.exe](https://github.com/AniChikage/open-typora/releases/download/v0.6.0/Open-Typora-0.6.0-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.6.0/Open-Typora-0.6.0-windows-x64.zip) |
-| macOS 14+ · Apple Silicon | **[Download DMG](https://github.com/AniChikage/open-typora/releases/download/v0.6.0/Open-Typora-0.6.0-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.6.0/Open-Typora-0.6.0-arm64.zip) |
+| Windows 10/11 · x64 | **[Download Setup.exe](https://github.com/AniChikage/open-typora/releases/download/v0.6.1/Open-Typora-0.6.1-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.6.1/Open-Typora-0.6.1-windows-x64.zip) |
+| macOS 14+ · Apple Silicon | **[Download DMG](https://github.com/AniChikage/open-typora/releases/download/v0.6.1/Open-Typora-0.6.1-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.6.1/Open-Typora-0.6.1-arm64.zip) |
 
-[SHA-256 checksums](https://github.com/AniChikage/open-typora/releases/download/v0.6.0/SHA256SUMS.txt) · [All releases](https://github.com/AniChikage/open-typora/releases)
+[SHA-256 checksums](https://github.com/AniChikage/open-typora/releases/download/v0.6.1/SHA256SUMS.txt) · [All releases](https://github.com/AniChikage/open-typora/releases)
 
 ### Install on Windows
 
@@ -58,7 +58,7 @@ The Windows build is currently **not code-signed**. Windows may display an unkno
 
 ### Install on macOS
 
-1. Download **[Open-Typora-0.6.0-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.6.0/Open-Typora-0.6.0-arm64.dmg)** from [Releases](https://github.com/AniChikage/open-typora/releases/latest).
+1. Download **[Open-Typora-0.6.1-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.6.1/Open-Typora-0.6.1-arm64.dmg)** from [Releases](https://github.com/AniChikage/open-typora/releases/latest).
 2. Open the DMG and drag **Open Typora** into **Applications**.
 3. Launch Open Typora from Applications.
 

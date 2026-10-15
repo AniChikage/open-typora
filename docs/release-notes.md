@@ -4,8 +4,8 @@ Open Typora for macOS and Windows.
 
 | Platform | Download | Requirements |
 | --- | --- | --- |
-| macOS | `Open-Typora-0.6.0-arm64.dmg` | macOS 14+, Apple Silicon |
-| Windows | `Open-Typora-0.6.0-windows-x64-Setup.exe` | Windows 10/11, x64 |
+| macOS | `Open-Typora-0.6.1-arm64.dmg` | macOS 14+, Apple Silicon |
+| Windows | `Open-Typora-0.6.1-windows-x64-Setup.exe` | Windows 10/11, x64 |
 
 ZIP alternatives and `SHA256SUMS.txt` are included. No Node.js, Xcode, or Typora installation is required to use the application.
 
