@@ -1,5 +1,6 @@
 import type { DocumentRecord, Host, Recovery, SessionSnapshot } from "./types";
 import samples from "../shared/samples.json";
+import { browserBackground, chooseBrowserBackground } from "./browserBackground";
 const browserRecords = new Map<string, DocumentRecord>();
 const key = "open-typora-session-v1";
 function draft(name: string, content: string): DocumentRecord {
@@ -29,6 +30,8 @@ const browser: Host = {
   async windowAction() { return false; },
   async imageAction() { throw new Error("图片文件操作请使用桌面应用。"); },
   async themes() { return []; }, async installTheme() { throw new Error("安装主题请使用桌面应用。"); },
+  background: () => browserBackground(), chooseBackground: chooseBrowserBackground,
+  clearBackground: () => browserBackground(null),
   async plugins() { return []; }, async installPlugin() { throw new Error("安装本地插件请使用桌面应用。"); },
   async removePlugin() { throw new Error("移除本地插件请使用桌面应用。"); },
   async conversionSettings() { return { pandoc: "", word: false }; },

@@ -18,6 +18,7 @@ final class WebKitTests: NSObject, NSApplicationDelegate, WKNavigationDelegate {
       let plugin = directory.appendingPathComponent("Native-plugin-fixture.js")
       try atomicWrite(plugin, Data("class NativePlugin extends BasePlugin { style() { return '#write { --plugin-fixture: loaded; }' }; call() { this.utils.insertText('插件') } }; module.exports = {plugin: NativePlugin};".utf8))
       _ = try Interchange.installPlugin(plugin, directory: directory)
+      try atomicWrite(directory.appendingPathComponent("Background-fixture.png"),Data(base64Encoded:"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aNNsAAAAASUVORK5CYII=")!)
       let record = try store.open(file, id: "webkit-fixture")
       host = NativeWindowHost(
         owner: owner, directory: directory,
@@ -69,6 +70,7 @@ final class WebKitTests: NSObject, NSApplicationDelegate, WKNavigationDelegate {
           let html = try String(contentsOf: self.owner.directory.appendingPathComponent("native-test.html"), encoding: .utf8)
           guard html.contains("data:image/"), html.contains("data:font/"), !html.contains("<link rel=\"stylesheet\"") else { throw NativeFailure("HTML export retained live app assets.") }
           print("PASS: HTML export contains embedded fonts and the owned local image")
+          guard !html.contains("data-editor-background") else { throw NativeFailure("HTML export included the personal background layer.") }
           let data = try JSONSerialization.data(
             withJSONObject: output, options: [.prettyPrinted, .sortedKeys])
           print(String(data: data, encoding: .utf8)!)

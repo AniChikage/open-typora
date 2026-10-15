@@ -9,6 +9,7 @@ import {
   shell,
   session,
   clipboard,
+  nativeImage,
 } from "electron";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -16,10 +17,11 @@ import { pandocPath, convertExport, convertImport, themes, installTheme } from "
 import { Workspace } from "./workspace.mjs";
 import { randomUUID } from "node:crypto";
 import { atomicWrite, DocumentStore } from "./store.mjs";
-import { readFile, realpath } from "node:fs/promises";
+import { readFile, realpath, stat } from "node:fs/promises";
 import { launchFiles } from "./launch-files.mjs";
 import { plugins, installPlugin } from "./plugins.mjs";
 import { pluginResource } from "./resources.mjs";
+import { readBackground, saveBackground, clearBackground } from "./background.mjs";
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const development = process.env.OPEN_TYPORA_DEV_URL;
 if (process.env.OPEN_TYPORA_DATA_DIR)
@@ -75,6 +77,18 @@ ipcMain.on("workspace:prepared", (event, id, value) => { if (event.sender !== wi
 function prepareOperation(phase, change) { return new Promise((resolve, reject) => { const id = randomUUID(), timeout = setTimeout(() => { handshakes.delete(id); reject(new Error("文件操作等待超时。")); }, 30000); handshakes.set(id, value => { clearTimeout(timeout); handshakes.delete(id); resolve(value); }); window.webContents.send("workspace:operation", id, phase, change); }); }
 let operationRunning = false;
 const handlers = {
+  background: () => readBackground(store.dataDir),
+  clearBackground: () => clearBackground(store.dataDir),
+  chooseBackground: async () => {
+    const result = await dialog.showOpenDialog(window,{title:"选择背景图片",filters:[{name:"背景图片",extensions:["png","jpg","jpeg","webp"]}],properties:["openFile"]});
+    if (result.canceled || !result.filePaths[0]) return null;
+    const file = result.filePaths[0];
+    if ((await stat(file)).size > 8 * 1024 * 1024) throw new Error("背景图片须小于 8 MB。");
+    return saveBackground(store.dataDir,await readFile(file),path.basename(file),bytes => {
+      const image = nativeImage.createFromBuffer(bytes), size = image.getSize();
+      if (image.isEmpty() || !size.width || !size.height || size.width * size.height > 40_000_000) throw new Error("图片无效或分辨率超过 4000 万像素，请选择较小的图片。");
+    });
+  },
   plugins: async () => (await plugins(store.dataDir)).map(authorizedPlugin),
   removePlugin: async (_, id) => { if (!/^local-[a-f0-9]{64}$/.test(id)) throw new Error("插件标识无效。"); const root = await realpath(path.join(store.dataDir, "plugins")); if (path.dirname(root) !== await realpath(store.dataDir)) throw new Error("插件目录无效。"); for (const suffix of [".json", ".mjs"]) { const file = path.join(root, id + suffix); try { if (path.dirname(await realpath(file)) !== root) throw new Error("插件资源路径无效。"); await shell.trashItem(file); } catch (error) { if (error.code !== "ENOENT") throw error; } } return true; },
   installPlugin: async () => { const result = await dialog.showOpenDialog(window, { filters: [{ name: "JavaScript", extensions: ["js", "cjs"] }], properties: ["openFile"] }); return result.canceled ? null : authorizedPlugin(await installPlugin(result.filePaths[0], store.dataDir)); },

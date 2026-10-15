@@ -19,3 +19,8 @@ declare module "turndown-plugin-gfm" { export const gfm: (service: import("turnd
 
 declare module "markdown-it-emoji/lib/data/full.mjs" { const names: Record<string, string>; export default names; }
 declare module "*?typora-plugin" { const factory: (context: any) => any; export default factory; }
+declare module "*shared/background.mjs" {
+  export const maxBackgroundBytes: number;
+  export function backgroundMime(bytes: Uint8Array): string;
+  export function checkedBackground(value: unknown): { name: string; dataUrl: string } | null;
+}

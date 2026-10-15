@@ -1,6 +1,6 @@
 # Themes and plugin compatibility
 
-Open Typora 0.6.1 includes six original themes and a compatibility host for a subset of [obgnail/typora_plugin](https://github.com/obgnail/typora_plugin). This is an independent integration, with no affiliation to Typora or the plugin authors. It does not load the complete Typora plugin distribution.
+Open Typora 0.7.0 includes six original themes and a compatibility host for a subset of [obgnail/typora_plugin](https://github.com/obgnail/typora_plugin). This is an independent integration, with no affiliation to Typora or the plugin authors. It does not load the complete Typora plugin distribution.
 
 ## Included community plugins
 
@@ -44,6 +44,14 @@ module.exports = { plugin: InsertDate }
 Preferences contains **简白, 暖纸, 青墨, 石墨, 深海, 松夜** with immediate previews. Warm paper and forest use serif document fonts; the other themes use a sans-serif writing face. Font availability follows the operating system. Theme selection persists locally and is included in exported HTML/PDF styles.
 
 Custom CSS installation on macOS and Windows supports local CSS imports plus referenced fonts and images. Resources are embedded, with depth/size limits and checks against directory traversal and symlink escapes. Remote resources must be downloaded first. Basic `#write`, `#typora-sidebar` and `.md-fences` selectors are adapted, along with common palette variables. This is **partial Typora theme compatibility**; no claim is made that every third-party theme renders identically.
+
+### Personal background images
+
+In **Preferences → Background image** (偏好设置 → 背景图片), choose a local PNG, JPEG or WebP image, up to 8 MB and 40 million pixels. The app stores a copy, so moving or deleting the original does not break the background. No upload or image-host service is involved. The image applies to the editing area in both live and source modes, across all themes.
+
+Opacity, blur, fill/fit/tile and position update immediately. **Reset effects** restores 18% opacity, no blur, centered fill; **Clear background** restores the theme background without changing the source image or document. Settings and the managed copy persist after restart; desktop windows share the same image and settings. Failed or cancelled selections retain the previous background. The browser preview stores its copy in IndexedDB.
+
+Personal backgrounds are excluded from exported HTML, PDF and converted documents. Backgrounds defined inside an imported CSS theme still follow that theme's export styles.
 
 ## Verification scope
 

@@ -18,6 +18,7 @@
       }
     });
   const methods = [
+    "background", "chooseBackground", "clearBackground",
     "restore", "imageAction", "importDocument", "exportConverted", "themes", "installTheme", "plugins", "installPlugin", "removePlugin", "conversionSettings", "ready", "fileOperation", "recent", "recentAction", "searchFiles", "reveal",
     "registerDraft",
     "open",

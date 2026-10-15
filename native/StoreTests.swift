@@ -161,6 +161,25 @@ func runStoreTests() throws {
     catch let error as NativeFailure { try expect(error.message.contains("闭合"), "malformed RTF fails explicitly without creating a partial imported document") }
   }
   let css = directory.appendingPathComponent("owned-theme.css")
+  let backgroundFile = directory.appendingPathComponent("owned-background.png")
+  let backgroundFormats = try JSONSerialization.jsonObject(with:Data(contentsOf:URL(fileURLWithPath:fm.currentDirectoryPath).appendingPathComponent("tests/background-formats.json"))) as! [String:String]
+  for (format,encoded) in backgroundFormats {
+    let fixture = directory.appendingPathComponent("background." + format)
+    try atomicWrite(fixture,Data(base64Encoded:encoded)!)
+    let image = try Interchange.installBackground(fixture,directory:store.dataDirectory)
+    try expect(image["dataUrl"]!.hasPrefix("data:image/" + format + ";base64,"),"actual native background decode: " + format)
+  }
+  let backgroundBytes = Data(base64Encoded:"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aNNsAAAAASUVORK5CYII=")!
+  try atomicWrite(backgroundFile,backgroundBytes)
+  let installedBackground = try Interchange.installBackground(backgroundFile,directory:store.dataDirectory)
+  try fm.removeItem(at:backgroundFile)
+  try expect(try Interchange.background(store.dataDirectory) == installedBackground,"background copy survives source image removal")
+  try atomicWrite(backgroundFile,Data("<svg/>".utf8))
+  do { _ = try Interchange.installBackground(backgroundFile,directory:store.dataDirectory); throw NativeFailure("invalid background accepted") }
+  catch let error as NativeFailure { try expect(error.message.contains("有效"),"background refuses non-raster data") }
+  try expect(try Interchange.background(store.dataDirectory) == installedBackground,"failed background replacement retains the original background")
+  try Interchange.clearBackground(store.dataDirectory)
+  try expect(try Interchange.background(store.dataDirectory) == nil && String(contentsOf:backgroundFile,encoding:.utf8) == "<svg/>","clearing background preserves the source file")
   try atomicWrite(css, Data("#write { color: #123456; }".utf8))
   let installedTheme = try Interchange.installTheme(css, directory: store.dataDirectory)
   try expect(try Interchange.themes(store.dataDirectory).contains { $0["id"] == installedTheme && $0["css"]!.contains("#123456") }, "CSS theme installation persists the selected theme")

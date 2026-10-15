@@ -1,8 +1,34 @@
 import AppKit
 import Foundation
 import UniformTypeIdentifiers
+import ImageIO
 
 final class Interchange {
+  static func background(_ directory: URL) throws -> [String:String]? {
+    let file = directory.appendingPathComponent("background.json")
+    guard FileManager.default.fileExists(atPath:file.path) else { return nil }
+    guard contained(canonicalFileURL(directory),canonicalFileURL(file)), (try file.resourceValues(forKeys:[.fileSizeKey]).fileSize ?? Int.max) <= 11_186_000 else { throw NativeFailure("背景图片数据无效，请重新选择。") }
+    let object = try JSONSerialization.jsonObject(with:Data(contentsOf:file),options:.fragmentsAllowed)
+    if object is NSNull { return nil }
+    guard let value = object as? [String:String], let name = value["name"], name.count <= 160, let url = value["dataUrl"], url.range(of:"^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$",options:.regularExpression) != nil else { throw NativeFailure("背景图片数据已损坏，请重新选择。") }
+    return ["name":name,"dataUrl":url]
+  }
+  static func clearBackground(_ directory: URL) throws {
+    try atomicWrite(directory.appendingPathComponent("background.json"),Data("null".utf8))
+  }
+  static func installBackground(_ file: URL, directory: URL) throws -> [String:String] {
+    guard (try file.resourceValues(forKeys:[.fileSizeKey]).fileSize ?? Int.max) <= 8 * 1024 * 1024 else { throw NativeFailure("背景图片须小于 8 MB。") }
+    let bytes = try Data(contentsOf:file)
+    let mime: String
+    if bytes.starts(with:[137,80,78,71,13,10,26,10]) { mime = "image/png" }
+    else if bytes.starts(with:[255,216,255]) { mime = "image/jpeg" }
+    else if bytes.starts(with:[82,73,70,70]), bytes.count >= 12, Array(bytes[8..<12]) == [87,69,66,80] { mime = "image/webp" }
+    else { throw NativeFailure("请选择有效的 PNG、JPEG 或 WebP 背景图片。") }
+    guard let source = CGImageSourceCreateWithData(bytes as CFData,nil), let properties = CGImageSourceCopyPropertiesAtIndex(source,0,nil) as? [CFString:Any], let width = properties[kCGImagePropertyPixelWidth] as? Int, let height = properties[kCGImagePropertyPixelHeight] as? Int, width > 0, height > 0, Double(width) * Double(height) <= 40_000_000, CGImageSourceCreateImageAtIndex(source,0,nil) != nil else { throw NativeFailure("图片无效或分辨率超过 4000 万像素，请选择较小的图片。") }
+    let value = ["name":String(file.lastPathComponent.prefix(160)),"dataUrl":"data:\(mime);base64,\(bytes.base64EncodedString())"]
+    try atomicWrite(directory.appendingPathComponent("background.json"),JSONSerialization.data(withJSONObject:value,options:.withoutEscapingSlashes))
+    return value
+  }
   static func run(_ executable: URL, arguments: [String], input: Data?, directory: URL) throws -> Data {
     let fm = FileManager.default, taskDirectory = directory.appendingPathComponent("conversion-" + UUID().uuidString)
     try fm.createDirectory(at: taskDirectory, withIntermediateDirectories: true)

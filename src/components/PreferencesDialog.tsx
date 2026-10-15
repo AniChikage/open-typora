@@ -3,12 +3,15 @@ import { host } from "../host";
 import { Dialog } from "./Dialog";
 import type { Preferences } from "../preferences";
 import { ThemePicker } from "./ThemePicker";
-export function PreferencesDialog({ value, change, theme, changeTheme, themes, installTheme, plugins, close }: { value: Preferences; change(next: Preferences): void; theme: string; changeTheme(theme: string): void; themes: { id: string; name: string }[]; installTheme(): Promise<void>; plugins(): void; close(): void }) {
+import { BackgroundSettings } from "./BackgroundSettings";
+import type { BackgroundAsset } from "../background";
+export function PreferencesDialog({ value, change, theme, changeTheme, themes, installTheme, background, chooseBackground, clearBackground, plugins, close }: { value: Preferences; change(next: Preferences): void; theme: string; changeTheme(theme: string): void; themes: { id: string; name: string }[]; installTheme(): Promise<void>; background: BackgroundAsset | null; chooseBackground(): Promise<void>; clearBackground(): Promise<void>; plugins(): void; close(): void }) {
   const [conversion, setConversion] = useState({ pandoc: "", word: false }), [error, setError] = useState("");
   useEffect(() => { void host.conversionSettings().then(setConversion).catch(e => setError(e.message)); }, []);
   const options = [["imageAutoUpload", "插入后通过 PicGo 自动上传"], ["remoteImages", "显示远程图片"], ["imagePrefix", "相对图片路径使用 ./ 前缀"], ["imageEscape", "自动转义图片路径"], ["spellcheck", "拼写检查"], ["autoPair", "自动配对括号与引号"], ["highlight", "高亮：==文字=="], ["subscript", "下标：H~2~O"], ["superscript", "上标：X^2^"], ["emoji", "Emoji：:smile:"], ["inlineMath", "行内公式：$x^2$"]] as const;
   return <Dialog title="偏好设置" close={close}>
     <ThemePicker value={theme} change={changeTheme} custom={themes} install={async () => { try { await installTheme(); } catch (error) { setError((error as Error).message); } }} />
+    <BackgroundSettings asset={background} value={value} change={change} choose={chooseBackground} clear={clearBackground} />
     <fieldset><legend>插件</legend><p className="dialog-note">无图阅读、只读模式、段落聚焦与常显语法标记等社区插件。</p><button onClick={plugins}>管理插件…</button></fieldset>
     <fieldset><legend>编辑器</legend><div className="form-grid">
       <label>正文字号<input type="number" min={12} max={28} value={value.fontSize} onChange={e => { const n = Number(e.target.value); if (n >= 12 && n <= 28) change({ ...value, fontSize: n }); }} /></label>

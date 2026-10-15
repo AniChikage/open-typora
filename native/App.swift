@@ -366,6 +366,16 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
   }
   func handle(_ name: String, _ args: [Any]) throws -> Any? {
     switch name {
+    case "background": return try Interchange.background(owner.directory)
+    case "clearBackground": try Interchange.clearBackground(owner.directory); return nil
+    case "chooseBackground":
+      #if WEBTEST
+        let file = owner.directory.appendingPathComponent("Background-fixture.png")
+      #else
+        let panel = NSOpenPanel(); panel.title = "选择背景图片"; panel.canChooseDirectories = false; panel.allowsMultipleSelection = false; panel.allowedContentTypes = [.png,.jpeg,UTType(filenameExtension:"webp")].compactMap { $0 }
+        guard panel.runModal() == .OK, let file = panel.url else { return nil }
+      #endif
+      return try Interchange.installBackground(file,directory:owner.directory)
     case "themes": return try Interchange.themes(owner.directory)
     case "plugins": return try Interchange.plugins(owner.directory)
     case "removePlugin":

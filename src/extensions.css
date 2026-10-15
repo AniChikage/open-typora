@@ -1,5 +1,5 @@
 .theme-settings .theme-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:8px 0 18px}
-.utility-dialog>.dialog-heading{position:sticky;top:0;z-index:3;padding:4px 0 12px;background:var(--paper)}
+.utility-dialog>.dialog-heading{position:sticky;top:0;z-index:3;padding:4px 0 12px;background:var(--paper);box-shadow:0 -28px 0 var(--paper)}
 .plugin-remove{margin-top:10px;font-size:12px;color:var(--muted);text-decoration:underline;text-underline-offset:3px}
 .theme-choice{padding:3px!important;text-align:left;border:1px solid transparent!important;border-radius:7px;min-width:0}
 .theme-choice[aria-pressed=true]{border-color:var(--accent)!important;background:transparent!important}
@@ -10,3 +10,22 @@
 .plugin-intro{margin-bottom:20px}.plugin-intro>p:first-child{font-size:15px;margin-top:0}.plugin-list{display:grid;gap:12px}.plugin-card{border:1px solid var(--border);border-radius:6px;padding:16px}.plugin-card-top{display:flex;justify-content:space-between;align-items:center;gap:12px}.plugin-card h3{font-size:14px;margin:0 0 4px;font-weight:600}.plugin-card p{font-size:12px;color:var(--muted);line-height:1.7;margin:10px 0}.plugin-origin{font-size:10px;color:var(--muted)}.plugin-toggle{display:flex!important;align-items:center;gap:6px;font-size:12px;white-space:nowrap}.plugin-toggle input{accent-color:var(--accent)}.plugin-actions{display:flex;align-items:center;justify-content:space-between;gap:10px}.plugin-actions code{font-size:11px;color:var(--muted)}.plugin-actions button,.theme-import button,.plugin-options button,.plugin-install{border:1px solid var(--border);border-radius:4px;padding:5px 10px;font-size:12px}.plugin-options{margin-top:12px;font-size:12px}.plugin-options summary{color:var(--muted);cursor:pointer}.plugin-options textarea{display:block;box-sizing:border-box;width:100%;min-height:145px;margin:7px 0;resize:vertical;font:11px/1.6 Menlo,Consolas,monospace;color:var(--ink);background:var(--code);border:1px solid var(--border);border-radius:4px;padding:9px}.plugin-options>label{display:block;margin-top:10px}.plugin-install{margin-top:18px}.plugin-trust{margin-top:18px;padding:16px;border:1px solid var(--border);border-radius:6px;font-size:13px;line-height:1.7}.plugin-trust h3{font-size:14px;margin-top:0}
 @media(max-width:600px){.theme-settings .theme-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.theme-preview{height:82px}.plugin-card{padding:12px}.plugin-toggle{font-size:11px}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+.writing-area.has-background{isolation:isolate;overflow:hidden;background:var(--paper)}
+.background-image{position:absolute;inset:0;pointer-events:none}
+.has-background>.document-editor,.has-background>.empty-document,.has-background>.conflict-banner{position:relative;z-index:1}
+.has-background .rich-document,.has-background .source-surface>.cm-editor{background:transparent!important}
+.background-preview{position:relative;isolation:isolate;overflow:hidden;min-height:118px;border:1px solid var(--border);border-radius:5px;background:var(--paper)}
+.background-preview-text{position:relative;padding:24px;display:flex;flex-direction:column;gap:10px;color:var(--ink)}
+.background-preview-text strong{font:21px/1.3 var(--document-font,serif)}
+.background-preview-text span{font-size:12px;color:var(--muted)}
+.background-file{display:flex;align-items:center;gap:9px;margin:12px 0;flex-wrap:wrap}
+.background-file>span{flex:1;min-width:120px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:12px}
+.background-file button,.background-reset{border:1px solid var(--border);border-radius:4px;padding:5px 10px;font-size:12px}
+.background-controls{display:grid;grid-template-columns:1fr 1fr;gap:14px 20px}
+.utility-dialog .background-controls label:not(.checkbox-option){display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;font-size:12px;min-width:0;margin:0}
+.background-controls output{color:var(--muted);font-variant-numeric:tabular-nums}
+.utility-dialog .background-controls input[type=range]{grid-column:1/-1;width:100%;accent-color:var(--accent);padding:0;border:0;margin:0;min-height:22px;background:transparent}
+.background-controls select{grid-column:1/-1;min-width:0;max-width:100%;padding:5px}
+.background-reset{margin-top:14px;color:var(--muted)}
+@media(max-width:480px){.background-controls{grid-template-columns:1fr}.background-preview-text{padding:20px}}
+@media print{.editor-background{display:none!important}.writing-area.has-background{overflow:visible}}

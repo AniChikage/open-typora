@@ -59,6 +59,9 @@ export interface Host {
   imageAction(id: string, sources: string[], action: string, options?: Record<string, unknown>): Promise<Record<string, string> | null>;
   themes(): Promise<{ id: string; name: string; css: string }[]>;
   installTheme(): Promise<string | null>;
+  background(): Promise<import("./background").BackgroundAsset | null>;
+  chooseBackground(): Promise<import("./background").BackgroundAsset | null>;
+  clearBackground(): Promise<unknown>;
   plugins(): Promise<{ id: string; name: string; url: string }[]>;
   installPlugin(): Promise<{ id: string; name: string; url: string } | null>;
   removePlugin(id: string): Promise<unknown>;

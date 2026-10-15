@@ -7,6 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import { installPlugin } from "../electron/plugins.mjs";
 import { builtInThemes } from "../src/themes.ts";
+import backgroundFormats from "./background-formats.json" with {type:"json"};
 
 const executablePath = process.env.OPEN_TYPORA_EXECUTABLE;
 assert.equal(process.platform, "win32");
@@ -25,7 +26,7 @@ delete env.ELECTRON_RUN_AS_NODE;
 let application, currentPage;
 try {
   application = await electron.launch({ executablePath, args: [first], env, timeout: 30000 });
-  const page = await application.firstWindow();
+  let page = await application.firstWindow();
   currentPage = page;
   await expect(page.getByRole("button", { name: path.basename(first), exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "A quiet place for your words" })).toBeVisible();
@@ -46,6 +47,59 @@ try {
     await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--paper').trim())).toBe(theme.paper);
   }
   await page.getByRole('button',{name:'使用简白主题',exact:true}).click();
+  for(const [format,encoded] of Object.entries(backgroundFormats)) {
+    const file = path.join(data,'Background format.'+format); await writeFile(file,Buffer.from(encoded,'base64'));
+    await application.evaluate(({dialog},file) => {dialog.showOpenDialog = async () => ({canceled:false,filePaths:[file]});},file);
+    await page.getByRole('button',{name:format === Object.keys(backgroundFormats)[0] ? '选择图片…' : '更换图片…',exact:true}).click();
+    await expect(page.getByRole('group',{name:'背景图片',exact:true})).toContainText(path.basename(file));
+    await expect(page.locator('.editor-background')).toBeVisible();
+  }
+  await page.getByRole('button',{name:'清除背景',exact:true}).click(); await expect(page.locator('.editor-background')).toHaveCount(0);
+  const backgroundFile = path.join(data,'Background fixture.png'), invalidBackground = path.join(data,'Invalid background.png');
+  await writeFile(backgroundFile,Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aNNsAAAAASUVORK5CYII=','base64'));
+  await writeFile(invalidBackground,'not an image');
+  await application.evaluate(({dialog},file) => { dialog.showOpenDialog = async () => ({canceled:false,filePaths:[file]}); },backgroundFile);
+  await page.getByRole('button',{name:'选择图片…',exact:true}).click();
+  await expect(page.locator('.editor-background')).toBeVisible();
+  const opacity = page.getByRole('slider',{name:'背景不透明度',exact:true}), blur = page.getByRole('slider',{name:'背景模糊',exact:true});
+  await opacity.press('Home'); for(let i=0;i<5;i++) await opacity.press('PageUp'); for(let i=0;i<5;i++) await opacity.press('ArrowRight');
+  for(let i=0;i<5;i++) await blur.press('ArrowRight');
+  await page.getByRole('combobox',{name:'背景位置',exact:true}).selectOption('top');
+  await page.getByRole('combobox',{name:'背景显示方式',exact:true}).selectOption('contain');
+  await expect(page.locator('.editor-background')).toHaveCSS('opacity','0.55');
+  await expect(page.locator('.editor-background')).toHaveCSS('filter','blur(5px)');
+  await page.getByRole('button',{name:'关闭偏好设置',exact:true}).click();
+  await page.getByRole('button',{name:'源码',exact:true}).click();
+  await expect(page.locator('.source-surface>.cm-editor')).toHaveCSS('background-color','rgba(0, 0, 0, 0)');
+  await page.getByRole('button',{name:'即时渲染',exact:true}).click();
+  await application.close();
+  const fs = await import('node:fs/promises'); await fs.rm(backgroundFile);
+  application = await electron.launch({executablePath,args:[second],env,timeout:30000}); page = await application.firstWindow(); currentPage = page;
+  await expect(page.locator('.editor-background')).toHaveCSS('opacity','0.55');
+  await expect(page.locator('.editor-background')).toHaveCSS('filter','blur(5px)');
+  await expect(page.locator('.editor-background')).toHaveCSS('background-position','50% 0%');
+  const htmlFile = path.join(data,'Background-free export.html');
+  await application.evaluate(({dialog},file) => { dialog.showSaveDialog = async () => ({canceled:false,filePath:file}); },htmlFile);
+  await openMenu('导出 HTML…');
+  await expect.poll(async () => {try {return await readFile(htmlFile,'utf8');} catch {return '';}}).toContain('Windows 文件关联');
+  const exportedHtml = await readFile(htmlFile,'utf8'); assert.ok(!exportedHtml.includes('data-editor-background')); assert.ok(!exportedHtml.includes('data:image/png'));
+  assert.equal(await readFile(second,'utf8'),'# Windows 文件关联\n\n保留空格和中文文件名。\n');
+  await page.emulateMedia({media:'print'}); await expect(page.locator('.editor-background')).toBeHidden(); await page.emulateMedia({media:'screen'});
+  await openMenu('偏好设置…');
+  await application.evaluate(({dialog},file) => { dialog.showOpenDialog = async () => ({canceled:false,filePaths:[file]}); },invalidBackground);
+  await page.getByRole('button',{name:'更换图片…',exact:true}).click();
+  await expect(page.getByRole('group',{name:'背景图片',exact:true}).getByRole('alert')).toContainText('有效');
+  await expect(page.locator('.editor-background')).toHaveCSS('opacity','0.55');
+  await application.evaluate(({dialog}) => { dialog.showOpenDialog = async () => ({canceled:true,filePaths:[]}); });
+  await page.getByRole('button',{name:'更换图片…',exact:true}).click();
+  await expect(page.getByRole('button',{name:'更换图片…',exact:true})).toBeEnabled();
+  await expect(page.locator('.editor-background')).toHaveCSS('opacity','0.55');
+  await page.getByRole('button',{name:'重置效果',exact:true}).click();
+  await expect(page.locator('.editor-background')).toHaveCSS('opacity','0.18');
+  await expect(page.locator('.editor-background')).toHaveCSS('filter','blur(0px)');
+  await page.screenshot({path:path.join(qa,'windows-background.png')});
+  await page.getByRole('button',{name:'清除背景',exact:true}).click(); await expect(page.locator('.editor-background')).toHaveCount(0);
+  assert.equal(JSON.parse(await readFile(path.join(env.OPEN_TYPORA_DATA_DIR,'background.json'),'utf8')),null);
   await page.getByRole('button',{name:'管理插件…',exact:true}).click();
   const plugin = page.locator('.plugin-card').filter({has:page.getByRole('heading',{name:'Win-plugin-fixture',exact:true})});
   await plugin.getByRole('checkbox').check();
@@ -65,7 +119,7 @@ try {
   await expect(page.locator('#write')).toHaveAttribute('aria-readonly','false');
   await expect(page.locator('style[data-plugin]')).toHaveCount(0);
   await page.screenshot({path:path.join(qa,'windows-plugins.png')});
-  await writeFile(path.join(qa, "windows-shell-results.json"), JSON.stringify({ ...identity, commandLineOpen: true, secondInstanceOpen: true, unicodePaths: true, themes:6, installedPluginModule:true, pluginEditUndo:true, readOnlyLiveAndSource:true, pluginCleanup:true }, null, 2));
+  await writeFile(path.join(qa, "windows-shell-results.json"), JSON.stringify({ ...identity, commandLineOpen: true, secondInstanceOpen: true, unicodePaths: true, backgroundPickControls:true, backgroundRestart:true, backgroundSourceMode:true, backgroundExportExcluded:true, backgroundInvalidAndCancel:true, backgroundClear:true, themes:6, installedPluginModule:true, pluginEditUndo:true, readOnlyLiveAndSource:true, pluginCleanup:true }, null, 2));
   console.log("PASS: installed Windows executable, command-line documents, single instance and Unicode paths");
 } catch (error) {
   console.error(JSON.stringify({ error: String(error), alerts: await currentPage?.getByRole('alert').allTextContents().catch(() => []) }));

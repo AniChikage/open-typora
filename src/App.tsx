@@ -31,11 +31,15 @@ import { PluginRuntime } from "./plugins/runtime";
 import { bundledPlugins, loadPluginPreferences, pluginPreferenceKey } from "./plugins/catalog";
 import type { PluginDefinition, PluginState } from "./plugins/types";
 import { PluginsDialog } from "./components/PluginsDialog";
+import { backgroundRevisionKey, backgroundStyle } from "./background";
+import type { BackgroundAsset } from "./background";
 export default function App() {
   const editors = useRef(new Map<string, EditorHandle>());
   const session = useDocuments(() => ![...editors.current.values()].some(editor => editor.composing()));
   const [preferences, setPreferences] = useState(() => { const initial = loadPreferences(); setMarkdownOptions(initial); return initial; });
   const [themes, setThemes] = useState<{ id: string; name: string; css: string }[]>([]);
+  const [background,setBackground] = useState<BackgroundAsset | null>(null);
+  const backgroundRequest = useRef(0);
   const [installedPlugins, setInstalledPlugins] = useState<PluginDefinition[]>([]);
   const [pluginPreferences, setPluginPreferences] = useState(loadPluginPreferences);
   const [pluginStates, setPluginStates] = useState<Record<string, PluginState>>({});
@@ -114,6 +118,18 @@ export default function App() {
   async function refreshThemes() { const items = await host.themes(); setThemes(items); return items; }
   useEffect(() => { if (session.ready) void refreshThemes().catch(e => session.setMessage(e.message)); }, [session.ready]);
   useEffect(() => applyTheme(theme, themes), [theme, themes]);
+  async function refreshBackground() {
+    const request = ++backgroundRequest.current, asset = await host.background();
+    if (request === backgroundRequest.current) setBackground(asset);
+  }
+  useEffect(() => { void refreshBackground().catch(error => session.setMessage(error.message)); }, []);
+  async function chooseBackground() {
+    const asset = await host.chooseBackground(); if (!asset) return;
+    ++backgroundRequest.current; setBackground(asset); localStorage.setItem(backgroundRevisionKey,crypto.randomUUID());
+  }
+  async function clearBackground() {
+    await host.clearBackground(); ++backgroundRequest.current; setBackground(null); localStorage.setItem(backgroundRevisionKey,crypto.randomUUID());
+  }
   async function installTheme() { const selected = await host.installTheme(); if (selected) { await refreshThemes(); setTheme("custom:" + selected); } }
   async function importDocument() {
     try { const imported = await host.importDocument(); if (!imported) return; const content = imported.markdown ?? htmlToMarkdown(imported.html || ""), record = { id: crypto.randomUUID(), path: null, name: imported.name, content, savedContent: "", diskHash: null, lineEnding: "\n" }; await host.registerDraft(record); await session.add(record); }
@@ -142,6 +158,8 @@ export default function App() {
     const sync = (event: StorageEvent) => {
       if (event.key === pluginPreferenceKey) setPluginPreferences(loadPluginPreferences());
       if (event.key === "open-typora-theme") setTheme(event.newValue || "light");
+      if (event.key === "open-typora-preferences") { const next = loadPreferences(); setMarkdownOptions(next); setPreferences(next); }
+      if (event.key === backgroundRevisionKey) void refreshBackground().catch(error => session.setMessage(error.message));
     };
     window.addEventListener("storage", sync); return () => window.removeEventListener("storage", sync);
   }, []);
@@ -297,7 +315,8 @@ export default function App() {
         theme={theme}
         toggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
       />
-      <main className="writing-area" aria-label="写作空间" inert={session.fileOperationBusy}>
+      <main className={`writing-area ${background ? "has-background" : ""}`} aria-label="写作空间" inert={session.fileOperationBusy}>
+        {background && <div className="background-image editor-background" data-editor-background="true" aria-hidden="true" style={backgroundStyle(background,preferences)} />}
         {active?.conflict && (
           <div className="conflict-banner" role="alert">
             <AlertCircle size={17} />
@@ -388,7 +407,7 @@ export default function App() {
       {dialog === "encoding" && active && <EncodingDialog key={active.id} record={active} change={session.changeEncoding} close={closeDialog} />}
       {dialog === "recent" && <RecentDialog entries={session.recent} action={session.recentAction} close={closeDialog} />}
       {dialog === "global-search" && <GlobalSearch folder={session.folder} close={closeDialog} open={async match => { const record = await session.openToken(match.token); if (record) requestAnimationFrame(() => editors.current.get(record.id)?.jump(match.line)); }} />}
-      {dialog === "preferences" && <PreferencesDialog value={preferences} change={changePreferences} theme={theme} changeTheme={setTheme} themes={themes} installTheme={installTheme} plugins={() => setDialog("plugins")} close={closeDialog} />}
+      {dialog === "preferences" && <PreferencesDialog value={preferences} change={changePreferences} theme={theme} changeTheme={setTheme} themes={themes} installTheme={installTheme} background={background} chooseBackground={chooseBackground} clearBackground={clearBackground} plugins={() => setDialog("plugins")} close={closeDialog} />}
       {dialog === "plugins" && <PluginsDialog definitions={pluginDefinitions} preferences={pluginPreferences} states={pluginStates} toggle={(id, enabled) => setPluginPreferences(previous => ({ ...previous, [id]: { ...previous[id], enabled } }))} configure={(id, config) => setPluginPreferences(previous => ({ ...previous, [id]: { ...previous[id], config } }))} invoke={id => void pluginRuntime.current?.invoke(id)} install={installPlugin} remove={removePlugin} close={closeDialog} />}
       {dialog === "quick-open" && <QuickOpen documents={session.documents} files={session.files} recent={session.recent} openRecent={path => session.recentAction("open", path)} select={session.setActiveId} open={session.openToken} close={closeDialog} />}
       {dialog && ["table", "link", "reference-link", "footnote"].includes(dialog) && <InsertDialog kind={dialog as InsertKind} selected={selectedText} close={closeDialog} submit={value => {

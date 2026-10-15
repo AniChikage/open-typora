@@ -486,7 +486,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
       if (source.current) source.current.contentDOM.spellcheck = preferences?.spellcheck ?? false;
       source.current?.dispatch({ effects: sourceBehavior.current.reconfigure(sourceOptions()) });
       if (typewriter && source.current && !activeMode.current) source.current.dispatch({ effects: EditorView.scrollIntoView(source.current.state.selection.main.head, { y: "center" }) });
-    }, [preferences, typewriter, readOnly]);
+    }, [preferences?.spellcheck, preferences?.tabSize, preferences?.autoPair, preferences?.emoji, preferences?.highlight, preferences?.subscript, preferences?.superscript, preferences?.inlineMath, preferences?.remoteImages, typewriter, readOnly]);
     useEffect(() => {
       if (!root.current?.closest(".document-editor")?.hasAttribute("hidden"))
         focusEditor();

@@ -4,19 +4,18 @@ Open Typora for macOS and Windows.
 
 | Platform | Download | Requirements |
 | --- | --- | --- |
-| macOS | `Open-Typora-0.6.1-arm64.dmg` | macOS 14+, Apple Silicon |
-| Windows | `Open-Typora-0.6.1-windows-x64-Setup.exe` | Windows 10/11, x64 |
+| macOS | `Open-Typora-0.7.0-arm64.dmg` | macOS 14+, Apple Silicon |
+| Windows | `Open-Typora-0.7.0-windows-x64-Setup.exe` | Windows 10/11, x64 |
 
 ZIP alternatives and `SHA256SUMS.txt` are included. No Node.js, Xcode, or Typora installation is required to use the application.
 
 ### What's new
 
-- Six built-in themes: clear white, warm paper, mist, graphite, midnight, and forest. Preferences includes previews and selection is saved locally.
-- A plugin manager with five adapted, unmodified community plugin sources: read-only, no images, paragraph focus, static markers, and dark inversion.
-- Local single-file CommonJS installation, configuration, shortcuts, unloading, and removal to Trash. Compatibility is limited to the documented API subset; this is not full Typora plugin-pack support.
-- Read-only mode protects live text, source mode, local code editors, undo and editing commands. Disabling it restores normal editing.
-- Windows CSS theme installation now embeds local imports, fonts, and images, matching the macOS resource handling.
-- Native WebKit acceptance executes the upstream plugins and dynamically imports an installed module under the existing script policy, including a real undoable document edit.
+- Local background-image selection in Preferences, with immediate preview, opacity, blur, position, fill/fit/tile, reset, and clear controls.
+- PNG, JPEG and WebP copies persist locally across restarts and desktop windows; the original file can be moved without breaking the background. No server upload is used.
+- Backgrounds work in live and source modes while document text and undo history stay intact. Personal backgrounds are excluded from HTML, PDF and converted exports.
+- Invalid or cancelled image selections retain the previous background. Selection is limited to 8 MB and 40 million pixels.
+
 
 [Plugin and theme compatibility](https://github.com/AniChikage/open-typora/blob/main/docs/plugins.md)
 

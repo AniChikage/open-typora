@@ -76,6 +76,25 @@ try {
   const originalResponse = await window.desktop.restore();
   if (!originalResponse.ok) throw new Error(originalResponse.error);
   const original = originalResponse.value.documents[0].content;
+  const openPreferences = async () => { window.__openTypora.command({action:"preferences"}); await wait(() => document.querySelector('[aria-label="关闭偏好设置"]')); };
+  const preferenceButton = text => [...document.querySelectorAll('[role="dialog"] button')].find(button => button.textContent === text);
+  await openPreferences(); preferenceButton('选择图片…').click();
+  await wait(() => document.querySelector('.editor-background'));
+  check((await window.desktop.background()).value.name === 'Background-fixture.png','native background picker persists the managed image');
+  const setRange = (label,value) => { const field = document.querySelector(`[aria-label="${label}"]`); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(field,String(value)); field.dispatchEvent(new Event('input',{bubbles:true})); };
+  setRange('背景不透明度',42); setRange('背景模糊',7);
+  await wait(() => getComputedStyle(document.querySelector('.editor-background')).opacity === '0.42');
+  check(getComputedStyle(document.querySelector('.editor-background')).filter === 'blur(7px)','background controls change the image layer without dimming text');
+  preferenceButton('重置效果').click();
+  await wait(() => getComputedStyle(document.querySelector('.editor-background')).opacity === '0.18');
+  check(getComputedStyle(document.querySelector('.editor-background')).filter === 'blur(0px)','reset restores subtle background defaults');
+  preferenceButton('清除背景').click(); await wait(() => !document.querySelector('.editor-background'));
+  check((await window.desktop.background()).value === null,'clear background updates native persistence');
+  preferenceButton('选择图片…').click(); await wait(() => document.querySelector('.editor-background'));
+  document.querySelector('[aria-label="关闭偏好设置"]').click();
+  await sourceMode(true);
+  check(getComputedStyle(document.querySelector('.source-surface .cm-editor')).backgroundColor === 'rgba(0, 0, 0, 0)' && readSource() === original,'background remains visible in source mode without changing Markdown');
+  await sourceMode(false);
   await wait(() => root().querySelectorAll(".mathjax-node svg").length === 2);
   check(
     !root().querySelector(".math-error,[data-mjx-error]"),
