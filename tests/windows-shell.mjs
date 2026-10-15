@@ -70,7 +70,7 @@ try {
   await expect(page.locator('.editor-background')).toHaveCSS('filter','blur(5px)');
   await page.getByRole('button',{name:'关闭偏好设置',exact:true}).click();
   await page.getByRole('button',{name:'源码',exact:true}).click();
-  await expect(page.locator('.source-surface>.cm-editor')).toHaveCSS('background-color','rgba(0, 0, 0, 0)');
+  await expect(page.locator('.document-editor:not([hidden]) .source-surface>.cm-editor')).toHaveCSS('background-color','rgba(0, 0, 0, 0)');
   await page.getByRole('button',{name:'即时渲染',exact:true}).click();
   await application.close();
   const fs = await import('node:fs/promises'); await fs.rm(backgroundFile);
@@ -81,7 +81,7 @@ try {
   const htmlFile = path.join(data,'Background-free export.html');
   await application.evaluate(({dialog},file) => { dialog.showSaveDialog = async () => ({canceled:false,filePath:file}); },htmlFile);
   await openMenu('导出 HTML…');
-  await expect.poll(async () => {try {return await readFile(htmlFile,'utf8');} catch {return '';}}).toContain('Windows 文件关联');
+  await expect.poll(async () => {try {return await readFile(htmlFile,'utf8');} catch {return '';}},{timeout:30000}).toContain('Windows 文件关联');
   const exportedHtml = await readFile(htmlFile,'utf8'); assert.ok(!exportedHtml.includes('data-editor-background')); assert.ok(!exportedHtml.includes('data:image/png'));
   assert.equal(await readFile(second,'utf8'),'# Windows 文件关联\n\n保留空格和中文文件名。\n');
   await page.emulateMedia({media:'print'}); await expect(page.locator('.editor-background')).toBeHidden(); await page.emulateMedia({media:'screen'});

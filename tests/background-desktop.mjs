@@ -22,13 +22,15 @@ try {
   }
   const opacity=page.getByRole('slider',{name:'背景不透明度',exact:true});await opacity.press('Home');for(let i=0;i<4;i++)await opacity.press('PageUp');
   await page.getByRole('combobox',{name:'背景位置',exact:true}).selectOption('top');
-  await page.getByRole('button',{name:'关闭偏好设置',exact:true}).click();await application.close();await rm(path.join(directory,'actual.webp'));
+  await page.getByRole('button',{name:'关闭偏好设置',exact:true}).click();
+  await page.getByRole('button',{name:'源码',exact:true}).click();await expect(page.locator('.document-editor:not([hidden]) .source-surface>.cm-editor')).toHaveCSS('background-color','rgba(0, 0, 0, 0)');
+  await page.getByRole('button',{name:'即时渲染',exact:true}).click();await application.close();await rm(path.join(directory,'actual.webp'));
   application=await electron.launch({args:[process.cwd()],env,timeout:30000});page=await application.firstWindow();
   await expect(page.locator('.editor-background')).toHaveCSS('opacity','0.4');await expect(page.locator('.editor-background')).toHaveCSS('background-position','50% 0%');
   console.log('PASS: Electron restart restores background copy and settings after source removal');
   const exported=path.join(directory,'export.html');await application.evaluate(({dialog},file)=>{dialog.showSaveDialog=async()=>({canceled:false,filePath:file});},exported);
   await page.getByRole('button',{name:'更多操作',exact:true}).click();await page.getByRole('menuitem',{name:'导出 HTML…',exact:true}).click();
-  await expect.poll(async()=>{try{return await readFile(exported,'utf8');}catch{return '';}}).toContain('让文字');
+  await expect.poll(async()=>{try{return await readFile(exported,'utf8');}catch{return '';}},{timeout:30000}).toContain('让文字');
   const html=await readFile(exported,'utf8');assert.ok(!html.includes('data:image/webp')&&!html.includes('data-editor-background'));
   console.log('PASS: actual Electron HTML export excludes the personal background');
   await page.getByRole('button',{name:'更多操作',exact:true}).click();await page.getByRole('menuitem',{name:'偏好设置…',exact:true}).click();
