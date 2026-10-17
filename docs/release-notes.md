@@ -4,18 +4,20 @@ Open Typora for macOS and Windows.
 
 | Platform | Download | Requirements |
 | --- | --- | --- |
-| macOS | `Open-Typora-0.7.0-arm64.dmg` | macOS 14+, Apple Silicon |
-| Windows | `Open-Typora-0.7.0-windows-x64-Setup.exe` | Windows 10/11, x64 |
+| macOS | `Open-Typora-0.7.1-arm64.dmg` | macOS 14+, Apple Silicon |
+| Windows | `Open-Typora-0.7.1-windows-x64-Setup.exe` | Windows 10/11, x64 |
 
 ZIP alternatives and `SHA256SUMS.txt` are included. No Node.js, Xcode, or Typora installation is required to use the application.
 
-### What's new
+### What's fixed
 
-- Local background-image selection in Preferences, with immediate preview, opacity, blur, position, fill/fit/tile, reset, and clear controls.
-- PNG, JPEG and WebP copies persist locally across restarts and desktop windows; the original file can be moved without breaking the background. No server upload is used.
-- Backgrounds work in live and source modes while document text and undo history stay intact. Personal backgrounds are excluded from HTML, PDF and converted exports.
-- Invalid or cancelled image selections retain the previous background. Selection is limited to 8 MB and 40 million pixels.
+- Fixed macOS windows that could not be moved by dragging the document title or empty title-bar area. The native AppKit host now handles window dragging directly; Electron-only CSS no longer determines macOS behavior.
+- The drag area follows window resizing. Document selection, sidebar controls and the macOS window buttons remain available.
+- Added native mouse-event routing regression checks for title-bar dragging and for keeping document and control clicks inside WebKit.
 
+### Validation
+
+The fix is being verified on macOS 26.5.2 (Apple Silicon). The original report was on macOS 27.0.1; that exact system version is not available locally and still needs reporter confirmation.
 
 [Plugin and theme compatibility](https://github.com/AniChikage/open-typora/blob/main/docs/plugins.md)
 

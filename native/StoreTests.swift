@@ -1,6 +1,7 @@
 import Foundation
 
 func runStoreTests() throws {
+  try runWindowChromeTests()
   let fm = FileManager.default
   let directory = fm.temporaryDirectory.appendingPathComponent(
     "open-typora-native-tests-\(UUID().uuidString)").resolvingSymlinksInPath()

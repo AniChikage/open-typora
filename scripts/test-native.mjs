@@ -18,6 +18,7 @@ try {
     "native/Interchange.swift",
     "native/ImageActions.swift",
       "native/StoreTests.swift",
+      "tests/WindowChromeTests.swift",
       "native/App.swift",
     "native/PDFExporter.swift",
       "-o",

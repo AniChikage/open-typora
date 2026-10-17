@@ -58,6 +58,35 @@ struct EditorCommand: Decodable {
   let selector: String?
 }
 struct CommandGroup: Decodable { let title: String; let items: [EditorCommand] }
+
+// WKWebView does not implement Electron's -webkit-app-region. Handle the
+// reserved 28-point toolbar row before WebKit consumes the mouse-down event.
+class EditorWindow: NSWindow {
+  func startsTitleBarDrag(_ event: NSEvent) -> Bool {
+    guard event.type == .leftMouseDown, event.window === self,
+      attachedSheet == nil, let content = contentView else { return false }
+    let point = content.convert(event.locationInWindow, from: nil)
+    let top = content.isFlipped ? point.y - content.bounds.minY : content.bounds.maxY - point.y
+    guard point.x >= content.bounds.minX + 4, point.x < content.bounds.maxX - 4,
+      top >= 4, top < 28 else { return false }
+    for type in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+      if let button = standardWindowButton(type), !button.isHidden,
+        button.convert(button.bounds, to: nil).contains(event.locationInWindow) { return false }
+    }
+    return true
+  }
+  override func sendEvent(_ event: NSEvent) {
+    guard startsTitleBarDrag(event) else { super.sendEvent(event); return }
+    if event.clickCount == 2 {
+      switch UserDefaults.standard.string(forKey: "AppleActionOnDoubleClick") {
+      case "None": break
+      case "Minimize": performMiniaturize(nil)
+      default: performZoom(nil)
+      }
+    } else { performDrag(with: event) }
+  }
+}
+
 final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler,
   WKNavigationDelegate, WKUIDelegate
 {
@@ -101,7 +130,7 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       frame: NSRect(x: 0, y: 0, width: 1380, height: 960), configuration: configuration)
     webView.navigationDelegate = self
     webView.uiDelegate = self
-    window = NSWindow(
+    window = EditorWindow(
       contentRect: webView.frame,
       styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
       backing: .buffered, defer: false)
@@ -109,6 +138,8 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
     window.tabbingIdentifier = "OpenTypora"
     window.titleVisibility = .hidden
     window.titlebarAppearsTransparent = true
+    window.isMovable = true
+    window.isMovableByWindowBackground = false
     window.isReleasedWhenClosed = false
     window.minSize = NSSize(width: 660, height: 500)
     window.contentView = webView

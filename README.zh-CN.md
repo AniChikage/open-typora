@@ -15,7 +15,7 @@
 
 Open Typora 是一款开源 Markdown 编辑器，受 Typora 的行内编辑体验启发。直接修改排版后的正文，需要时切换源码，文档以普通 `.md` 文件保存在自己的文件夹中。
 
-**项目状态：**当前为早期开发版本 **0.7.0**，发布目标为 **macOS 14+、Apple Silicon** 和 **Windows 10/11 x64**，界面目前为简体中文。本项目独立实现，与 Typora 无隶属关系；功能和交互仍在持续完善。
+**项目状态：**当前为早期开发版本 **0.7.1**，发布目标为 **macOS 14+、Apple Silicon** 和 **Windows 10/11 x64**，界面目前为简体中文。本项目独立实现，与 Typora 无隶属关系；功能和交互仍在持续完善。
 
 ## 功能
 
@@ -46,10 +46,10 @@ Open Typora 是一款开源 Markdown 编辑器，受 Typora 的行内编辑体�
 
 | 平台 | 安装包 | 其他方式 |
 | --- | --- | --- |
-| Windows 10/11 · x64 | **[下载 Setup.exe](https://github.com/AniChikage/open-typora/releases/download/v0.7.0/Open-Typora-0.7.0-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.7.0/Open-Typora-0.7.0-windows-x64.zip) |
-| macOS 14+ · Apple Silicon | **[下载 DMG](https://github.com/AniChikage/open-typora/releases/download/v0.7.0/Open-Typora-0.7.0-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.7.0/Open-Typora-0.7.0-arm64.zip) |
+| Windows 10/11 · x64 | **[下载 Setup.exe](https://github.com/AniChikage/open-typora/releases/download/v0.7.1/Open-Typora-0.7.1-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.7.1/Open-Typora-0.7.1-windows-x64.zip) |
+| macOS 14+ · Apple Silicon | **[下载 DMG](https://github.com/AniChikage/open-typora/releases/download/v0.7.1/Open-Typora-0.7.1-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.7.1/Open-Typora-0.7.1-arm64.zip) |
 
-[SHA-256 校验文件](https://github.com/AniChikage/open-typora/releases/download/v0.7.0/SHA256SUMS.txt) · [所有版本](https://github.com/AniChikage/open-typora/releases)
+[SHA-256 校验文件](https://github.com/AniChikage/open-typora/releases/download/v0.7.1/SHA256SUMS.txt) · [所有版本](https://github.com/AniChikage/open-typora/releases)
 
 ### 安装 Windows 版
 
@@ -59,7 +59,7 @@ Windows 版目前**没有代码签名证书**，系统可能显示未知发布�
 
 ### 安装 macOS 版
 
-1. 从 [Releases](https://github.com/AniChikage/open-typora/releases/latest) 下载 **[Open-Typora-0.7.0-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.7.0/Open-Typora-0.7.0-arm64.dmg)**。
+1. 从 [Releases](https://github.com/AniChikage/open-typora/releases/latest) 下载 **[Open-Typora-0.7.1-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.7.1/Open-Typora-0.7.1-arm64.dmg)**。
 2. 打开 DMG，把 **Open Typora** 拖入 **Applications（应用程序）**。
 3. 从应用程序中启动 Open Typora。
 
