@@ -17,7 +17,7 @@ ZIP alternatives and `SHA256SUMS.txt` are included. No Node.js, Xcode, or Typora
 
 ### Validation
 
-The fix is being verified on macOS 26.5.2 (Apple Silicon). The original report was on macOS 27.0.1; that exact system version is not available locally and still needs reporter confirmation.
+Verified on macOS 26.5.2 (Apple Silicon): a human tester confirmed physical-mouse title-bar dragging, 78 automated tests and 91 native checks passed, and the native WebKit editing/save/export regression passed. The original report was on macOS 27.0.1; that exact system version is not available locally and still needs reporter confirmation.
 
 [Plugin and theme compatibility](https://github.com/AniChikage/open-typora/blob/main/docs/plugins.md)
 
