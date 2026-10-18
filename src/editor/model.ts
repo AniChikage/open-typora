@@ -35,6 +35,22 @@ export class MarkdownDocument {
   private undoStack: Command[] = [];
   private redoStack: Command[] = [];
   private group = false;
+  private compositionSession: { entry: Snapshot; undo: Command[]; redo: Command[] } | null = null;
+  beginComposition() {
+    if (this.compositionSession) return;
+    this.closeGroup();
+    this.compositionSession = { entry: { text:this.text,selection:{...this.selection} }, undo:this.undoStack, redo:this.redoStack };
+    this.undoStack=[]; this.redoStack=[];
+  }
+  endComposition() {
+    const session=this.compositionSession; if (!session) return false;
+    const after={text:this.text,selection:{...this.selection}};
+    this.undoStack=session.undo; this.redoStack=session.redo;
+    this.text=session.entry.text; this.selection=session.entry.selection; this.compositionSession=null;
+    this.closeGroup();
+    const changed=this.replace(0,this.text.length,after.text,"composition",after.selection);
+    this.closeGroup(); return changed;
+  }
   private sourceSession: {
     entry: Snapshot;
     undo: Command[];
@@ -250,6 +266,7 @@ export class MarkdownDocument {
     lineEnding = source.includes("\r\n") ? "\r\n" : "\n",
   ) {
     this.sourceSession = null;
+    this.compositionSession = null;
     this.lineEnding = lineEnding;
     this.original = source;
     this.text = source.replace(/\r\n/g, "\n");

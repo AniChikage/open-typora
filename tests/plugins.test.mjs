@@ -161,6 +161,15 @@ test("late cleanup from a failed plugin cannot overwrite a newly enabled instanc
     release();await new Promise(resolve=>setTimeout(resolve,5));assert.equal(run.states.race.status,'ready');
   }finally {await run.value.destroy();}
 });
+test("plugin edit events wait for composition and observe only committed Markdown",async()=>{
+  let text='original',composing=false;const seen=[];
+  const run=new PluginRuntime({getMarkdown:()=>text,getPath:()=>'/tmp/test.md',getSelection:()=>'',composing:()=>composing,insert(){},replace(){},setReadOnly(){},notify(){},changed(){},saveConfig(){}});
+  try {
+    await run.setEnabled({id:'events',name:'events',description:'',config:{},factory:c=>class extends c.BasePlugin{process(){this.utils.eventHub.on('fileEdited',()=>seen.push(this.utils.getCurrentFileContent()));}}},true);
+    run.documentChanged();composing=true;text='originalni';run.documentChanged();assert.deepEqual(seen,[]);
+    composing=false;text='original你';run.documentChanged();run.documentChanged();assert.deepEqual(seen,['original你']);
+  }finally {await run.destroy();}
+});
 test("local CommonJS installation preserves original source, is content addressed and rejects invalid input", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "open-typora-plugins-"));
   try {

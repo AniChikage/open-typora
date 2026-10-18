@@ -50,6 +50,7 @@ export interface EditorHandle {
   findNext(back?: boolean): void;
   context(): string;
   composing(): boolean;
+  markdown(): string;
   transform(change: (text: string) => string): void;
 }
 interface Props {
@@ -62,10 +63,11 @@ interface Props {
   onError(error: string): void;
   onCursor(line: number, column: number): void;
   onSelection?(text: string): void;
+  onCompositionEnd?(): void;
 }
 export const MarkdownEditor = forwardRef<EditorHandle, Props>(
   function MarkdownEditor(
-    { document: record, rendered, readOnly = false, preferences, typewriter = false, onChange, onError, onCursor, onSelection },
+    { document: record, rendered, readOnly = false, preferences, typewriter = false, onChange, onError, onCursor, onSelection, onCompositionEnd },
     ref,
   ) {
     const root = useRef<HTMLDivElement>(null),
@@ -73,8 +75,8 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
     const model = useRef<MarkdownDocument | null>(null),
       rich = useRef<RichEditor | null>(null),
       source = useRef<EditorView | null>(null);
-    const callbacks = useRef({ onChange, onError, onCursor, onSelection });
-    callbacks.current = { onChange, onError, onCursor, onSelection };
+    const callbacks = useRef({ onChange, onError, onCursor, onSelection, onCompositionEnd });
+    callbacks.current = { onChange, onError, onCursor, onSelection, onCompositionEnd };
     const initial = useRef(record),
       requested = useRef(rendered),
       activeMode = useRef(rendered);
@@ -115,6 +117,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
     }
     function compositionFinished() {
       if (pendingOptions.current) applyViewOptions();
+      callbacks.current.onCompositionEnd?.();
       setMode(requested.current);
     }
     const sourceBehavior = useRef(new Compartment());
@@ -340,17 +343,18 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
                 return true;
               },
               compositionstart() {
-                if (compositionTimer.current !== null) clearTimeout(compositionTimer.current);
+                if (compositionTimer.current !== null) { clearTimeout(compositionTimer.current); doc.endComposition(); }
                 compositionTimer.current = null;
                 sourceComposing.current = true;
-                doc.closeGroup();
+                doc.beginComposition();
                 return false;
               },
               compositionend() {
                 compositionTimer.current = setTimeout(() => {
                   compositionTimer.current = null;
                   sourceComposing.current = false;
-                  doc.closeGroup();
+                  doc.endComposition();
+                  publish();
                   compositionFinished();
                 }, 0);
                 return false;
@@ -402,6 +406,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
       () => ({
         view: () => source.current,
         composing: isComposing,
+        markdown: () => model.current?.toMarkdown() || "",
         transform: change => { const doc = model.current; if (!doc || editingBlocked()) return; doc.closeGroup(); const next = change(doc.text); if (next !== doc.text) { doc.replace(0, doc.text.length, next, "document-command"); if (activeMode.current) rich.current?.render(false); else syncSource(); publish(); } },
         find: () => {
           if (!activeMode.current) {

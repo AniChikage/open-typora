@@ -241,6 +241,15 @@ test("separate Chinese candidate commits remain separate undo groups", async () 
   }
   assert.equal(f.model.text,"输入你好\n"); f.editor.undo(); assert.equal(f.model.text,"输入你\n"); f.editor.undo(); assert.equal(f.model.text,"输入\n"); f.close();
 });
+test("CodeMirror composition sessions preserve redo on cancellation and commit as one edit",()=>{
+  const doc=new MarkdownDocument('原文');
+  doc.replace(2,2,'后');doc.undo();assert.equal(doc.canRedo,true);
+  doc.beginComposition();doc.replace(2,2,'ni','composition');doc.replace(2,4,'','composition');
+  assert.equal(doc.endComposition(),false);assert.equal(doc.text,'原文');assert.equal(doc.canUndo,false);assert.equal(doc.canRedo,true);
+  doc.redo();assert.equal(doc.text,'原文后');
+  doc.beginComposition();doc.replace(3,3,'zhong','composition');doc.replace(3,8,'中文','composition');doc.endComposition();
+  assert.equal(doc.text,'原文后中文');doc.undo();assert.equal(doc.text,'原文后');doc.redo();assert.equal(doc.text,'原文后中文');
+});
 test("task checkboxes update their own marker and undo without changing other tasks", () => {
   const f = fixture("- [ ] 第一项\n- [x] 第二项\n");
   f.root

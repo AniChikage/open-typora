@@ -122,6 +122,7 @@ try {
     if (id === 'collapse_list') {
       [...pluginCard(name).querySelectorAll('button')].find(button=>button.textContent==='插件命令…').click();
       const command=()=>[...pluginCard(name).querySelectorAll('button')].find(button=>button.textContent==='记住折叠状态');
+      await wait(()=>command());
       check(command()?.getAttribute('aria-pressed')==='true','upstream dynamic command is visible with its checked state');
       command().click(); await wait(()=>command()?.getAttribute('aria-pressed')==='false');
       check(true,'plugin command calls the original plugin and persists the changed setting');

@@ -83,6 +83,7 @@ export class PluginRuntime {
     this.focus();
   }
   documentChanged() {
+    if (this.options.composing?.()) return;
     this.syncDOM();
     const next = { id: this.options.getDocumentId?.() || this.options.getPath() || "untitled", path: this.options.getPath(), text: this.options.getMarkdown() };
     const previous = this.previousDocument;

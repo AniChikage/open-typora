@@ -72,7 +72,7 @@ export default function App() {
   const pluginDefinitions = useMemo(() => [...bundledPlugins, ...installedPlugins].map(definition => ({ ...definition, config: { ...definition.config, ...pluginPreferences[definition.id]?.config } })), [installedPlugins, pluginPreferences]);
   useEffect(() => {
     const runtime = new PluginRuntime({
-      getMarkdown: () => pluginContext.current.active?.content || "", getPath: () => pluginContext.current.active?.path || null,
+      getMarkdown: () => pluginContext.current.editor()?.markdown() ?? pluginContext.current.active?.content ?? "", getPath: () => pluginContext.current.active?.path || null,
       getSelection: () => pluginContext.current.editor()?.selectionText() || "",
       getDocumentId: () => pluginContext.current.active?.id || "",
       composing: () => !!pluginContext.current.editor()?.composing(),
@@ -93,7 +93,7 @@ export default function App() {
     if (!session.ready || !active) return;
     for (const definition of pluginDefinitions) void pluginRuntime.current?.setEnabled(definition, !!pluginPreferences[definition.id]?.enabled);
   }, [pluginDefinitions, pluginPreferences, session.ready, !!active]);
-  useEffect(() => { pluginRuntime.current?.documentChanged(); }, [active?.id, active?.content]);
+  useEffect(() => { pluginRuntime.current?.documentChanged(); }, [active?.id, active?.path, active?.content]);
   useEffect(() => { pluginRuntime.current?.event("beforeToggleSourceMode", !rendered); }, [rendered]);
   useEffect(() => { pluginRuntime.current?.event("afterToggleSidebar", sidebar); }, [sidebar]);
   async function installPlugin() { const installed = await host.installPlugin(); if (installed) setInstalledPlugins(previous => [...previous.filter(item => item.id !== installed.id), { ...installed, description: "本地单文件插件，通过兼容接口运行。", config: {} }]); }
@@ -376,6 +376,7 @@ export default function App() {
                       setCursor({ line, column });
                   }}
                   onSelection={text => { if (record.id === session.activeId) setSelection(text); }}
+                  onCompositionEnd={() => { if (record.id === session.activeId) pluginRuntime.current?.documentChanged(); }}
                 />
               </div>
             ))}

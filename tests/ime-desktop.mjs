@@ -66,6 +66,9 @@ try {
   const source=surface.locator('.source-surface .cm-content'); await expect(source).toBeVisible();
   await source.press(mod==='Meta'?'Meta+ArrowUp':'Control+Home'); await source.press(mod==='Meta'?'Meta+ArrowRight':'End');
   await mark('zhong'); await mark('zhongwen'); await page.waitForTimeout(50);
+  const editsBeforeCommit=await page.evaluate(()=>window.imeProbe.edits);
+  await mark('zhongwenzi'); await page.waitForTimeout(50);
+  assert.equal(await page.evaluate(()=>window.imeProbe.edits),editsBeforeCommit,'Plugins must not observe provisional source edits');
   await page.getByRole('button',{name:'即时渲染',exact:true}).evaluate(button=>button.click());
   await expect(source).toBeVisible();
   await page.waitForTimeout(60);
@@ -74,6 +77,12 @@ try {
   await expect(root).toBeVisible(); await saved(original.replace('# IME acceptance','# IME acceptance中文'));
   await page.keyboard.press(`${mod}+z`); await saved(original);
   checks.push('Source composition delays mode switching until commit and preserves one source-session undo');
+  await page.getByRole('button',{name:'源码',exact:true}).click();
+  await source.press(mod==='Meta'?'Meta+ArrowUp':'Control+Home');
+  await page.keyboard.insertText('redo'); await saved('redo'+original); await page.keyboard.press(`${mod}+z`); await saved(original);
+  await mark('quxiao'); await mark(''); await page.waitForTimeout(50); await saved(original);
+  await page.keyboard.press(`${mod}+Shift+z`); await saved('redo'+original); await page.keyboard.press(`${mod}+z`); await saved(original);
+  checks.push('Cancelling source composition preserves the existing redo stack');
   await expect.poll(()=>page.evaluate(()=>window.imeProbe.edits)).toBeGreaterThan(0);
   assert.equal(await page.evaluate(()=>window.imeProbe.loads),1);
   assert.deepEqual(errors,[]); assert.equal(await page.locator('vite-error-overlay').count(),0);

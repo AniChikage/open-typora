@@ -607,6 +607,7 @@ export class RichEditor {
     const element = this.leafElement(window.getSelection()?.anchorNode);
     this.model.selection = this.bookmark();
     this.model.closeGroup();
+    if ((event.target as Element)?.closest(".cm-editor")) this.model.beginComposition();
     this.compositionSnapshot = null;
     const selection = window.getSelection();
     if (!(event.target as Element)?.closest(".cm-editor") && selection && this.leafElement(selection.anchorNode) !== this.leafElement(selection.focusNode)) {
@@ -661,6 +662,7 @@ export class RichEditor {
       this.composing = false;
       this.composingLeaf = null;
       this.compositionSnapshot = null;
+      changed = this.model.endComposition() || changed;
       this.model.closeGroup();
       if (changed) this.publish();
       this.callbacks.compositionFinished();
