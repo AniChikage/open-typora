@@ -6,6 +6,7 @@ import {
   readdir,
   stat,
   realpath,
+  lstat,
   unlink,
   open,
 } from "node:fs/promises";
@@ -356,6 +357,16 @@ export class DocumentStore {
     const base = await realpath(record.path ? path.dirname(record.path) : this.dataDir);
     let requested = path.resolve(base, reference);
     if (process.platform === "darwin") { if (requested.startsWith("/var/")) requested = "/private" + requested; else if (requested.startsWith("/tmp/")) requested = "/private" + requested; }
+    if (process.platform === "win32") {
+      // realpath expands valid 8.3 names (RUNNER~1, PROGRA~1) and normalizes
+      // case. Check links explicitly before accepting that normalization.
+      let component = path.parse(requested).root;
+      for (const part of requested.slice(component.length).split(path.sep).filter(Boolean)) {
+        component = path.join(component,part);
+        if ((await lstat(component)).isSymbolicLink()) throw new Error("图片位于文档目录之外（符号链接）。");
+      }
+      requested = await realpath(requested);
+    }
     const target = await realpath(requested);
     if (target !== requested) throw new Error("图片位于文档目录之外。");
     if ((await stat(target)).size > 20 * 1024 * 1024)

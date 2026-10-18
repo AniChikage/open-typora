@@ -49,3 +49,10 @@ test('partial trash failure reports success only for files actually removed, whi
   assert.ok(moved['two.png']); assert.deepEqual(await readFile(path.join(f.root,'two.png')),png);
   assert.deepEqual(await readFile(path.join(f.directory,'moved.png')),png);
 });
+test('absolute image paths from the system temporary directory accept Windows short directory names',async t=>{
+  const f=await fixture(t),absolute=path.join(f.root,'one.png');
+  const resolved=await f.store.asset(f.record.id,absolute);
+  assert.deepEqual(await readFile(resolved),png);
+  const fileURL=(await import('node:url')).pathToFileURL(absolute).href;
+  assert.equal(await f.store.asset(f.record.id,fileURL),resolved);
+});

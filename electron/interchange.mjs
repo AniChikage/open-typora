@@ -65,7 +65,7 @@ export async function convertImport(file, directory) {
   }
   if (!directory) throw new Error("缺少导入资源存储目录。");
   const imports = path.join(directory,"Imported"); await mkdir(imports,{recursive:true});
-  const media = await mkdtemp(path.join(imports,"document-"));
+  const media = await realpath(await mkdtemp(path.join(imports,"document-")));
   const temporary = await mkdtemp(path.join(directory,"conversion-"));
   let success = false;
   try {
