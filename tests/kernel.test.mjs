@@ -648,7 +648,19 @@ test("table modified Enter inserts a row and soft Enter stays inside one Markdow
     f.editor.undo(); assert.equal(f.model.toMarkdown(),source);
     point(f.editor,source.indexOf('alpha')+2); input(f.root,'insertLineBreak');
     assert.ok(f.model.text.includes('| al<br>pha | beta |'));
+    assert.equal(f.root.querySelectorAll('td br').length,1);
     assert.equal(f.root.querySelectorAll('tbody tr').length,2);
+    input(f.root,'insertText','中'); assert.ok(f.model.text.includes('| al<br>中pha | beta |'));
+    f.editor.undo();
+    input(f.root,'deleteContentBackward'); assert.equal(f.model.toMarkdown(),source);
+    f.editor.undo(); assert.ok(f.model.text.includes('| al<br>pha | beta |'));
     f.editor.undo(); assert.equal(f.model.toMarkdown(),source);
+    point(f.editor,source.indexOf('alpha')+5); input(f.root,'insertLineBreak');
+    assert.equal(f.root.querySelectorAll('[data-break-placeholder]').length,1);
+    input(f.root,'insertText','新行'); assert.ok(f.model.text.includes('| alpha<br>新行 | beta |'));
+    assert.equal(f.root.querySelectorAll('[data-break-placeholder]').length,0);
+    f.editor.undo(); input(f.root,'deleteContentBackward'); assert.equal(f.model.toMarkdown(),source);
+    f.editor.undo(); point(f.editor,source.indexOf('alpha')+5); input(f.root,'deleteContentForward');
+    assert.equal(f.model.toMarkdown(),source);
   } finally {f.close();}
 });

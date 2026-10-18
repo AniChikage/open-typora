@@ -51,6 +51,11 @@ try {
   await expect(root.locator('tbody tr')).toHaveCount(3); await page.keyboard.press(`${mod}+z`); await saved(original);
   await point('cellA','cellA',2); await page.keyboard.press('Shift+Enter');
   await saved(original.replace('cellA','ce<br>llA')); await expect(root.locator('tbody tr')).toHaveCount(2);
+  await expect(root.locator('td br')).toHaveCount(1);
+  await page.keyboard.insertText('新行'); await saved(original.replace('cellA','ce<br>新行llA'));
+  await page.keyboard.press(`${mod}+z`); await saved(original.replace('cellA','ce<br>llA'));
+  await page.keyboard.press('Backspace'); await saved(original);
+  await page.keyboard.press(`${mod}+z`); await saved(original.replace('cellA','ce<br>llA'));
   await page.keyboard.press(`${mod}+z`); await saved(original);
   checks.push('Modified Enter inserts a table row; Shift-Enter stays in the cell; undo restores exact source');
   const fence = root.locator('.md-fence').filter({has:page.locator('.fence-language').filter({hasText:/^javascript$/})});

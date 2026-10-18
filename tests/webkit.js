@@ -338,6 +338,9 @@ try {
   root().dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',code:'Enter',metaKey:true,bubbles:true,cancelable:true}));
   check(root().querySelectorAll('tbody tr').length === 2,'native Cmd-Enter inserts a table row');
   window.__openTypora.command({action:'undo'}); pointText('cellA',2); input('insertLineBreak');
+  check(root().querySelectorAll('td br').length === 1,'native cell break renders as a real line break');
+  input('insertText','新行'); await sourceMode(true); check(readSource() === paritySource.replace('cellA','ce<br>新行llA'),'native typing continues after the cell break');
+  await sourceMode(false); window.__openTypora.command({action:'undo'});
   await sourceMode(true); check(readSource() === paritySource.replace('cellA','ce<br>llA'),'native Shift-Enter preserves the table with an inline cell break');
   await sourceMode(false); window.__openTypora.command({action:'undo'});
   await sourceMode(true); check(readSource() === paritySource,'native table undo and source round trip restore exact Markdown'); await sourceMode(false);

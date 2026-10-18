@@ -14,6 +14,13 @@ export function alertTitle(kind: string) {
   return `<span class="markdown-alert-title"><svg class="alert-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7v4M8 4.3v1" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>${label}</span>`;
 }
 export function configureDocumentSyntax(md: MarkdownIt) {
+  md.inline.ruler.before("emphasis", "html_break", (state, silent) => {
+    const match = /^<br\s*\/?>/i.exec(state.src.slice(state.pos));
+    if (!match) return false;
+    if (!silent) { const token = state.push("html_break", "br", 0); token.markup = match[0]; }
+    state.pos += match[0].length; return true;
+  });
+  md.renderer.rules.html_break = () => "<br>";
   md.renderer.rules.html_block = (tokens, index) => DOMPurify.sanitize(tokens[index].content, { ALLOW_DATA_ATTR: false, FORBID_ATTR: ["contenteditable"], ADD_TAGS: ["video", "audio", "source", "iframe"], ADD_ATTR: ["allowfullscreen", "sandbox"] });
   md.renderer.rules.alert_marker = (tokens, index) => alertTitle(tokens[index].content);
   md.core.ruler.after("inline", "alert_blocks", state => {

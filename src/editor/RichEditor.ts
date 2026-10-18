@@ -266,6 +266,10 @@ export class RichEditor {
     if (local < 0) local = leaf.raw.length;
     const texts = this.textNodes(element);
     for (const text of texts) {
+      if (local === text.length && text.parentElement?.classList.contains("md-cell-break")) {
+        const marker = text.parentElement, parent = marker.parentNode!;
+        return { node: parent, offset: [...parent.childNodes].indexOf(marker) + 2 };
+      }
       if (local <= text.length) return { node: text, offset: local };
       local -= text.length;
     }
@@ -458,6 +462,8 @@ export class RichEditor {
         return;
       case "deleteContentBackward":
         if (from === to) {
+          const marker = [...this.root.querySelectorAll<HTMLElement>(".md-cell-break")].find(element => this.point(element, 0) + (element.textContent?.length || 0) === from);
+          if (marker) { from -= marker.textContent!.length; insert = ""; kind = "structure"; break; }
           const pairs: Record<string, string> = { "(": ")", "[": "]", "{": "}", '"': '"', "'": "'" };
           if (this.autoPair && pairs[this.model.text[from - 1]] && pairs[this.model.text[from - 1]] === this.model.text[to]) {
             from--; to++; insert = ""; break;
@@ -485,6 +491,8 @@ export class RichEditor {
         break;
       case "deleteContentForward":
         if (from === to) {
+          const marker = [...this.root.querySelectorAll<HTMLElement>(".md-cell-break")].find(element => this.point(element, 0) === from);
+          if (marker) { to += marker.textContent!.length; insert = ""; kind = "structure"; break; }
           const node = this.model.nodeAt(from),
             next = this.model.nodes[this.model.nodes.indexOf(node!) + 1];
           to =

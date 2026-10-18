@@ -379,6 +379,11 @@ function tokenInlineHtml(
   };
   for (const token of inlineTokens(raw, environment)) {
     if (cursor === 0 && token.type === "text" && environment.alertType && token.content === `[!${environment.alertType}]`) { const title = String(environment.alertType).toLowerCase(); append(object(token.content, alertTitle(title), "alert", 0)); cursor += token.content.length; continue; }
+    if (token.type === "html_break") {
+      cursor += token.markup.length;
+      append(`<span class="md-meta md-cell-break">${escapeHtml(token.markup)}</span><br>${cursor === raw.length ? '<br class="md-ui" data-break-placeholder>' : ''}`);
+      continue;
+    }
     if (token.type === "html_embed") { append(object(token.content, renderMarkdown(token.content, documentId, { ...environment, fragment: true }).replace(/^<p>|<\/p>\n?$/g, ""), "image", cursor)); cursor += token.content.length; continue; }
     if (token.type === "comment") {
       append(object(token.markup, `<span class="md-comment-view">${escapeHtml(token.content.trim()) || "注释"}</span>`, "comment", cursor)); cursor += token.markup.length; continue;
