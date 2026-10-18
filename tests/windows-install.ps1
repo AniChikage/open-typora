@@ -10,10 +10,13 @@ $env:OPEN_TYPORA_EXECUTABLE = Join-Path $destination 'Open Typora.exe'
 if (!(Test-Path $env:OPEN_TYPORA_EXECUTABLE)) { throw 'Installer did not produce the application executable' }
 node tests/desktop.mjs
 $desktopExit = $LASTEXITCODE
-node tests/windows-shell.mjs
+node tests/electron-shell.mjs
 $shellExit = $LASTEXITCODE
+node tests/parity-desktop.mjs
+$parityExit = $LASTEXITCODE
 if ($desktopExit -ne 0) { throw 'Installed desktop regression failed' }
 if ($shellExit -ne 0) { throw 'Windows shell and plugin regression failed' }
+if ($parityExit -ne 0) { throw 'Installed editing parity regression failed' }
 $extension = Get-ItemPropertyValue 'HKCU:\Software\Classes\.md' '(default)'
 $command = Get-ItemPropertyValue "HKCU:\Software\Classes\$extension\shell\open\command" '(default)'
 if (!$command.Contains($env:OPEN_TYPORA_EXECUTABLE) -or !$command.Contains('%1')) { throw "Invalid Markdown file association: $command" }

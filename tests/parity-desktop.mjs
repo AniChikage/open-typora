@@ -1,0 +1,87 @@
+import { _electron as electron, expect } from "playwright/test";
+import assert from "node:assert/strict";
+import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+
+const data = await mkdtemp(path.join(os.tmpdir(), "open-typora-parity-"));
+const qa = process.env.OPEN_TYPORA_QA_DIR || path.join(data, "evidence");
+await mkdir(qa, {recursive:true});
+const file = path.join(data,"Editing parity 中文.md");
+const original = '# Editing parity\n\n- alpha\n- beta\n- gamma\n\n> - quoted one\n> - quoted two\n\n| A | B |\n| --- | --- |\n| cellA | cellB |\n| cellC | cellD |\n\n```javascript\nlet first = 1;\nlet second = 2;\n```\n\n```sequence\nAlice->Bob: Hello Bob\nNote right of Bob: Bob thinks\nBob-->Alice: I am good thanks\n```\n\n```flow\nst=>start: Start\nop=>operation: Work\ncond=>condition: Ready?\ne=>end: End\nst->op->cond\ncond(yes)->e\ncond(no)->op\n```\n';
+await writeFile(file,original);
+const env = {...process.env,OPEN_TYPORA_DATA_DIR:path.join(data,"session")};
+delete env.ELECTRON_RUN_AS_NODE; delete env.OPEN_TYPORA_DEV_URL;
+let application,page;
+const errors = [], checks = [];
+try {
+  application = await electron.launch({...(process.env.OPEN_TYPORA_EXECUTABLE ? {executablePath:process.env.OPEN_TYPORA_EXECUTABLE,args:[]} : {args:[process.cwd()]}),env,timeout:30000});
+  page = await application.firstWindow(); page.on("pageerror",error => errors.push(error.message));
+  await expect(page.getByRole('button',{name:'欢迎.md',exact:true})).toBeVisible();
+  await application.evaluate(({dialog},file) => {dialog.showOpenDialog = async () => ({canceled:false,filePaths:[file]});},file);
+  const menu = async name => {await page.getByRole('button',{name:'更多操作',exact:true}).click(); await page.getByRole('menuitem',{name,exact:true}).click();};
+  await menu('打开文件');
+  const surface = page.locator('.document-editor:not([hidden])'), root = surface.locator('.rich-document');
+  await expect(root.getByRole('heading',{name:'Editing parity',exact:true})).toBeVisible();
+  const point = async (start,end=start,offset=0) => root.evaluate((element,{start,end,offset}) => {
+    const walker = document.createTreeWalker(element,NodeFilter.SHOW_TEXT), found = [];
+    let node;
+    while ((node=walker.nextNode())) if (!node.parentElement.closest('.md-meta,.md-view,.fence-body')) found.push(node);
+    const a = found.find(node=>node.data.includes(start)), b = found.find(node=>node.data.includes(end));
+    if(!a||!b) throw new Error('Missing selection target');
+    element.focus(); getSelection().setBaseAndExtent(a,a.data.indexOf(start)+offset,b,b.data.indexOf(end)+(end===start?offset:end.length));
+    document.dispatchEvent(new Event('selectionchange'));
+  },{start,end,offset});
+  const saved = text => expect.poll(()=>readFile(file,'utf8')).toBe(text);
+  const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
+  await expect(surface.locator('.mermaid-block svg')).toHaveCount(2,{timeout:30000});
+  await expect(surface.locator('[data-diagram-language="sequence"] svg')).toContainText('Hello Bob');
+  await expect(surface.locator('[data-diagram-language="flow"] svg')).toContainText('Ready?');
+  await saved(original);
+  checks.push('Legacy sequence and flow render labels and branches without changing Markdown');
+  await point('alpha','gamma'); await page.keyboard.press('Tab');
+  const indented = original.replace('- alpha\n- beta\n- gamma','  - alpha\n  - beta\n  - gamma');
+  await saved(indented); await page.keyboard.press('Shift+Tab'); await saved(original);
+  await page.keyboard.press(`${mod}+z`); await saved(indented); await page.keyboard.press(`${mod}+z`); await saved(original);
+  await point('quoted one','quoted two'); await page.keyboard.press('Tab');
+  await saved(original.replace('> - quoted one\n> - quoted two','>   - quoted one\n>   - quoted two'));
+  await page.keyboard.press('Shift+Tab'); await saved(original);
+  checks.push('List and quoted-list multi-line Tab, Shift-Tab and structural undo preserve all text');
+  await point('cellA','cellA',2); await page.keyboard.press(`${mod}+Enter`);
+  await expect(root.locator('tbody tr')).toHaveCount(3); await page.keyboard.press(`${mod}+z`); await saved(original);
+  await point('cellA','cellA',2); await page.keyboard.press('Shift+Enter');
+  await saved(original.replace('cellA','ce<br>llA')); await expect(root.locator('tbody tr')).toHaveCount(2);
+  await page.keyboard.press(`${mod}+z`); await saved(original);
+  checks.push('Modified Enter inserts a table row; Shift-Enter stays in the cell; undo restores exact source');
+  const fence = root.locator('.md-fence').filter({has:page.locator('.fence-language').filter({hasText:/^javascript$/})});
+  await fence.locator('.fence-body').click();
+  const code = fence.locator('.cm-content'); await expect(code).toBeVisible();
+  await code.press(`${mod}+a`); await code.press('Tab');
+  await saved(original.replace('let first = 1;\nlet second = 2;','  let first = 1;\n  let second = 2;'));
+  await code.press('Shift+Tab'); await saved(original);
+  checks.push('Local code selection indents and outdents all lines without replacing selected code');
+  await root.getByRole('heading',{name:'Editing parity',exact:true}).click();
+  await page.getByRole('button',{name:'源码',exact:true}).click();
+  await expect(surface.locator('.source-surface .cm-content')).toContainText('Alice->Bob: Hello Bob');
+  await page.getByRole('button',{name:'即时渲染',exact:true}).click(); await saved(original);
+  const html = path.join(data,'portable.html');
+  await application.evaluate(({dialog},file)=>{dialog.showSaveDialog=async()=>({canceled:false,filePath:file});},html);
+  await menu('导出 HTML…');
+  await expect.poll(async()=>{try{return await readFile(html,'utf8');}catch{return '';}}).toContain('<svg');
+  const exported = await readFile(html,'utf8'); assert.ok(exported.includes('Ready?')&&exported.includes('Hello Bob'));
+  checks.push('Source/live round trip and portable HTML preserve both rendered diagrams');
+  if(process.platform !== 'darwin') {
+    await root.click(); await page.keyboard.press('Control+p');
+    await expect(page.getByRole('dialog',{name:'快速打开',exact:true})).toBeVisible(); await page.keyboard.press('Escape');
+    await page.keyboard.press('Control+Shift+1');
+    await expect(page.getByRole('button',{name:'Editing parity',exact:true})).toBeVisible();
+    checks.push('PC Ctrl+P quick open and Ctrl+Shift+1 outline use the documented platform bindings');
+  }
+  assert.deepEqual(errors,[]);
+  assert.ok(!(await page.locator('vite-error-overlay').count()));
+  await page.screenshot({path:path.join(qa,'editing-parity.png')});
+  await writeFile(path.join(qa,'parity-results.json'),JSON.stringify({platform:process.platform,checks,errors,originalPreserved:await readFile(file,'utf8')===original},null,2));
+  console.log(checks.map(check=>'PASS: '+check).join('\n'));
+} catch(error) {
+  await page?.screenshot({path:path.join(qa,'parity-failure.png')}).catch(()=>{}); throw error;
+} finally {await application?.close();}

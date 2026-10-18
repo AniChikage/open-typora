@@ -43,8 +43,8 @@ export function setMarkdownOptions(options: { highlight: boolean; subscript: boo
 }
 const defaultFence = md.renderer.rules.fence!;
 md.renderer.rules.fence = (tokens, index, options, env, self) =>
-  tokens[index].info.trim() === "mermaid"
-    ? `<div class="mermaid-block">${md.utils.escapeHtml(tokens[index].content)}</div>`
+  /^(mermaid|sequence|flow)$/.test(tokens[index].info.trim())
+    ? `<div class="mermaid-block" data-diagram-language="${tokens[index].info.trim()}">${md.utils.escapeHtml(tokens[index].content)}</div>`
     : defaultFence(tokens, index, options, env, self);
 md.renderer.rules.image = (tokens, index, _options, env) => {
   const token = tokens[index],

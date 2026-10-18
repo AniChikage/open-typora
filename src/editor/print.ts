@@ -106,7 +106,7 @@ export async function conversionMarkdown(source: string, rendered: HTMLElement) 
     changes.push({ from: match.index, to: match.index + match[0].length, text: `[${match[1]}]: ${await embed(url)}${match[3]}` });
   }
   const diagrams = [...rendered.querySelectorAll<HTMLElement>(".mermaid-block")]; let index = 0;
-  for (const block of parseBlocks(source).filter(block => block.kind === "fence" && /^ {0,3}(?:`{3,}|~{3,})mermaid\s*(?:\r?\n|$)/.test(block.source))) {
+  for (const block of parseBlocks(source).filter(block => block.kind === "fence" && /^ {0,3}(?:`{3,}|~{3,})(mermaid|sequence|flow)\s*(?:\r?\n|$)/.test(block.source))) {
     const diagram = diagrams[index++], svg = diagram?.querySelector<SVGSVGElement>("svg");
     if (!svg || diagram.classList.contains("diagram-error")) throw new Error("图表有语法错误，无法导出。");
     changes.push({ from: offsets[block.fromLine - 1], to: Math.min(source.length, offsets[block.toLine]), text: `![流程图](${await diagramPNG(svg)})\n\n` });

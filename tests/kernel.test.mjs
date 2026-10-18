@@ -619,3 +619,36 @@ test("read-only mode blocks DOM typing, paste, cut and composition while retaini
     assert.notEqual(f.model.toMarkdown(),original); f.editor.undo(); assert.equal(f.model.toMarkdown(),original);
   } finally { f.close(); }
 });
+
+test("Tab and Shift-Tab transform every selected list line, including quoted lists, in one undo step", () => {
+  for (const source of ["- alpha\n- beta\n- gamma\n", "> - alpha\n> - beta\n> - gamma\n"]) {
+    const f = fixture(source);
+    try {
+      const from = source.indexOf('alpha'), to = source.indexOf('gamma');
+      f.model.selection = {anchor:to,head:from}; f.editor.restore();
+      f.root.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true}));
+      const expected = source.split('\n').map(line => line ? line.replace(/^(> )?/, '$1  ') : line).join('\n');
+      assert.equal(f.model.toMarkdown(),expected);
+      assert.ok(f.editor.bookmark().anchor > f.editor.bookmark().head, 'retain backward selection');
+      f.root.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Tab',shiftKey:true,bubbles:true,cancelable:true}));
+      assert.equal(f.model.toMarkdown(),source);
+      f.editor.undo(); assert.equal(f.model.toMarkdown(),expected);
+      f.editor.undo(); assert.equal(f.model.toMarkdown(),source);
+    } finally {f.close();}
+  }
+});
+test("table modified Enter inserts a row and soft Enter stays inside one Markdown cell", () => {
+  const source = '| A | B |\n| --- | --- |\n| alpha | beta |\n| gamma | delta |\n';
+  const f = fixture(source);
+  try {
+    point(f.editor,source.indexOf('alpha')+2);
+    f.root.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Enter',metaKey:true,bubbles:true,cancelable:true}));
+    assert.equal(f.root.querySelectorAll('tbody tr').length,3);
+    assert.ok(f.model.text.indexOf('gamma') > f.model.text.indexOf('|  |  |'));
+    f.editor.undo(); assert.equal(f.model.toMarkdown(),source);
+    point(f.editor,source.indexOf('alpha')+2); input(f.root,'insertLineBreak');
+    assert.ok(f.model.text.includes('| al<br>pha | beta |'));
+    assert.equal(f.root.querySelectorAll('tbody tr').length,2);
+    f.editor.undo(); assert.equal(f.model.toMarkdown(),source);
+  } finally {f.close();}
+});

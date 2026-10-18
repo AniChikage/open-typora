@@ -1,4 +1,5 @@
 import DOMPurify from "dompurify";
+import { diagramSource } from "./legacyDiagrams.ts";
 let loader: Promise<typeof import("mermaid")> | undefined;
 let queue = Promise.resolve();
 export async function renderDiagrams(container: HTMLElement) {
@@ -23,7 +24,7 @@ export async function renderDiagrams(container: HTMLElement) {
       try {
         const { svg } = await mermaid.render(
           `diagram-${crypto.randomUUID()}`,
-          element.dataset.mermaid,
+          diagramSource(element.dataset.diagramLanguage || "mermaid", element.dataset.mermaid),
         );
         if (element.isConnected) {
           element.innerHTML = DOMPurify.sanitize(svg, {
@@ -31,9 +32,10 @@ export async function renderDiagrams(container: HTMLElement) {
           });
           element.dataset.ready = "true";
         }
-      } catch {
+      } catch (error) {
         element.textContent = element.dataset.mermaid!;
         element.classList.add("diagram-error");
+        element.title = error instanceof Error ? error.message : "图表语法错误";
       }
     }
   };

@@ -14,7 +14,7 @@ import {
   Code2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { commandGroups, shortcutLabel } from "../commands";
+import { commandGroups, commandKey, shortcutLabel } from "../commands";
 import { version } from "../../package.json";
 interface Props {
   name: string;
@@ -124,7 +124,7 @@ export function Toolbar(props: Props) {
                 const extra = group.items.filter(item => !item.selector && !items.some(quick => quick.action === item.action) && !["theme", "folder", "sidebar", "source", "close-window"].includes(item.action));
                 return <section className="command-group" key={group.title}><div className="menu-divider" /><p>{group.title}</p>{extra.map(item => <button key={item.action} role="menuitem" aria-label={item.label} disabled={
                   !!item.context && (props.disabled || (["rich", "table"].includes(item.context) && !props.rendered) || (item.context === "table" && props.context !== "table_open"))
-                } onClick={() => { setOpen(false); props.command(item.action); }}><span className="menu-check" /><span>{item.label}</span><kbd>{shortcutLabel(item.key)}</kbd></button>)}</section>;
+                } onClick={() => { setOpen(false); props.command(item.action); }}><span className="menu-check" /><span>{item.label}</span><kbd>{shortcutLabel(commandKey(item))}</kbd></button>)}</section>;
               })}
               <div className="menu-divider" />
               <button

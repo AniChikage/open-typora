@@ -2,7 +2,7 @@ name: Desktop release
 
 on:
   push:
-    branches: [main]
+    branches: [main, "codex/**"]
     tags: ["v*"]
     paths: ["native/**", "electron/**", "src/**", "shared/**", "scripts/**", "tests/**", "design/icon.svg", "package*.json", ".github/workflows/release.yml"]
   workflow_dispatch:
@@ -20,6 +20,46 @@ permissions:
   contents: read
 
 jobs:
+  linux:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Install desktop runtime libraries
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2 libgbm1 libxss1 libxtst6 xdg-utils desktop-file-utils fonts-noto-cjk
+      - name: Build Linux x64 DEB and AppImage
+        run: npm run package:linux
+      - name: Install DEB, exercise both packaged payloads, and uninstall
+        run: xvfb-run -a node tests/linux-install.mjs
+        env:
+          OPEN_TYPORA_QA_DIR: ${{ runner.temp }}/open-typora-linux-qa
+      - name: Save Linux acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: linux-acceptance
+          path: ${{ runner.temp }}/open-typora-linux-qa
+          retention-days: 7
+      - name: Save tested Linux packages
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: linux-packages
+          path: |
+            release/linux/*.deb
+            release/linux/*.AppImage
+            release/linux/SHA256SUMS-linux-x64.txt
+          if-no-files-found: error
+          retention-days: 7
+
   windows:
     runs-on: windows-2025
     timeout-minutes: 30
@@ -91,7 +131,7 @@ jobs:
 
   publish:
     if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
-    needs: [macos, windows]
+    needs: [macos, windows, linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -115,7 +155,7 @@ jobs:
           cd release-assets
           cat SHA256SUMS-*.txt | sort -k2 > SHA256SUMS.txt
           sha256sum --check SHA256SUMS.txt
-      - name: Publish both platforms together
+      - name: Publish all three platforms together
         run: |
           set -euo pipefail
           if gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft > "$RUNNER_TEMP/release-draft.txt"; then
@@ -126,5 +166,5 @@ jobs:
           else
             gh release create "$RELEASE_TAG" --draft --verify-tag --title "Open Typora ${RELEASE_TAG#v}" --notes-file docs/release-notes.md
           fi
-          gh release upload "$RELEASE_TAG" release-assets/*.dmg release-assets/*-Setup.exe release-assets/*.zip release-assets/SHA256SUMS.txt
+          gh release upload "$RELEASE_TAG" release-assets/*.dmg release-assets/*-Setup.exe release-assets/*.zip release-assets/*.deb release-assets/*.AppImage release-assets/SHA256SUMS.txt
           gh release edit "$RELEASE_TAG" --draft=false --latest

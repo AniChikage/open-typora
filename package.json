@@ -1,6 +1,6 @@
 {
   "name": "open-typora",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "A local Markdown writing space with live rendering and lossless source editing.",
   "private": true,
   "type": "module",
@@ -28,7 +28,9 @@
     "test:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File tests/windows-install.ps1",
     "dev:demo": "vite --config vite.demo.config.ts --host 127.0.0.1 --port 5187",
     "build:demo": "tsc -b && vite build --config vite.demo.config.ts",
-    "test:background-desktop": "node tests/background-desktop.mjs"
+    "test:background-desktop": "node tests/background-desktop.mjs",
+    "package:linux": "npm run build && node scripts/icon.mjs && node scripts/package-linux.mjs",
+    "test:parity": "node tests/parity-desktop.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "6.20.3",

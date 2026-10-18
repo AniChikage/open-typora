@@ -79,7 +79,7 @@ export function applyBlockCommand(model: MarkdownDocument, action: string, args:
   }
   if (action === "indent" || action === "outdent") {
     return transformLines(model, line => {
-      const match = /^((?:[ \t]*>[ \t]*)*)([ \t]*)(.*)$/.exec(line)!;
+      const match = /^((?:[ \t]*>[ \t]?)*)([ \t]*)(.*)$/.exec(line)!;
       return match[1] + (action === "indent" ? " ".repeat(tabSize) + match[2] : match[2].replace(new RegExp(`^(?: {1,${tabSize}}|\\t)`), "")) + match[3];
     });
   }

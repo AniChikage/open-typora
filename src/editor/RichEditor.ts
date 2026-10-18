@@ -5,7 +5,7 @@ import { EditorState, Compartment } from "@codemirror/state";
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { indentUnit } from "@codemirror/language";
 import { EditorView, keymap, drawSelection } from "@codemirror/view";
-import { defaultKeymap } from "@codemirror/commands";
+import { defaultKeymap, indentMore, indentLess } from "@codemirror/commands";
 import { MarkdownDocument } from "./model.ts";
 import type { DocumentNode, SelectionBookmark } from "./model.ts";
 import {
@@ -825,6 +825,12 @@ export class RichEditor {
       event.shiftKey ? this.redo() : this.undo();
       return;
     }
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey &&
+        window.getSelection()?.anchorNode?.parentElement?.closest("td,th")) {
+      event.preventDefault();
+      this.tableAction("row");
+      return;
+    }
     if (event.key === "Tab") {
       event.preventDefault();
       this.tab(event.shiftKey);
@@ -851,8 +857,9 @@ export class RichEditor {
     const table = window
       .getSelection()
       ?.anchorNode?.parentElement?.closest("td,th");
-    if (table && !soft) {
-      this.tableNext(false, true);
+    if (table) {
+      if (soft) this.insert("<br>", "structure");
+      else this.tableNext(false, true);
       return;
     }
     const node = this.model.nodeAt(from),
@@ -925,20 +932,11 @@ export class RichEditor {
       this.tableNext(back);
       return;
     }
-    const selection = this.bookmark(),
-      start = this.model.text.lastIndexOf("\n", selection.head - 1) + 1;
-    if (/^\s*(?:[-+*]|\d+[.)])\s/.test(this.model.text.slice(start))) {
-      const count = back
-        ? new RegExp(`^ {1,${this.tabSize}}`).exec(this.model.text.slice(start))?.[0].length || 0
-        : 0;
+    const selection = this.bookmark(), from = Math.min(selection.anchor, selection.head), to = Math.max(selection.anchor, selection.head),
+      start = this.model.text.lastIndexOf("\n", from - 1) + 1;
+    if (back || this.model.text.slice(from, to).includes("\n") || /^[ \t]*(?:>[ \t]*)*(?:[-+*]|\d+[.)])[ \t]/.test(this.model.text.slice(start))) {
       this.model.selection = selection;
-      if (
-        this.model.replace(start, start + count, back ? "" : " ".repeat(this.tabSize), "indent", {
-          anchor: selection.anchor + (back ? -count : this.tabSize),
-          head: selection.head + (back ? -count : this.tabSize),
-        })
-      )
-        this.publish();
+      if (applyBlockCommand(this.model, back ? "outdent" : "indent", {}, this.tabSize)) this.publish();
     } else this.insert("\t");
   }
   private tableNext(back: boolean, nextRow = false) {
@@ -1290,10 +1288,12 @@ export class RichEditor {
             {
               key: "Tab",
               run: (cm) => {
+                if (!cm.state.selection.main.empty) return indentMore(cm);
                 cm.dispatch(cm.state.replaceSelection(" ".repeat(this.tabSize)));
                 return true;
               },
             },
+            { key: "Shift-Tab", run: indentLess },
             ...defaultKeymap,
           ]),
           EditorView.updateListener.of((update) => {

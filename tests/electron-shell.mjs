@@ -5,12 +5,13 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { installPlugin } from "../electron/plugins.mjs";
 import { builtInThemes } from "../src/themes.ts";
 import backgroundFormats from "./background-formats.json" with {type:"json"};
 
 const executablePath = process.env.OPEN_TYPORA_EXECUTABLE;
-assert.equal(process.platform, "win32");
+assert.ok(["win32", "linux"].includes(process.platform));
 assert.ok(executablePath, "Test the installed executable, not the development host");
 const qa = process.env.OPEN_TYPORA_QA_DIR;
 await mkdir(qa, { recursive: true });
@@ -35,7 +36,7 @@ try {
   }));
   assert.equal(identity.packaged, true);
   assert.equal(identity.version, JSON.parse(await readFile("package.json", "utf8")).version);
-  await promisify(execFile)(executablePath, [second], { env, timeout: 30000 });
+  await promisify(execFile)(executablePath, [process.platform === "linux" ? pathToFileURL(second).href : second], { env, timeout: 30000 });
   await expect(page.getByRole("button", { name: path.basename(second), exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Windows 文件关联" })).toBeVisible();
   assert.equal(await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length), 1);
@@ -119,7 +120,7 @@ try {
   await expect(page.locator('#write')).toHaveAttribute('aria-readonly','false');
   await expect(page.locator('style[data-plugin]')).toHaveCount(0);
   await page.screenshot({path:path.join(qa,'windows-plugins.png')});
-  await writeFile(path.join(qa, "windows-shell-results.json"), JSON.stringify({ ...identity, commandLineOpen: true, secondInstanceOpen: true, unicodePaths: true, backgroundPickControls:true, backgroundRestart:true, backgroundSourceMode:true, backgroundExportExcluded:true, backgroundInvalidAndCancel:true, backgroundClear:true, themes:6, installedPluginModule:true, pluginEditUndo:true, readOnlyLiveAndSource:true, pluginCleanup:true }, null, 2));
+  await writeFile(path.join(qa, `${process.platform}-shell-results.json`), JSON.stringify({ ...identity, commandLineOpen: true, secondInstanceOpen: true, unicodePaths: true, backgroundPickControls:true, backgroundRestart:true, backgroundSourceMode:true, backgroundExportExcluded:true, backgroundInvalidAndCancel:true, backgroundClear:true, themes:6, installedPluginModule:true, pluginEditUndo:true, readOnlyLiveAndSource:true, pluginCleanup:true }, null, 2));
   console.log("PASS: installed Windows executable, command-line documents, single instance and Unicode paths");
 } catch (error) {
   console.error(JSON.stringify({ error: String(error), alerts: await currentPage?.getByRole('alert').allTextContents().catch(() => []) }));

@@ -1,25 +1,12 @@
 import { build, Platform, Arch } from "electron-builder";
-import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import pkg from "../package.json" with { type: "json" };
-import { licenseNotices } from "./license-notices.mjs";
+import { prepareElectronApplication } from "./prepare-electron.mjs";
 
 if (process.platform !== "win32" || process.arch !== "x64") throw new Error("Build Windows x64 releases on a Windows x64 machine.");
-const application = path.resolve("build/windows-app");
-await rm(application, { recursive: true, force: true });
-await mkdir(application, { recursive: true });
-for (const folder of ["dist", "electron", "shared"]) await cp(folder, path.join(application, folder), { recursive: true });
-// Only the file bridge needs Node dependencies; the editor is already bundled.
-for (const name of ["iconv-lite", "safer-buffer"]) await cp(`node_modules/${name}`, path.join(application, "node_modules", name), { recursive: true });
-await cp("LICENSE", path.join(application, "LICENSE"));
-await licenseNotices(path.join(application, "ThirdPartyLicenses"));
-await cp("third-party/typora-plugins", path.join(application, "ThirdPartyLicenses/typora-plugins"), { recursive: true });
-await writeFile(path.join(application, "package.json"), JSON.stringify({
-  name: pkg.name, version: pkg.version, description: pkg.description,
-  main: pkg.main, type: "module", license: pkg.license, author: pkg.author,
-  homepage: pkg.homepage, dependencies: { "iconv-lite": pkg.dependencies["iconv-lite"] },
-}, null, 2));
+const application = await prepareElectronApplication("windows");
 await build({
   targets: Platform.WINDOWS.createTarget(["nsis", "zip"], Arch.x64),
   publish: "never",

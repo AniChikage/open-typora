@@ -4,6 +4,7 @@ import { execFileSync } from "node:child_process";
 const svg = await readFile(new URL("../design/icon.svg", import.meta.url), "utf8");
 await mkdir("build/icon.iconset", { recursive: true });
 await writeFile("build/icon.svg", svg);
+await sharp(Buffer.from(svg)).resize(512, 512).png().toFile("build/icon.png");
 for (const size of [16, 32, 128, 256, 512]) {
   await sharp(Buffer.from(svg))
     .resize(size, size)

@@ -11,7 +11,7 @@ import { host } from "./host";
 import { renderDiagrams } from "./editor/diagrams";
 import { renderMath } from "./editor/math";
 import { exportHtml, portableHtml, conversionMarkdown } from "./editor/print";
-import { commandForKey, commandsByAction } from "./commands";
+import { commandForKey, commandKey, commandsByAction } from "./commands";
 import { loadPreferences } from "./preferences";
 import { PreferencesDialog } from "./components/PreferencesDialog";
 import { InsertDialog } from "./components/InsertDialog";
@@ -75,7 +75,7 @@ export default function App() {
       getSelection: () => pluginContext.current.editor()?.selectionText() || "",
       insert: text => pluginContext.current.editor()?.insert(text), replace: text => pluginContext.current.editor()?.transform(() => text),
       setReadOnly, notify: text => pluginContext.current.notify(text), changed: (id, state) => setPluginStates(previous => ({ ...previous, [id]: state })),
-      reservedHotkeys: [...commandsByAction.values()].map(command => command.key || "").filter(Boolean),
+      reservedHotkeys: [...commandsByAction.values()].map(command => commandKey(command) || "").filter(Boolean),
       saveConfig: (id, config) => setPluginPreferences(previous => ({ ...previous, [id]: { ...previous[id], config: { ...previous[id]?.config, ...config } } })),
     });
     pluginRuntime.current = runtime;
