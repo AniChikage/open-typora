@@ -53,9 +53,14 @@ export async function convertImport(file, directory) {
   if (/\.html?$/i.test(file)) return { html: await readFile(file, "utf8"), name };
   if (/\.txt$/i.test(file)) return { markdown: await readFile(file, "utf8"), name };
   const pandoc = await pandocPath(), legacy = /\.(doc|rtf)$/i.test(file);
-  const office = legacy ? await libreOfficePath() : "";
-  if (!pandoc || (legacy && !office)) {
+  const format = pandoc ? await importFormat(pandoc) : "";
+  // Pandoc 2.x's ODT reader omits equations and table headers. LibreOffice's
+  // DOCX bridge retains those structures instead of silently dropping them.
+  const oldODT = /\.odt$/i.test(file) && format.startsWith("markdown");
+  const needsOffice = legacy || oldODT, office = needsOffice ? await libreOfficePath() : "";
+  if (!pandoc || (needsOffice && !office)) {
     if (process.platform === "darwin") { const {stdout} = await exec("/usr/bin/textutil",["-convert","html","-stdout",file],{timeout:30000,maxBuffer:20*1024*1024}); return {html:stdout,name}; }
+    if (oldODT) throw new Error("当前 Pandoc 的 ODT 导入需要 LibreOffice；也可升级到 Pandoc 3.x。");
     throw new Error(legacy ? "导入 DOC / RTF 需要安装 LibreOffice 和 Pandoc；也可先另存为 DOCX。" : "导入此格式需要安装 Pandoc，可在偏好设置中选择其可执行文件。");
   }
   if (!directory) throw new Error("缺少导入资源存储目录。");
@@ -65,7 +70,7 @@ export async function convertImport(file, directory) {
   let success = false;
   try {
     let input = path.resolve(file);
-    if (legacy) {
+    if (needsOffice) {
       // An isolated profile prevents a running LibreOffice GUI from absorbing
       // the conversion request or opening a user's active document.
       await exec(office,["-env:UserInstallation="+pathToFileURL(path.join(temporary,"profile")).href,"--headless","--nologo","--norestore","--convert-to","docx","--outdir",temporary,input],{timeout:60000,maxBuffer:2*1024*1024});
@@ -99,7 +104,6 @@ export async function convertImport(file, directory) {
     }
     unwrap(document); await checkMedia(media);
     const json = path.join(temporary,"document.json"); await writeFile(json,JSON.stringify(document));
-    const format = await importFormat(pandoc);
     const result = await exec(pandoc,[json,"--from=json","--to="+format,format.startsWith("gfm") ? "--markdown-headings=atx" : "--atx-headers","--wrap=none"],{cwd:media,timeout:30000,maxBuffer:20*1024*1024});
     success = true;
     if (!(await readdir(media)).length) await rm(media,{recursive:true,force:true});

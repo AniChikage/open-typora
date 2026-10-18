@@ -69,7 +69,7 @@ The desktop launcher and Markdown file association are included. Uninstalling wi
 
 For other compatible distributions, make the AppImage executable (`chmod +x Open-Typora-0.9.0-linux-x64.AppImage`) and run it. FUSE 2 may be required. If FUSE is unavailable, extract it with `./Open-Typora-0.9.0-linux-x64.AppImage --appimage-extract` and run `./squashfs-root/AppRun`. CI exercises the extracted AppImage payload; FUSE mounting and every desktop environment have not been manually verified. Do not disable Chromium's sandbox to run the application.
 
-Additional document conversion on Windows/Linux requires [Pandoc](https://pandoc.org/installing.html). Legacy DOC/RTF imports also require [LibreOffice](https://www.libreoffice.org/download/download-libreoffice/), detected from its standard installation or PATH. Image copy, move, rename, download and Trash operations are available on all three platforms.
+Additional document conversion on Windows/Linux requires [Pandoc](https://pandoc.org/installing.html). ODT imports with older Pandoc 2.x also require LibreOffice to retain equations and headers. Legacy DOC/RTF imports also require [LibreOffice](https://www.libreoffice.org/download/download-libreoffice/), detected from its standard installation or PATH. Image copy, move, rename, download and Trash operations are available on all three platforms.
 
 ### Install on Windows
 

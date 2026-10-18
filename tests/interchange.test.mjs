@@ -22,7 +22,8 @@ for (const format of ['docx','odt','epub']) test(`actual ${format} import retain
   await exec(pandoc,[md,'--from=markdown','--to='+format,'--output='+file,'--resource-path='+root]);
   const imported = await convertImport(file,path.join(root,'session'));
   assert.match(imported.markdown,/中文 heading/); assert.match(imported.markdown,/\|.*one.*中文/);
-  assert.match(imported.markdown,/let answer = 42/); assert.match(imported.markdown,/\$\$?\s*E\s*=\s*mc/);
+  assert.match(imported.markdown.replace(/[ *]/g,''),/\|A\|B\|/);
+  assert.match(imported.markdown,/let answer = 42/); assert.match(imported.markdown.replace(/\\text\{([^}]*)\}/g,"$1").replace(/\s+/g,""),/\$\$?E=mc/);
   assert.match(imported.markdown,/Footnote text/);
   const image = imported.markdown.match(/(?:src="|\]\(<?)([^"\s)>]+)/)?.[1]; assert.ok(image,imported.markdown);
   assert.deepEqual(await readFile(image.startsWith("file:") ? fileURLToPath(image) : decodeURIComponent(image)),png);

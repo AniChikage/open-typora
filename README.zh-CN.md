@@ -69,7 +69,7 @@ sudo apt install ./Open-Typora-0.9.0-linux-x64.deb
 
 其他兼容发行版可以使用 AppImage：先执行 `chmod +x Open-Typora-0.9.0-linux-x64.AppImage`，再运行文件。可能需要 FUSE 2；没有 FUSE 时可通过 `./Open-Typora-0.9.0-linux-x64.AppImage --appimage-extract` 解包，再运行 `./squashfs-root/AppRun`。CI 验证解包后的实际应用；FUSE 挂载和所有桌面环境尚未人工验收。请勿通过关闭 Chromium 沙箱来运行。
 
-Windows/Linux 的更多文档转换需安装 [Pandoc](https://pandoc.org/installing.html)；旧 DOC/RTF 导入还需安装 [LibreOffice](https://www.libreoffice.org/download/download-libreoffice/)，应用会从标准安装位置或 PATH 自动检测。三个平台均支持图片复制、移动、重命名、下载和废纸篓操作。
+Windows/Linux 的更多文档转换需安装 [Pandoc](https://pandoc.org/installing.html)；旧版 Pandoc 2.x 导入 ODT 也需 LibreOffice，以保留公式和表头；旧 DOC/RTF 导入还需安装 [LibreOffice](https://www.libreoffice.org/download/download-libreoffice/)，应用会从标准安装位置或 PATH 自动检测。三个平台均支持图片复制、移动、重命名、下载和废纸篓操作。
 
 ### 安装 Windows 版
 
