@@ -6,6 +6,7 @@ import { textMatches, replaceTextMatches } from "./search";
 import {
   forwardRef,
   useEffect,
+  useLayoutEffect,
   useImperativeHandle,
   useRef,
   useState,
@@ -388,18 +389,9 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
         ensureSource();
         syncSource();
       }
-      const changed = activeMode.current !== value;
       activeMode.current = value;
       setVisibleMode(value);
       historyState();
-      if (changed)
-        requestAnimationFrame(() => {
-          // Inactive documents also receive the global mode preference.
-          // Their delayed focus must never steal a live IME selection.
-          if (activeMode.current !== value || root.current?.closest(".document-editor")?.hasAttribute("hidden")) return;
-          if (value) rich.current?.restore();
-          else source.current?.focus();
-        });
     }
     useImperativeHandle(
       ref,
@@ -497,6 +489,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
         compositionFinished,
       });
       setMode(requested.current);
+      if (!root.current?.closest(".document-editor")?.hasAttribute("hidden")) focusEditor();
       return () => {
         if (compositionTimer.current !== null) clearTimeout(compositionTimer.current);
         rich.current?.destroy();
@@ -530,7 +523,9 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
     useEffect(() => {
       applyViewOptions();
     }, [preferences?.spellcheck, preferences?.tabSize, preferences?.autoPair, preferences?.emoji, preferences?.highlight, preferences?.subscript, preferences?.superscript, preferences?.inlineMath, preferences?.remoteImages, typewriter, readOnly]);
-    useEffect(() => {
+    useLayoutEffect(() => {
+      // Focus once after the mode's DOM is visible, before keyboard input.
+      // A delayed frame can restore an older caret after a navigation key.
       if (!root.current?.closest(".document-editor")?.hasAttribute("hidden"))
         focusEditor();
     }, [visibleMode]);

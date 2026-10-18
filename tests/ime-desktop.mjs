@@ -78,6 +78,7 @@ try {
   await page.keyboard.press(`${mod}+z`); await saved(original);
   checks.push('Source composition delays mode switching until commit and preserves one source-session undo');
   await page.getByRole('button',{name:'源码',exact:true}).click();
+  await expect(source).toBeVisible(); await expect(source).toBeFocused();
   await source.press(mod==='Meta'?'Meta+ArrowUp':'Control+Home');
   await page.waitForTimeout(60);
   assert.equal(await source.evaluate(element=>element.contains(getSelection()?.anchorNode)),true,'An older mode transition must not steal the new source selection');
@@ -91,5 +92,5 @@ try {
   await page.screenshot({path:path.join(qa,'ime-and-plugins.png')});
   await writeFile(path.join(qa,'ime-results.json'),JSON.stringify({platform:process.platform,checks,errors,mechanism:'Chromium Input.imeSetComposition and Input.insertText; not physical IME candidate acceptance'},null,2));
   for(const check of checks) console.log('PASS: '+check);
-} catch(error) { console.error(await page?.evaluate(()=>({events:window.imeEvents?.slice(-18),text:document.querySelector('.source-surface:not([hidden])')?.textContent,alerts:[...document.querySelectorAll('[role="alert"]')].map(x=>x.textContent)})).catch(()=>null)); await page?.screenshot({path:path.join(qa,'ime-failure.png')}).catch(()=>{});throw error; }
+} catch(error) { console.error(await page?.evaluate(()=>({events:window.imeEvents?.slice(-18),text:document.querySelector('.document-editor:not([hidden]) .source-surface')?.textContent,selection:getSelection()?.toString(),alerts:[...document.querySelectorAll('[role="alert"]')].map(x=>x.textContent)})).catch(()=>null)); await page?.screenshot({path:path.join(qa,'ime-failure.png')}).catch(()=>{});throw error; }
 finally {if(app){await app.evaluate(({app})=>app.exit(0)).catch(()=>{});await app.close().catch(()=>{});}}
