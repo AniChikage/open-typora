@@ -146,6 +146,10 @@ func runStoreTests() throws {
   let redecoded = try encodingStore.open(lossFile, id: utf16.id, encoding: "gbk")
   try expect(redecoded.content == "外部 GBK" && redecoded.encoding == "gbk", "explicit reopen decodes the actual file without rewriting it")
   if Interchange.pandoc() != nil {
+    let formula = directory.appendingPathComponent("formula.docx")
+    try Interchange.export("docx", source: "# Formula\n\n$E=mc^2$\n", html: "<p>Formula</p>", destination: formula, workingDirectory: directory, temporaryDirectory: store.dataDirectory)
+    let formulaMarkdown = try Interchange.importFile(formula, directory: store.dataDirectory)["markdown"] ?? ""
+    try expect(formulaMarkdown.contains("$E") && !formulaMarkdown.contains("$`"), "Pandoc math imports use editor-supported dollar syntax")
     let rtf = directory.appendingPathComponent("complex.rtf")
     let base64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aNNsAAAAASUVORK5CYII="
     let complex = "# 复杂标题\n\n| 项目 | 内容 |\n| --- | --- |\n| 中文甲 | 完整单元格 |\n\n脚注引用[^n]。\n\n[^n]: 中文脚注内容。\n\n![图片](data:image/png;base64," + base64 + ")\n\n```javascript\nconst message = \"中文代码\";\n```\n"

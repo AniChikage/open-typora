@@ -19,7 +19,7 @@ Open Typora 0.9.0 adds selection commands, cross-platform image management, and 
 - Windows/Linux now support local image copy, move, rename and Trash operations, bulk copy/move, and HTTP image downloads. Existing destination files are never overwritten. Failed batch copies roll back their new files before any originals are moved.
 - Windows/Linux DOCX, ODT and EPUB imports extract embedded media into persistent local storage. Saved imported documents retain their images after restart.
 - Legacy DOC/RTF import on Windows/Linux uses optional LibreOffice plus Pandoc. Preferences reports detected converters and explains missing dependencies. macOS retains its native conversion path.
-- Pandoc imports avoid its newer GitHub-specific math syntax so formulas render in the editor.
+- Pandoc imports avoid its newer GitHub-specific math syntax so formulas render in the editor. Double-dollar formulas inside paragraphs retain the following text; HTML local images and portable export use the document resource bridge.
 - Both READMEs prominently identify this as unofficial and link to the official Typora purchase page.
 
 ## Validation and limits

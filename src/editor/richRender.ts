@@ -454,10 +454,7 @@ function tokenInlineHtml(
         append(
           object(
             source,
-            renderMarkdown(source, documentId, environment).replace(
-              /^<p>|<\/p>\n?$/g,
-              "",
-            ),
+            `<span class="mathjax-node" data-tex="${escapeHtml(token.content)}" data-display="${marker === "$$"}">${escapeHtml(token.content)}</span>`,
             "math",
             from,
           ),

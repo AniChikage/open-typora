@@ -24,9 +24,9 @@ for (const format of ['docx','odt','epub']) test(`actual ${format} import retain
   assert.match(imported.markdown,/中文 heading/); assert.match(imported.markdown,/\|.*one.*中文/);
   assert.match(imported.markdown,/let answer = 42/); assert.match(imported.markdown,/\$\$?\s*E\s*=\s*mc/);
   assert.match(imported.markdown,/Footnote text/);
-  const image = imported.markdown.match(/(?:src="|\]\(<?)(file:[^"\s)>]+)/)?.[1]; assert.ok(image,imported.markdown);
-  assert.deepEqual(await readFile(fileURLToPath(image)),png);
-  await rm(file); assert.deepEqual(await readFile(fileURLToPath(image)),png);
+  const image = imported.markdown.match(/(?:src="|\]\(<?)([^"\s)>]+)/)?.[1]; assert.ok(image,imported.markdown);
+  assert.deepEqual(await readFile(image.startsWith("file:") ? fileURLToPath(image) : decodeURIComponent(image)),png);
+  await rm(file); assert.deepEqual(await readFile(image.startsWith("file:") ? fileURLToPath(image) : decodeURIComponent(image)),png);
   assert.deepEqual((await readdir(path.join(root,'session'))).sort(),['Imported']);
 });
 for (const format of ['doc','rtf']) test(`actual LibreOffice ${format} conversion imports headings, tables and image`,{skip:!pandoc||!office},async t=>{
@@ -36,8 +36,8 @@ for (const format of ['doc','rtf']) test(`actual LibreOffice ${format} conversio
   await exec(office,['-env:UserInstallation='+pathToFileURL(path.join(root,'profile')).href,'--headless','--norestore','--convert-to',filters[format],'--outdir',root,docx],{timeout:60000});
   const file = path.join(root,'legacy.'+format), imported = await convertImport(file,path.join(root,'session'));
   assert.match(imported.markdown,/中文 heading/); assert.match(imported.markdown,/\|.*one.*中文/); assert.match(imported.markdown,/Footnote text/);
-  const image = imported.markdown.match(/(?:src="|\]\(<?)(file:[^"\s)>]+)/)?.[1]; assert.ok(image,imported.markdown);
-  assert.ok((await readFile(fileURLToPath(image))).length>20);
+  const image = imported.markdown.match(/(?:src="|\]\(<?)([^"\s)>]+)/)?.[1]; assert.ok(image,imported.markdown);
+  assert.ok((await readFile(image.startsWith("file:") ? fileURLToPath(image) : decodeURIComponent(image))).length>20);
   assert.deepEqual((await readdir(path.join(root,'session'))).sort(),['Imported']);
 });
 test('failed import cleans temporary conversion and extracted resources',{skip:!pandoc},async t=>{

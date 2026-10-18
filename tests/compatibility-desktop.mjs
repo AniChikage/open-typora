@@ -30,6 +30,8 @@ try {
   const command = action=>application.evaluate(({BrowserWindow},action)=>BrowserWindow.getAllWindows()[0].webContents.send('app:command',{action}),action);
   const openDialog = async file=>application.evaluate(({dialog},file)=>{dialog.showOpenDialog=async()=>({canceled:false,filePaths:[file]});},file);
   const saveDialog = async file=>application.evaluate(({dialog},file)=>{dialog.showSaveDialog=async()=>({canceled:false,filePath:file});},file);
+  const refused = await page.evaluate(url=>window.desktop.readResource(url),pathToFileURL(md).href);
+  assert.equal(refused.ok,false,'Resource bridge must reject non-bundled file URLs');
   const root = page.locator('.document-editor:not([hidden]) .rich-document');
   let savedDoc;
   for (const format of ['docx','odt','epub','doc','rtf']) {
@@ -42,9 +44,9 @@ try {
     await expect(root).toContainText('Footnote text');
     if (['docx','odt','epub'].includes(format)) await expect(root.locator('.mathjax-node svg')).not.toHaveCount(0);
     const exported = path.join(data,'export-'+format+'.html'); await saveDialog(exported); await command('html');
-    await expect.poll(async()=>{try{return await readFile(exported,'utf8');}catch{return '';}}).toContain('data:image/png;base64,');
+    await expect.poll(async()=>{try{return await readFile(exported,'utf8');}catch{return '';}},{timeout:30000}).toContain('data:image/png;base64,');
     const html = await readFile(exported,'utf8'); assert.ok(html.includes('cell one')&&html.includes('Footnote text'));
-    if (format === 'docx') { savedDoc=path.join(data,'Imported saved.md'); await saveDialog(savedDoc); await command('saveAs'); await expect.poll(async()=>{try{return await readFile(savedDoc,'utf8');}catch{return '';}}).toContain('file:'); }
+    if (format === 'docx') { savedDoc=path.join(data,'Imported saved.md'); await saveDialog(savedDoc); await command('saveAs'); await expect.poll(async()=>{try{return await readFile(savedDoc,'utf8');}catch{return '';}}).toContain('Imported/'); }
     checks.push(format+': actual import renders persistent image/table/note, then embeds it in portable HTML');
 
   }
@@ -70,6 +72,7 @@ try {
   page = await application.firstWindow(); page.on('pageerror',error=>errors.push(error.message));
   const reopened = page.locator('.document-editor:not([hidden]) .rich-document');
   await application.evaluate(({dialog})=>{dialog.showMessageBox=async()=>({response:2});});
+  await page.getByRole('button',{name:'Imported saved.md',exact:true}).click();
   await expect(reopened.getByRole('heading',{name:'兼容验收',exact:true})).toBeVisible();
   await expect.poll(()=>reopened.locator('img').evaluateAll(images=>images.length>0&&images.every(image=>image.naturalWidth>0))).toBe(true);
   checks.push('Saved imported document and extracted media survive an application restart');

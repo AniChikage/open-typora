@@ -710,3 +710,11 @@ test("HTML file URL images use the document resource bridge without enabling act
   assert.equal(template.content.querySelector('[onerror],script'),null);
   assert.ok(!template.innerHTML.includes('javascript:'));
 });
+test("double-dollar math inside a paragraph retains the formula view and all following editable text", () => {
+  const source='before $$E=mc^2$$ after'; const f=fixture(source);
+  assert.equal(f.root.querySelectorAll('.mathjax-node').length,1);
+  assert.equal(f.root.querySelector('.mathjax-node').dataset.tex,'E=mc^2');
+  assert.ok(f.root.textContent.includes(' after'));
+  point(f.editor,source.length);input(f.root,'insertText','!');assert.equal(f.model.text,source+'!');
+  f.editor.undo();assert.equal(f.model.text,source);f.close();
+});

@@ -193,7 +193,9 @@ final class Interchange {
   }
   static func importMarkdownFormat(_ converter: URL, directory: URL) throws -> String {
     let extensions = try run(converter, arguments: ["--list-extensions=gfm"], input: nil, directory: directory)
-    return "gfm+tex_math_dollars+footnotes" + ((String(data: extensions, encoding: .utf8) ?? "").contains("tex_math_gfm") ? "-tex_math_gfm" : "")
+    let available = String(data: extensions, encoding: .utf8) ?? ""
+    if !available.contains("tex_math_dollars") { return "markdown+pipe_tables+tex_math_dollars+footnotes-simple_tables-multiline_tables-grid_tables-implicit_figures-link_attributes" }
+    return "gfm+tex_math_dollars+footnotes" + (available.contains("tex_math_gfm") ? "-tex_math_gfm" : "")
   }
   static func importFile(_ file: URL, directory: URL) throws -> [String: String] {
     let fm = FileManager.default

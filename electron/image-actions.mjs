@@ -10,14 +10,14 @@ export function imageName(source) {
   try { return path.basename(decodeURIComponent(new URL(source).pathname)) || "image.png"; }
   catch { return path.basename(decodeURIComponent(source)) || "image.png"; }
 }
-async function download(source) {
+export async function downloadImage(source) {
   const response = await fetch(source, {signal: AbortSignal.timeout(20000)});
   const extension = imageTypes[response.headers.get("content-type")?.split(";")[0]];
   if (!response.ok || !extension || Number(response.headers.get("content-length")) > maximum) throw new Error("远程图片读取失败或超过 20 MB。");
   const parts = []; let size = 0;
   for await (const part of response.body) { size += part.length; if (size > maximum) { throw new Error("远程图片超过 20 MB。"); } parts.push(part); }
   if (!size) throw new Error("远程图片为空。");
-  return {bytes:Buffer.concat(parts),extension};
+  return {bytes:Buffer.concat(parts),extension,mime:response.headers.get("content-type").split(";")[0]};
 }
 function reference(target, record, options) {
   if (!record.path) return pathToFileURL(target).href;
@@ -58,7 +58,7 @@ export async function imageAction({store,id,sources,action,options={},destinatio
     try {
       for (const [index,item] of items.entries()) {
         let file = item.local;
-        if (!file) { const {bytes,extension} = await download(item.source); file = path.join(temporary,index+extension); await writeFile(file,bytes); }
+        if (!file) { const {bytes,extension} = await downloadImage(item.source); file = path.join(temporary,index+extension); await writeFile(file,bytes); }
         const response = await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({list:[file]}),signal:AbortSignal.timeout(30000)});
         const result = await response.json();
         if (!response.ok || !result.success || !/^https?:\/\//i.test(result.result?.[0] || "")) throw new Error("PicGo 未返回有效图片地址。请确认图床已配置。");
@@ -84,7 +84,7 @@ export async function imageAction({store,id,sources,action,options={},destinatio
       if (item.local === item.target) continue;
       if (item.local) await copyFile(item.local,item.target,constants.COPYFILE_EXCL);
       else {
-        const {bytes} = await download(item.source), handle = await open(item.target,"wx");
+        const {bytes} = await downloadImage(item.source), handle = await open(item.target,"wx");
         created.push(item.target);
         try { await handle.writeFile(bytes); } finally { await handle.close(); }
       }

@@ -44,6 +44,7 @@ async function checkMedia(directory) {
 }
 async function importFormat(pandoc) {
   const {stdout} = await exec(pandoc,["--list-extensions=gfm"],{timeout:10000,maxBuffer:100000});
+  if (!stdout.includes("tex_math_dollars")) return "markdown+pipe_tables+tex_math_dollars+footnotes-simple_tables-multiline_tables-grid_tables-implicit_figures-link_attributes";
   return "gfm+tex_math_dollars+footnotes" + (stdout.includes("tex_math_gfm") ? "-tex_math_gfm" : "");
 }
 export async function convertImport(file, directory) {
@@ -83,7 +84,7 @@ export async function convertImport(file, directory) {
           if (value.t === "Image" && !/\.(?:png|jpe?g|gif|webp|avif|svg)$/i.test(target[0])) throw new Error("导入图片格式不受支持，请先将 WMF / EMF 等图片转换为 PNG 或 JPEG。");
           const resource = path.resolve(media,target[0]);
           if (!resource.startsWith(media+path.sep)) throw new Error("导入资源路径无效。");
-          target[0] = pathToFileURL(resource).href;
+          target[0] = resource.split(path.sep).join("/").replace(/[ %()#?]/g,character=>"%"+character.charCodeAt(0).toString(16).toUpperCase());
         }
       }
       for (const child of Object.values(value)) if (Array.isArray(child)) child.forEach(resources); else if (child && typeof child === "object") resources(child);
@@ -98,7 +99,7 @@ export async function convertImport(file, directory) {
     }
     unwrap(document); await checkMedia(media);
     const json = path.join(temporary,"document.json"); await writeFile(json,JSON.stringify(document));
-    const result = await exec(pandoc,[json,"--from=json","--to="+await importFormat(pandoc),"--wrap=none"],{cwd:media,timeout:30000,maxBuffer:20*1024*1024});
+    const result = await exec(pandoc,[json,"--from=json","--to="+await importFormat(pandoc),"--markdown-headings=atx","--wrap=none"],{cwd:media,timeout:30000,maxBuffer:20*1024*1024});
     success = true;
     if (!(await readdir(media)).length) await rm(media,{recursive:true,force:true});
     return {markdown:result.stdout,name};
