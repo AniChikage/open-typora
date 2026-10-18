@@ -7,7 +7,8 @@
     "plugin/no_image.js",
     "plugin/blur.js",
     "plugin/read_only.js",
-    "plugin/static_markers.js"
+    "plugin/static_markers.js",
+    "plugin/collapse_list.js"
   ],
   "note": "Unmodified upstream sources; Open Typora provides the compatibility host.",
   "sha256": {
@@ -15,6 +16,7 @@
     "no_image.js": "f9bef63f085a2fdfad2b6086b6071beecb6a107bcd25676f49728c2674ff6b41",
     "blur.js": "55b3b543bc2ad44b1c62b2b83dfbd643e404ce0663ef2aa2e36ec53ea391f4ef",
     "read_only.js": "ba46ee1eee1b1f1b59a32fc6cd202c0c759fd3d43e58f921d7223e8577015794",
-    "static_markers.js": "72141946c48f0d12ceada587c4f37b6b3427a56afbf7755b5218335eb2fadd4b"
+    "static_markers.js": "72141946c48f0d12ceada587c4f37b6b3427a56afbf7755b5218335eb2fadd4b",
+    "collapse_list.js": "f25de30885f412082805effd5731bd1f4113c70dbdfdfcc288bbbd7d30f94ba3"
   }
 }

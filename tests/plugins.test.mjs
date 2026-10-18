@@ -88,6 +88,79 @@ test("six built-in themes apply to the editor and exported styles without alteri
   for (const theme of builtInThemes) { const clear = applyTheme(theme.id); assert.equal(document.documentElement.dataset.appearance, theme.dark ? "dark" : "light"); assert.match(document.querySelector('style[data-custom-theme]').textContent, new RegExp(theme.paper)); clear(); }
   assert.equal(document.getElementById("write").innerHTML, original);
 });
+test("document lifecycle distinguishes a load from edits and supports ordered, once, removed and cross-plugin listeners", async () => {
+  let text="first", id="one"; const events=[], states={};
+  const run=new PluginRuntime({getMarkdown:()=>text,getPath:()=>'/tmp/'+id+'.md',getDocumentId:()=>id,getSelection:()=>'',insert(){},replace(){},setReadOnly(){},notify(){},changed:(id,state)=>states[id]=state,saveConfig(){}});
+  const definition={id:'events',name:'events',description:'',config:{},factory:c=>class extends c.BasePlugin {process(){
+    const e=this.utils.eventHub, removed=()=>events.push('removed'); e.on('fileEdited',()=>events.push('late'),10); e.on('fileEdited',()=>events.push('early'),-1);
+    e.once('fileEdited',()=>events.push('once')); e.on('fileEdited',removed); e.off('fileEdited',removed);
+    e.on('fileContentLoaded',path=>events.push('load:'+path)); e.on('shared',()=>events.push('shared'));
+  }}};
+  try {
+    await run.setEnabled(definition,true); run.documentChanged(); text='second'; run.documentChanged(); run.documentChanged(); text='third'; run.documentChanged(); id='two'; run.documentChanged();
+    assert.deepEqual(events,['load:/tmp/one.md','early','once','late','early','late','load:/tmp/two.md']);
+    await run.setEnabled({id:'sender',name:'sender',description:'',config:{},factory:c=>class extends c.BasePlugin {call(){this.utils.eventHub.emit('shared')}}},true);
+    await run.invoke('sender'); assert.equal(events.at(-1),'shared');
+  } finally {await run.destroy();}
+});
+test("async event failures release only the failed plugin's resources", async()=>{
+  const run=runtime();
+  try {
+    await run.value.setEnabled({id:'async',name:'async',description:'',config:{},factory:c=>class extends c.BasePlugin { process(){ c.File.lock(); this.utils.insertStyle('async','p{color:red}'); this.utils.eventHub.on('fileEdited',async()=>{throw new Error('async failed')}); } }},true);
+    await run.value.setEnabled(await definition('dark',{DARK_DEFAULT:true}),true);
+    run.value.event('fileEdited'); await new Promise(resolve=>setTimeout(resolve,5));
+    assert.equal(run.states.async.status,'error'); assert.match(run.states.async.error,/async failed/); assert.equal(document.querySelector('style[data-plugin="async"]'),null); assert.equal(run.locks.at(-1),false); assert.equal(run.states.dark.status,'ready');
+  } finally {await run.value.destroy();}
+});
+test("dynamic hotkeys support arrays, pause, unregister and IME guards; timers stop on disable",async()=>{
+  const run=runtime();let calls=0,ticks=0;
+  const plugin={id:'resources',name:'resources',description:'',config:{},factory:c=>class extends c.BasePlugin {process(){
+    this.utils.hotkeyHub.registerSingle(['ctrl+alt+x','ctrl+alt+y'],()=>calls++);
+    c.setInterval(()=>ticks++,3); c.window.setTimeout(()=>ticks+=1000,100);
+  } call(action){this.utils.hotkeyHub[action==='unregister'?'unregister':action]('ctrl+alt+x')}}};
+  const press=(extra={})=>document.dispatchEvent(new KeyboardEvent('keydown',{bubbles:true,cancelable:true,key:'x',code:'KeyX',ctrlKey:true,altKey:true,...extra}));
+  try {
+    await run.value.setEnabled(plugin,true); press(); assert.equal(calls,1); press({keyCode:229}); press({isComposing:true}); assert.equal(calls,1);
+    await run.value.invoke('resources','pause'); press(); assert.equal(calls,1); await run.value.invoke('resources','resume'); press(); assert.equal(calls,2);
+    await run.value.invoke('resources','unregister'); press(); assert.equal(calls,2);
+    await new Promise(resolve=>setTimeout(resolve,12)); assert.ok(ticks>0); await run.value.setEnabled(plugin,false); const stopped=ticks; await new Promise(resolve=>setTimeout(resolve,110)); assert.equal(ticks,stopped);
+  }finally {await run.value.destroy();}
+});
+test("pinned original list-folding plugin preserves folded lists across DOM replacement without touching Markdown",async()=>{
+  const root=document.getElementById('write'), original=root.innerHTML, run=runtime();
+  root.innerHTML='<ul data-cid="list"><li>first</li><li>second</li></ul>';
+  try {
+    const plugin=await definition('collapse_list',{RECORD_COLLAPSE:true,TRIANGLE_COLOR:''}); await run.value.setEnabled(plugin,true); assert.equal(run.states.collapse_list.status,'ready');
+    const list=root.querySelector('ul'); list.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,clientX:-18,clientY:0})); assert.ok(list.classList.contains('plugin-collapsed-list'));
+    root.innerHTML='<ul data-cid="list"><li>first</li><li>changed</li></ul>'; run.value.documentChanged(); assert.ok(root.querySelector('ul').classList.contains('plugin-collapsed-list')); assert.equal(root.textContent,'firstchanged');
+    await run.value.invoke('collapse_list','record_collapse_state'); assert.equal(run.saved.at(-1).config.RECORD_COLLAPSE,false);
+    await run.value.setEnabled(plugin,false); assert.equal(document.querySelector('style[data-plugin="collapse_list"]'),null);
+  }finally {await run.value.destroy();root.innerHTML=original;}
+});
+test("plugin commands retain labels, checked/disabled states and selection metadata",async()=>{
+  const run=runtime();let invoked;
+  try {
+    await run.value.setEnabled({id:'commands',name:'commands',description:'',config:{},factory:c=>class extends c.BasePlugin {
+      staticActions=[{act_value:'static',act_name:'Static command'}];
+      getDynamicActions(anchor,meta){meta.target=anchor;return [{act_value:'dynamic',act_name:'Dynamic command',act_state:true},{act_value:'unavailable',act_disabled:true}];}
+      call(action,meta){invoked={action,target:meta.target};}
+    }},true);
+    const actions=run.value.actions('commands');assert.deepEqual(actions.map(x=>x.name),['Static command','Dynamic command','unavailable']);assert.equal(actions[1].checked,true);assert.equal(actions[2].disabled,true);
+    await run.value.invoke('commands','dynamic');assert.equal(invoked.action,'dynamic');assert.equal(invoked.target,document.getElementById('write'));
+  }finally {await run.value.destroy();}
+});
+test("late cleanup from a failed plugin cannot overwrite a newly enabled instance",async()=>{
+  const run=runtime();let release;
+  const first={id:'race',name:'race',description:'',config:{version:1},factory:c=>class extends c.BasePlugin {
+    process(){this.utils.eventHub.on('fail',async()=>{throw Error('old instance')});}
+    destroy(){return new Promise(resolve=>release=resolve);}
+  }};
+  try {
+    await run.value.setEnabled(first,true);run.value.event('fail');await Promise.resolve();
+    await run.value.setEnabled({...first,config:{version:2},factory:c=>class extends c.BasePlugin{}},true);
+    release();await new Promise(resolve=>setTimeout(resolve,5));assert.equal(run.states.race.status,'ready');
+  }finally {await run.value.destroy();}
+});
 test("local CommonJS installation preserves original source, is content addressed and rejects invalid input", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "open-typora-plugins-"));
   try {

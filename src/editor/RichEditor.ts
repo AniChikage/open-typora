@@ -25,6 +25,7 @@ import { applyBlockCommand } from "./blockCommands.ts";
 import type { BlockArguments } from "./blockCommands.ts";
 import { htmlToMarkdown } from "./clipboard.ts";
 import { inlineTokens } from "./markdown.ts";
+import { imeKey } from "./composition.ts";
 export interface RichCallbacks {
   change(): void;
   cursor(line: number, column: number): void;
@@ -36,6 +37,8 @@ export class RichEditor {
   leaves = new Map<string, Leaf>();
   composing = false;
   private composingLeaf: Leaf | null = null;
+  private compositionTimer: ReturnType<typeof setTimeout> | null = null;
+  private compositionSnapshot: { raw: string; positions: number[] } | null = null;
   private mutating = false;
   private pointing = false;
   private html = new Map<string, string>();
@@ -123,6 +126,7 @@ export class RichEditor {
     this.render(false);
   }
   destroy() {
+    if (this.compositionTimer !== null) clearTimeout(this.compositionTimer);
     for (const type of ["beforeinput", "keydown", "paste", "cut", "drop", "compositionstart"]) this.root.removeEventListener(type, this.protectReadOnly, true);
     cancelAnimationFrame(this.scrollFrame);
     this.fence?.view.destroy();
@@ -598,20 +602,51 @@ export class RichEditor {
             (to - from);
     return this.model.replace(from, to, insert, kind, { anchor: head, head });
   }
-  private compositionStart = () => {
+  private compositionStart = (event: CompositionEvent) => {
+    if (this.compositionTimer !== null) this.finishComposition();
     const element = this.leafElement(window.getSelection()?.anchorNode);
     this.model.selection = this.bookmark();
     this.model.closeGroup();
+    this.compositionSnapshot = null;
+    const selection = window.getSelection();
+    if (!(event.target as Element)?.closest(".cm-editor") && selection && this.leafElement(selection.anchorNode) !== this.leafElement(selection.focusNode)) {
+      let raw = ""; const positions: number[] = [];
+      for (const element of this.root.querySelectorAll<HTMLElement>("[data-leaf]")) {
+        const leaf = this.leaves.get(element.dataset.leaf!);
+        if (!leaf) continue;
+        for (let i = 0; i < leaf.raw.length; i++) positions[raw.length+i] = leaf.positions[i];
+        raw += leaf.raw;
+        positions[raw.length] = leaf.positions.at(-1)!;
+      }
+      this.compositionSnapshot = { raw, positions };
+    }
     this.composingLeaf = element
       ? this.leaves.get(element.dataset.leaf!) || null
       : null;
     this.composing = true;
   };
   private compositionEnd = () => {
-    queueMicrotask(() => {
+    if (!this.composing) return;
+    if (this.compositionTimer !== null) clearTimeout(this.compositionTimer);
+    // WebKit may deliver the final input after compositionend's microtasks.
+    this.compositionTimer = setTimeout(() => this.finishComposition(), 0);
+  };
+  private finishComposition() {
+      if (this.compositionTimer !== null) clearTimeout(this.compositionTimer);
+      this.compositionTimer = null;
+      let changed = false;
       const leaf = this.composingLeaf,
         element = leaf && this.root.querySelector(`[data-leaf="${leaf.id}"]`);
-      if (leaf && element) {
+      if (this.compositionSnapshot) {
+        const before = this.compositionSnapshot, raw = this.raw(this.root);
+        let start = 0, end = 0;
+        while (start < before.raw.length && start < raw.length && before.raw[start] === raw[start]) start++;
+        while (end < before.raw.length - start && end < raw.length - start && before.raw.at(-1-end) === raw.at(-1-end)) end++;
+        if (raw !== before.raw) {
+          const from = before.positions[start], to = before.positions[before.raw.length-end];
+          changed = this.model.replace(from, to, raw.slice(start,raw.length-end), "composition");
+        }
+      } else if (leaf && element) {
         const raw = this.raw(element),
           selection = window.getSelection();
         let local = raw.length;
@@ -621,14 +656,15 @@ export class RichEditor {
           range.setEnd(selection.anchorNode, selection.anchorOffset);
           local = range.toString().length;
         }
-        this.reconcileLeaf(leaf, raw, "composition", local);
+        changed = this.reconcileLeaf(leaf, raw, "composition", local);
       }
       this.composing = false;
       this.composingLeaf = null;
-      this.publish();
+      this.compositionSnapshot = null;
+      this.model.closeGroup();
+      if (changed) this.publish();
       this.callbacks.compositionFinished();
-    });
-  };
+  }
   private paste = (event: ClipboardEvent) => {
     if ((event.target as HTMLElement).closest(".cm-editor")) return;
     const images = [...(event.clipboardData?.files || [])].filter(file => file.type.startsWith("image/"));
@@ -818,7 +854,7 @@ export class RichEditor {
   private keydown = (event: KeyboardEvent) => {
     if (
       this.composing ||
-      event.isComposing ||
+      imeKey(event) ||
       (event.target as HTMLElement).closest(".cm-editor")
     )
       return;
@@ -1397,7 +1433,7 @@ export class RichEditor {
               start,
               end,
               body ? encodeCodeBody(text, body.prefix) : text,
-              update.transactions.some(transaction => transaction.isUserEvent("input.type.compose")) ? "composition" : "typing",
+              this.composing || update.transactions.some(transaction => transaction.isUserEvent("input.type.compose")) ? "composition" : "typing",
               {
                 anchor: newPoint(update.state.selection.main.anchor),
                 head: newPoint(update.state.selection.main.head),

@@ -1,6 +1,9 @@
 import DOMPurify from "dompurify";
 import { adaptThemeCss } from "../themes.ts";
-import type { PluginDefinition, PluginState } from "./types.ts";
+import type { PluginDefinition, PluginState, PluginAction } from "./types.ts";
+import { PluginEvents } from "./events.ts";
+import { imeKey } from "../editor/composition.ts";
+import { StateRecorder } from "./stateRecorder.ts";
 
 interface Options {
   getMarkdown(): string; getPath(): string | null; getSelection(): string;
@@ -8,14 +11,19 @@ interface Options {
   setReadOnly(value: boolean): void; notify(message: string): void;
   changed(id: string, state: PluginState): void;
   saveConfig(id: string, config: Record<string, any>): void;
+  getDocumentId?(): string;
+  composing?(): boolean;
   reservedHotkeys?: string[];
 }
 interface Running {
   definition: PluginDefinition; plugin: any; disposed: boolean;
   cleanup: (() => void)[]; styles: Map<string, HTMLStyleElement>;
-  events: Map<string, Set<(...args: any[]) => void>>;
+  events: PluginEvents;
   shortcuts: { hotkey: string; callback: () => unknown }[];
+  shortcutsPaused?: boolean;
   file: any;
+  actionMeta?: Record<string,unknown>;
+  recorder?: StateRecorder;
 }
 export function matchesHotkey(event: KeyboardEvent, shortcut: string, mac = /Mac/.test(navigator.platform)) {
   const parts = shortcut.toLowerCase().split(/[+-]/).map(x => x.trim()).filter(Boolean), key = parts.pop();
@@ -37,6 +45,8 @@ export class PluginRuntime {
   private stopped = false;
   private observer: MutationObserver;
   private options: Options;
+  private previousDocument: { id: string; path: string | null; text: string } | null = null;
+  private anchor: Element | null = null;
   constructor(options: Options) {
     this.options = options;
     document.addEventListener("keydown", this.keydown, true);
@@ -49,6 +59,7 @@ export class PluginRuntime {
   private focus = () => {
     const root = this.write(), anchor = window.getSelection()?.anchorNode;
     if (!root || !anchor || !root.contains(anchor)) return;
+    this.anchor = anchor.nodeType === 1 ? anchor as Element : anchor.parentElement;
     let block = anchor.nodeType === 1 ? anchor as Element : anchor.parentElement;
     while (block?.parentElement && block.parentElement !== root) block = block.parentElement;
     for (const child of root.children) child.classList.toggle("md-focus", child === block);
@@ -59,6 +70,8 @@ export class PluginRuntime {
     if (!root) return;
     root.id = "write";
     for (const child of root.children) child.setAttribute("cid", child.getAttribute("data-cid") || child.getAttribute("data-leaf") || "block");
+    for (const element of root.querySelectorAll("ul,ol")) { element.setAttribute("mdtype","list"); element.classList.add(element.tagName === "UL" ? "ul-list" : "ol-list"); }
+    for (const item of this.running.values()) item.recorder?.sync();
     const aliases: Record<string, string> = { s: "del", sub: "subscript", sup: "superscript", math: "inline_math", mark: "highlight" };
     for (const inline of root.querySelectorAll<HTMLElement>(".md-inline[data-mark]")) {
       const mark = inline.dataset.mark!; inline.setAttribute("md-inline", aliases[mark] || mark);
@@ -71,19 +84,32 @@ export class PluginRuntime {
   }
   documentChanged() {
     this.syncDOM();
+    const next = { id: this.options.getDocumentId?.() || this.options.getPath() || "untitled", path: this.options.getPath(), text: this.options.getMarkdown() };
+    const previous = this.previousDocument;
+    this.previousDocument = next;
     for (const item of this.running.values()) {
       item.file?.freshLock();
-      for (const type of ["fileContentLoaded", "fileEdited"]) this.publish(item, type);
+      if (!previous || previous.id !== next.id || previous.path !== next.path) {
+        for (const type of ["beforeFileOpen", "fileOpened", "otherFileOpened", "fileContentLoaded"]) this.publish(item, type, next.path);
+      } else if (previous.text !== next.text) this.publish(item, "fileEdited", next.path);
     }
+  }
+  event(name: string, ...args: any[]) { for (const item of this.running.values()) this.publish(item,name,...args); }
+  actions(id: string): PluginAction[] {
+    const item=this.running.get(id); if (!item || item.disposed) return [];
+    const meta={}, root=this.write(), anchor=this.anchor && root?.contains(this.anchor) ? this.anchor : root;
+    try {
+      const list=[...(item.plugin.staticActions || []), ...(item.plugin.getDynamicActions?.(anchor,meta) || [])];
+      item.actionMeta=meta;
+      return list.filter(action=>typeof action.act_value==='string').map(action=>({value:action.act_value,name:String(action.act_name || action.act_value),disabled:!!action.act_disabled,checked:typeof action.act_state==='boolean'?action.act_state:undefined}));
+    } catch(error) {void this.fail(item,error);return [];}
   }
   private publish(item: Running, name: string, ...args: any[]) {
-    for (const callback of item.events.get(name) || []) {
-      try { callback(...args); } catch (error) { void this.fail(item, error); }
-    }
+    if (!item.disposed) item.events.emit(name,...args);
   }
   private keydown = (event: KeyboardEvent) => {
-    if (event.isComposing || (event.target instanceof Element && event.target.closest('input,textarea,select,[role="dialog"]'))) return;
-    for (const item of this.running.values()) for (const shortcut of item.shortcuts) {
+    if (imeKey(event) || this.options.composing?.() || (event.target instanceof Element && event.target.closest('input,textarea,select,[role="dialog"]'))) return;
+    for (const item of this.running.values()) for (const shortcut of item.shortcutsPaused ? [] : item.shortcuts) {
       if (matchesHotkey(event, shortcut.hotkey)) {
         event.preventDefault(); event.stopImmediatePropagation();
         void this.invoke(item.definition.id, undefined, shortcut.callback); return;
@@ -91,11 +117,15 @@ export class PluginRuntime {
     }
   };
   private async fail(item: Running, error: unknown) {
+    if (item.disposed) return;
     await this.dispose(item);
+    if (this.stopped || this.running.has(item.definition.id)) return;
     this.options.changed(item.definition.id, { enabled: false, status: "error", error: error instanceof Error ? error.message : String(error) });
   }
   private context(item: Running) {
     const own = (cleanup: () => void) => item.cleanup.push(cleanup);
+    const recorder = new StateRecorder(this.write, () => this.options.getDocumentId?.() || this.options.getPath() || "untitled");
+    item.recorder = recorder; own(() => recorder.clear());
     const track = <T extends object>(target: T): T => new Proxy(target, { get: (object, key) => {
       if (key === "addEventListener") return (name: string, fn: EventListener, opts?: boolean | AddEventListenerOptions) => { (object as EventTarget).addEventListener(name, fn, opts); own(() => (object as EventTarget).removeEventListener(name, fn, opts)); };
       if (key === "classList") {
@@ -123,8 +153,36 @@ export class PluginRuntime {
       if (!style) { style = document.createElement("style"); style.dataset.plugin = item.definition.id; item.styles.set(name, style); document.head.append(style); }
       style.textContent = adaptThemeCss(css).replace(/(\d+)\s+ms\b/g, "$1ms");
     };
-    const eventType = { allPluginsHadInjected: "allPluginsHadInjected", fileContentLoaded: "fileContentLoaded", fileEdited: "fileEdited", beforeFileOpen: "beforeFileOpen" };
-    const on = (name: string, callback: (...args: any[]) => void) => { if (!item.events.has(name)) item.events.set(name, new Set()); item.events.get(name)!.add(callback); return () => item.events.get(name)?.delete(callback); };
+    const eventType = Object.fromEntries(["allPluginsHadInjected", "fileContentLoaded", "fileEdited", "beforeFileOpen", "fileOpened", "otherFileOpened", "beforeToggleSourceMode", "afterToggleSidebar", "toggleSettingPage", "outlineUpdated"].map(name => [name,name]));
+    const on = item.events.on;
+    const activeTimers = new Map<number,boolean>();
+    own(() => { for (const [id,repeat] of activeTimers) repeat ? window.clearInterval(id) : window.clearTimeout(id); activeTimers.clear(); });
+    const timed = (repeat: boolean, callback: (...args: any[]) => unknown, delay = 0, ...args: any[]) => {
+      const invoke = () => { if (!repeat) activeTimers.delete(id); if (!item.disposed) { try { Promise.resolve(callback(...args)).catch(error => this.fail(item,error)); } catch(error) { void this.fail(item,error); } } };
+      const id = repeat ? window.setInterval(invoke,delay) : window.setTimeout(invoke,delay);
+      activeTimers.set(id,repeat); return id;
+    };
+    const clearTimer = (id: number) => { window.clearTimeout(id); window.clearInterval(id); activeTimers.delete(id); };
+    const timers = { setTimeout: (callback: (...args: any[]) => unknown, delay?: number, ...args: any[]) => timed(false,callback,delay,...args), setInterval: (callback: (...args: any[]) => unknown, delay?: number, ...args: any[]) => timed(true,callback,delay,...args), clearTimeout: clearTimer, clearInterval: clearTimer };
+    const scopedWindow = new Proxy(window, { get(target,key) {
+      if (key in timers) return timers[key as keyof typeof timers];
+      if (key === "document") return scopedDocument;
+      if (key === "addEventListener") return (name: string, fn: EventListener, opts?: boolean | AddEventListenerOptions) => { target.addEventListener(name,fn,opts); own(() => target.removeEventListener(name,fn,opts)); };
+      const value = Reflect.get(target,key,target); return typeof value === "function" ? value.bind(target) : value;
+    } });
+    const register = (bindings: any) => {
+      for (const binding of Array.isArray(bindings) ? bindings : [bindings]) {
+        if (Array.isArray(binding)) { register(binding); continue; }
+        if (!binding?.hotkey || typeof binding.callback !== "function") continue;
+        for (const hotkey of Array.isArray(binding.hotkey) ? binding.hotkey : [binding.hotkey]) {
+          const signature = hotkeySignature(hotkey);
+          if (this.options.reservedHotkeys?.some(key => hotkeySignature(key) === signature)) throw new Error(`快捷键 ${hotkey} 已被编辑器使用，请在插件设置中更换。`);
+          for (const other of this.running.values()) if (other !== item && other.shortcuts.some(entry => hotkeySignature(entry.hotkey) === signature)) throw new Error(`快捷键 ${hotkey} 已被其他插件使用。`);
+          item.shortcuts = item.shortcuts.filter(entry => hotkeySignature(entry.hotkey) !== signature);
+          item.shortcuts.push({ hotkey, callback: binding.callback });
+        }
+      }
+    };
     const file: any = {
       lock: () => { this.locks.add(item.definition.id); this.options.setReadOnly(true); },
       unlock: () => { this.locks.delete(item.definition.id); this.options.setReadOnly(this.locks.size > 0); },
@@ -139,13 +197,20 @@ export class PluginRuntime {
       PLUGIN_LOAD_ABORT: Symbol("PLUGIN_LOAD_ABORT"), supportHasSelector: CSS.supports("selector(:has(*))"), entities,
       insertStyle, upsertStyle: insertStyle, removeStyle: (name: string) => { item.styles.get(name)?.remove(); item.styles.delete(name); },
       notification: { show: (message: string) => this.options.notify(String(message)) },
-      eventHub: { eventType, on, addEventListener: on, publishEvent: (name: string, ...args: any[]) => this.publish(item, name, ...args) },
-      settings: { save: async (_name: string, values: Record<string, any>) => { Object.assign(item.plugin.config, values); this.options.saveConfig(item.definition.id, values); } },
+      eventHub: { eventType, on, addEventListener: on, off: item.events.off, removeEventListener: item.events.off, once: (name: string, callback: (...args: any[]) => unknown, order?: number) => on(name,callback,order,true), emit: (name: string, ...args: any[]) => this.event(name,...args), publishEvent: (name: string, ...args: any[]) => this.event(name,...args) },
+      hotkeyHub: { register, registerSingle: (hotkey: string | string[], callback: () => unknown) => register({hotkey,callback}), unregister: (hotkey: string) => { const signature = hotkeySignature(hotkey); item.shortcuts = item.shortcuts.filter(entry => hotkeySignature(entry.hotkey) !== signature); }, pause: () => { item.shortcutsPaused = true; }, resume: () => { item.shortcutsPaused = false; } },
+      settings: {
+        save: async (_name: string, values: Record<string, any>) => { if (item.disposed) return; Object.assign(item.plugin.config, values); this.options.saveConfig(item.definition.id, {...values}); },
+        autoSave: (plugin: any) => { plugin.config = new Proxy(plugin.config, { set: (target,key,value) => { if (Object.is(target[key],value)) return true; Reflect.set(target,key,value); if (!item.disposed) this.options.saveConfig(item.definition.id,{...target}); return true; } }); },
+      },
+      stateRecorder: recorder,
       metaKeyPressed: (event: MouseEvent) => event.metaKey || event.ctrlKey,
-      getCurrentFilePath: () => this.options.getPath(), getCurrentFileContent: () => this.options.getMarkdown(),
+      getCurrentFilePath: () => this.options.getPath(), getFilePath: () => this.options.getPath(), getCurrentFileContent: () => this.options.getMarkdown(),
       getSelection: () => this.options.getSelection(), insertText: (text: string) => this.options.insert(text),
       editCurrentFile: async (change: (text: string) => string) => this.options.replace(change(this.options.getMarkdown())),
       waitUntil: async (predicate: () => any) => { for (let i = 0; i < 100 && !item.disposed; i++) { const value = predicate(); if (value) return value; await new Promise(resolve => setTimeout(resolve, 30)); } throw new Error("插件等待的编辑器接口不可用。"); },
+      debounce: (callback: (...args: any[]) => unknown, delay = 100) => { let timer: number; return (...args: any[]) => { timers.clearTimeout(timer); timer = timers.setTimeout(callback,delay,...args); }; },
+      throttle: (callback: (...args: any[]) => unknown, delay = 100) => { let last = -Infinity; return (...args: any[]) => { const now = Date.now(); if (now-last >= delay) { last=now; return callback(...args); } }; },
       decorator: { afterCall: (target: () => any, name: string, callback: (...args: any[]) => void) => {
         const object = target(), original = object[name]; if (typeof original !== "function") throw new Error(`尚不支持接口：${name}`);
         object[name] = function(...args: any[]) { const result = original.apply(this, args); callback(...args); return result; };
@@ -165,7 +230,7 @@ export class PluginRuntime {
       callback(_anchor?: Element) {}
       call() { const anchor = window.getSelection()?.anchorNode?.parentElement || document.getElementById("write"); return this.callback(anchor || undefined); }
     }
-    return { BasePlugin, BaseCustomPlugin, utils, File: file, $: jquery, document: scopedDocument, window,
+    return { BasePlugin, BaseCustomPlugin, utils, File: file, $: jquery, document: scopedDocument, window: scopedWindow, ...timers,
       require: (name: string) => { throw new Error(`尚不支持模块「${name}」。当前兼容层不提供 Node/Electron 或外部模块。`); } };
   }
   setEnabled(definition: PluginDefinition, enabled: boolean) {
@@ -176,7 +241,7 @@ export class PluginRuntime {
       if (enabled && current && JSON.stringify(current.definition.config) === JSON.stringify(definition.config)) return;
       if (current) await this.dispose(current);
       if (!enabled) { this.options.changed(definition.id, { enabled: false, status: "disabled" }); return; }
-      const item: Running = { definition: { ...definition, config: structuredClone(definition.config) }, plugin: null, disposed: false, cleanup: [], styles: new Map(), events: new Map(), shortcuts: [], file: null };
+      const item: Running = { definition: { ...definition, config: structuredClone(definition.config) }, plugin: null, disposed: false, cleanup: [], styles: new Map(), events: new PluginEvents(error => { void this.fail(item,error); }), shortcuts: [], file: null };
       this.running.set(definition.id, item); this.options.changed(definition.id, { enabled: true, status: "loading" });
       try {
         this.syncDOM();
@@ -184,17 +249,13 @@ export class PluginRuntime {
         if (!factory) throw new Error("插件缺少入口。");
         const context = this.context(item), Constructor = factory(context);
         if (typeof Constructor !== "function") throw new Error("插件需要导出 module.exports.plugin 类。");
-        const plugin = new Constructor(definition.id, item.definition.config, { t: (key: string) => ({ modeEnabled: "已开启", modeDisabled: "已关闭", pluginName: definition.name }[key] || key) }); item.plugin = plugin;
+        const labels: Record<string,string> = { modeEnabled: "已开启", modeDisabled: "已关闭", pluginName: definition.name, "$label.RECORD_COLLAPSE": "记住折叠状态" };
+        const plugin = new Constructor(definition.id, item.definition.config, { t: (key: string) => labels[key] || key, fillActions: (actions: any[]) => actions.map(action=>({...action,act_name:action.act_name || labels[action.act_value] || action.act_value})) }); item.plugin = plugin;
         if (await plugin.prepare?.() === context.utils.PLUGIN_LOAD_ABORT) throw new Error("此插件不支持当前环境。");
         await plugin.init?.();
         const style = plugin.style?.(); if (typeof style === "string") context.utils.insertStyle(definition.id, style); else if (style) throw new Error("插件使用了尚未支持的外部样式资源。");
         const html = plugin.html?.(); if (html) { const node = document.createElement("div"); node.innerHTML = DOMPurify.sanitize(html); document.body.append(node); item.cleanup.push(() => node.remove()); }
-        const hotkeys = plugin.hotkey?.() || []; item.shortcuts = (Array.isArray(hotkeys) ? hotkeys : [hotkeys]).filter((binding: any) => binding?.hotkey && typeof binding.callback === "function");
-        for (const shortcut of item.shortcuts) {
-          const signature = hotkeySignature(shortcut.hotkey);
-          if (this.options.reservedHotkeys?.some(key => hotkeySignature(key) === signature)) throw new Error(`快捷键 ${shortcut.hotkey} 已被编辑器使用，请在插件设置中更换。`);
-          for (const other of this.running.values()) if (other !== item && other.shortcuts.some(binding => hotkeySignature(binding.hotkey) === signature)) throw new Error(`快捷键 ${shortcut.hotkey} 已被其他插件使用。`);
-        }
+        context.utils.hotkeyHub.register(plugin.hotkey?.());
         await plugin.process?.(); await plugin.postprocess?.(); this.publish(item, "allPluginsHadInjected");
         await Promise.resolve();
         if (!item.disposed && !this.stopped) this.options.changed(definition.id, { enabled: true, status: "ready" });
@@ -204,7 +265,7 @@ export class PluginRuntime {
   }
   async invoke(id: string, action?: string, callback?: () => unknown) {
     const item = this.running.get(id); if (!item || item.disposed) return;
-    try { await (callback ? callback() : item.plugin.call?.(action || (id === "static_markers" ? "toggle_state" : undefined))); } catch (error) { await this.fail(item, error); }
+    try { await (callback ? callback() : item.plugin.call?.(action || (id === "static_markers" ? "toggle_state" : undefined), item.actionMeta)); } catch (error) { await this.fail(item, error); }
   }
   private async dispose(item: Running) {
     if (item.disposed) return;

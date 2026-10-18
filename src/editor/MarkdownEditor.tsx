@@ -91,6 +91,32 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
     const searchField = useRef<HTMLInputElement>(null);
     const searchTerms = useRef({ query, replacement, searchOptions }); searchTerms.current = { query, replacement, searchOptions };
     const syncing = useRef(false);
+    const sourceComposing = useRef(false);
+    const pendingOptions = useRef(false);
+    const compositionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const isComposing = () => !!(rich.current?.composing || sourceComposing.current || source.current?.composing);
+    function editingBlocked() {
+      if (viewOptions.current.readOnly) return true;
+      if (!isComposing()) return false;
+      callbacks.current.onError("请先完成当前输入法组合输入，再修改文档。");
+      return true;
+    }
+    function applyViewOptions() {
+      if (isComposing()) { pendingOptions.current = true; return; }
+      pendingOptions.current = false;
+      const { preferences, typewriter, readOnly } = viewOptions.current;
+      if (rich.current) {
+        rich.current.setOptions({ spellcheck: preferences?.spellcheck ?? false, tabSize: preferences?.tabSize || 2, typewriter, autoPair: preferences?.autoPair ?? false, emoji: preferences?.emoji ?? true, readOnly });
+        model.current?.refreshCaret(); rich.current.render(false);
+      }
+      if (source.current) source.current.contentDOM.spellcheck = preferences?.spellcheck ?? false;
+      source.current?.dispatch({ effects: sourceBehavior.current.reconfigure(sourceOptions()) });
+      if (typewriter && source.current && !activeMode.current) source.current.dispatch({ effects: EditorView.scrollIntoView(source.current.state.selection.main.head, { y: "center" }) });
+    }
+    function compositionFinished() {
+      if (pendingOptions.current) applyViewOptions();
+      setMode(requested.current);
+    }
     const sourceBehavior = useRef(new Compartment());
     const sourceOptions = () => [EditorState.readOnly.of(viewOptions.current.readOnly), EditorView.editable.of(!viewOptions.current.readOnly), indentUnit.of(" ".repeat(viewOptions.current.preferences?.tabSize || 2)), ...(viewOptions.current.preferences?.autoPair ? [closeBrackets(), keymap.of(closeBracketsKeymap)] : [])];
     const viewOptions = useRef({ preferences, typewriter, readOnly });
@@ -154,7 +180,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
       syncing.current = false;
     }
     function history(redo = false) {
-      if (viewOptions.current.readOnly) return;
+      if (editingBlocked()) return;
       const doc = model.current;
       if (!doc) return;
       if (!activeMode.current && source.current) {
@@ -185,7 +211,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
       }
     }
     function insert(text: string, kind = "command") {
-      if (viewOptions.current.readOnly) return;
+      if (editingBlocked()) return;
       if (activeMode.current) rich.current?.insert(text, kind);
       else if (source.current && model.current) {
         const selection = source.current.state.selection.main;
@@ -260,7 +286,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
               if (update.docChanged) {
                 const old = update.startState.selection.main;
                 doc.selection = { anchor: old.anchor, head: old.head };
-                const kind = update.transactions.some((t) =>
+                const kind = sourceComposing.current || update.transactions.some((t) =>
                   t.isUserEvent("input.type.compose"),
                 )
                   ? "composition"
@@ -280,7 +306,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
                   anchor: selected.anchor,
                   head: selected.head,
                 };
-                doc.closeGroup();
+                if (!sourceComposing.current) doc.closeGroup();
               }
               if (update.selectionSet || update.docChanged) {
                 const line = update.state.doc.lineAt(selected.head);
@@ -313,11 +339,20 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
                 for (const image of images) void insertImage(image);
                 return true;
               },
+              compositionstart() {
+                if (compositionTimer.current !== null) clearTimeout(compositionTimer.current);
+                compositionTimer.current = null;
+                sourceComposing.current = true;
+                doc.closeGroup();
+                return false;
+              },
               compositionend() {
-                queueMicrotask(() => {
+                compositionTimer.current = setTimeout(() => {
+                  compositionTimer.current = null;
+                  sourceComposing.current = false;
                   doc.closeGroup();
-                  setMode(requested.current);
-                });
+                  compositionFinished();
+                }, 0);
                 return false;
               },
             }),
@@ -330,7 +365,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
       const doc = model.current;
       if (!doc) return;
       value = value && doc.text.length <= 300_000;
-      if (rich.current?.composing || source.current?.composing) return;
+      if (isComposing()) return;
       doc.closeGroup();
       if (value) {
         if (!activeMode.current && source.current) {
@@ -355,6 +390,9 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
       historyState();
       if (changed)
         requestAnimationFrame(() => {
+          // Inactive documents also receive the global mode preference.
+          // Their delayed focus must never steal a live IME selection.
+          if (root.current?.closest(".document-editor")?.hasAttribute("hidden")) return;
           if (value) rich.current?.restore();
           else source.current?.focus();
         });
@@ -363,8 +401,8 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
       ref,
       () => ({
         view: () => source.current,
-        composing: () => !!(rich.current?.composing || source.current?.composing),
-        transform: change => { const doc = model.current; if (!doc || viewOptions.current.readOnly) return; doc.closeGroup(); const next = change(doc.text); if (next !== doc.text) { doc.replace(0, doc.text.length, next, "document-command"); if (activeMode.current) rich.current?.render(false); else syncSource(); publish(); } },
+        composing: isComposing,
+        transform: change => { const doc = model.current; if (!doc || editingBlocked()) return; doc.closeGroup(); const next = change(doc.text); if (next !== doc.text) { doc.replace(0, doc.text.length, next, "document-command"); if (activeMode.current) rich.current?.render(false); else syncSource(); publish(); } },
         find: () => {
           if (!activeMode.current) {
             ensureSource();
@@ -394,7 +432,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
           }
         },
         wrap: (before, after = "") => {
-          if (viewOptions.current.readOnly) return;
+          if (editingBlocked()) return;
           if (activeMode.current) rich.current?.wrap(before, after);
           else {
             const s = source.current?.state.selection.main;
@@ -451,10 +489,11 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
         link: (url) =>
           void (/^(?:https?:|mailto:)/i.test(url) ? host.openLink(url) : host.openDocumentLink(original.id, url))
             .catch((error) => callbacks.current.onError(error.message)),
-        compositionFinished: () => setMode(requested.current),
+        compositionFinished,
       });
       setMode(requested.current);
       return () => {
+        if (compositionTimer.current !== null) clearTimeout(compositionTimer.current);
         rich.current?.destroy();
         source.current?.destroy();
         rich.current = null;
@@ -469,7 +508,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
       if (
         !model.current ||
         model.current.toMarkdown() === record.content ||
-        rich.current?.composing
+        isComposing()
       )
         return;
       model.current.replaceExternal(record.content, record.lineEnding);
@@ -484,13 +523,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
       historyState();
     });
     useEffect(() => {
-      if (rich.current) {
-        rich.current.setOptions({ spellcheck: preferences?.spellcheck ?? false, tabSize: preferences?.tabSize || 2, typewriter, autoPair: preferences?.autoPair ?? false, emoji: preferences?.emoji ?? true, readOnly });
-        model.current?.refreshCaret(); rich.current.render(false);
-      }
-      if (source.current) source.current.contentDOM.spellcheck = preferences?.spellcheck ?? false;
-      source.current?.dispatch({ effects: sourceBehavior.current.reconfigure(sourceOptions()) });
-      if (typewriter && source.current && !activeMode.current) source.current.dispatch({ effects: EditorView.scrollIntoView(source.current.state.selection.main.head, { y: "center" }) });
+      applyViewOptions();
     }, [preferences?.spellcheck, preferences?.tabSize, preferences?.autoPair, preferences?.emoji, preferences?.highlight, preferences?.subscript, preferences?.superscript, preferences?.inlineMath, preferences?.remoteImages, typewriter, readOnly]);
     useEffect(() => {
       if (!root.current?.closest(".document-editor")?.hasAttribute("hidden"))

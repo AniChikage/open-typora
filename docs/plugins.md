@@ -1,6 +1,6 @@
 # Themes and plugin compatibility
 
-Open Typora 0.9.0 includes six original themes and a compatibility host for a subset of [obgnail/typora_plugin](https://github.com/obgnail/typora_plugin). This is an independent integration, with no affiliation to Typora or the plugin authors. It does not load the complete Typora plugin distribution.
+Open Typora 0.10.0 includes six original themes and a compatibility host for a subset of [obgnail/typora_plugin](https://github.com/obgnail/typora_plugin). This is an independent integration, with no affiliation to Typora or the plugin authors. It does not load the complete Typora plugin distribution.
 
 ## Included community plugins
 
@@ -8,6 +8,7 @@ Open **View → Plugin Manager** (显示 → 插件管理), or use **Preferences
 
 | Plugin | Upstream file | Adapted behavior | Default shortcut |
 | --- | --- | --- | --- |
+| Fold lists / 列表折叠 | `collapse_list.js` | Click the triangle beside a list to show only its first item; optional per-document session state survives editor DOM refreshes | — |
 | Read-only / 只读模式 | `read_only.js` | Locks live editing, source, local code editors, undo and editing commands; document navigation and copying remain available | Mod+Alt+R |
 | No images / 无图阅读 | `no_image.js` | Hides inline images; hover reveals them | Mod+Alt+I |
 | Paragraph focus / 段落聚焦 | `blur.js` | Blurs other top-level blocks; hover restores clarity | Mod+Alt+Shift+B |
@@ -16,7 +17,7 @@ Open **View → Plugin Manager** (显示 → 插件管理), or use **Preferences
 
 Mod means Command on macOS and Control on Windows. Reserved editor shortcuts and collisions with other loaded plugins are rejected. Use **Plugin settings** to adjust the JSON configuration, including `HOTKEY`. A loading failure displays its cause and releases resources owned through the compatibility API.
 
-The five upstream files are included unchanged under `third-party/typora-plugins`, pinned to commit `4a856129a9dbefaa963bfba4aacd3e5484bde60a`, with their MIT license and provenance. They are compiled as ordinary modules; the host does not use `eval` or enable `unsafe-eval`. Runtime adapters normalize a small set of DOM selectors and upstream CSS transition units.
+The six upstream files are included unchanged under `third-party/typora-plugins`, pinned to commit `4a856129a9dbefaa963bfba4aacd3e5484bde60a`, with their MIT license and provenance. They are compiled as ordinary modules; the host does not use `eval` or enable `unsafe-eval`. Runtime adapters normalize a small set of DOM selectors and upstream CSS transition units.
 
 ## Installing another plugin
 
@@ -27,6 +28,16 @@ Installed JavaScript is trusted application code, **not a sandbox**. It can acce
 The supported entry is a single CommonJS file exporting `module.exports.plugin`. Compatible `BasePlugin` lifecycle hooks are `prepare`, `init`, `style` (CSS string), `html` (sanitized), `hotkey`, `process` and `postprocess`; commands use `call`, and cleanup can use `destroy`. A simple `BaseCustomPlugin.callback(anchor)` entry is supported, but the upstream custom-plugin manager and all selector/hint conventions are not implemented.
 
 The adapter provides style insertion/removal, notifications, local settings updates, lifecycle/document events, basic selection and Markdown access, undoable text insertion/replacement, `File.lock/unlock/freshLock`, tracked document event listeners, and a small `$` helper. It does **not** provide Node `require`, filesystem/process modules, Electron APIs, dependencies, the full jQuery API, or arbitrary Typora internals. Unsupported module requests fail visibly. Plugins using those interfaces require a port. Direct global DOM mutations outside the tracked helpers remain the plugin author's cleanup responsibility.
+
+### Events, commands and cleanup
+
+Version 0.10.0 distinguishes document-load events (`fileOpened`, `otherFileOpened`, `fileContentLoaded`, with a path argument) from `fileEdited`. Load notifications describe the newly active document; they do not fire on each keystroke. `eventHub.on/off`, `addEventListener/removeEventListener`, ordered listeners, `once`, and cross-plugin `emit/publishEvent` are available. `beforeToggleSourceMode` reports a mode request, which may wait for composition to finish; `afterToggleSidebar` reports its visible state. Async listener failures unload only the failing plugin.
+
+`hotkeyHub.register/registerSingle/unregister/pause/resume` supports single shortcuts and arrays, with the same collision checks as `hotkey()`. Candidate-input key 229 and active composition never trigger host shortcuts. Timers created with the provided `setTimeout/setInterval` or `window` helpers stop on disable, failure or unload; `debounce` uses those owned timers. This tracking does not cover arbitrary global aliases, private workers or external asynchronous operations.
+
+**Plugin commands** in the manager exposes `staticActions` and `getDynamicActions(anchor, meta)`, including labels, disabled/checked states and metadata passed to `call(action, meta)`. `settings.autoSave` persists top-level configuration changes. `stateRecorder` preserves registered truthy DOM state within the current app session, keyed by document and block; it is not a disk-persistence implementation of the complete upstream service.
+
+Document mutations through the host adapter are blocked while an IME composition is pending, with a notice to finish input first. A plugin must retry after commit; direct DOM writes by trusted JavaScript remain outside this protection.
 
 For example, this independent single-file plugin adds an undoable edit:
 

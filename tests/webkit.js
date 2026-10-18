@@ -115,10 +115,17 @@ try {
   window.__openTypora.command({action:'undo'}); check(!root().textContent.includes('插件'), 'plugin edits undo without changing surrounding Markdown');
   await openPlugins(); pluginCard('Native-plugin-fixture').querySelector('input[type="checkbox"]').click(); await wait(() => !document.querySelector('style[data-plugin^="local-"]'));
   check(true, 'disabling an installed plugin removes its styles');
-  for (const [name, id] of [['只读模式','read_only'],['无图阅读','no_image'],['段落聚焦','blur'],['常显语法标记','static_markers'],['反色夜间模式','dark']]) {
+  for (const [name, id] of [['列表折叠','collapse_list'],['只读模式','read_only'],['无图阅读','no_image'],['段落聚焦','blur'],['常显语法标记','static_markers'],['反色夜间模式','dark']]) {
     pluginCard(name).querySelector('input[type="checkbox"]').click();
     await wait(() => !pluginCard(name).querySelector('.plugin-actions button').disabled);
     check(!pluginCard(name).querySelector('[role="alert"]'), 'upstream ' + id + ' plugin runs in native WebKit');
+    if (id === 'collapse_list') {
+      [...pluginCard(name).querySelectorAll('button')].find(button=>button.textContent==='插件命令…').click();
+      const command=()=>[...pluginCard(name).querySelectorAll('button')].find(button=>button.textContent==='记住折叠状态');
+      check(command()?.getAttribute('aria-pressed')==='true','upstream dynamic command is visible with its checked state');
+      command().click(); await wait(()=>command()?.getAttribute('aria-pressed')==='false');
+      check(true,'plugin command calls the original plugin and persists the changed setting');
+    }
     if (id === 'read_only') {
       closePlugins(); pointText('粗体', 1); input('insertText','BLOCKED');
       check(!root().textContent.includes('BLOCKED') && root().getAttribute('aria-readonly') === 'true', 'read-only plugin blocks real editor input events');
@@ -132,6 +139,22 @@ try {
   }
   check(!document.documentElement.classList.contains('plugin-dark') && root().getAttribute('aria-readonly') === 'false', 'plugin teardown restores editing and removes presentation effects');
   closePlugins();
+  for (const [needle, offset] of [["粗体",1],["任务",1],["B",1]]) {
+    pointText(needle,offset);
+    const node=getSelection().anchorNode, before=node.data, at=getSelection().anchorOffset;
+    node.parentElement.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true}));
+    node.data=before.slice(0,at)+'nihao'+before.slice(at);
+    const target=node.parentElement;
+    target.dispatchEvent(new CompositionEvent('compositionend',{bubbles:true,data:'你好'}));
+    await Promise.resolve();
+    node.data=before.slice(0,at)+'你好'+before.slice(at); getSelection().collapse(node,at+2);
+    target.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:'你好'}));
+    await new Promise(resolve=>setTimeout(resolve,20));
+    await sourceMode(true);
+    check(readSource()===original.replace(needle,needle.slice(0,offset)+'你好'+needle.slice(offset)), 'WebKit delayed Chinese commit preserves '+needle+' and its Markdown container');
+    await sourceMode(false); window.__openTypora.command({action:'undo'});
+    await sourceMode(true); check(readSource()===original,'WebKit Chinese commit undoes once for '+needle); await sourceMode(false);
+  }
   pointText("。", 1);
   input("insertParagraph");
   const emptyLeaf = [...root().querySelectorAll("[data-leaf]")].find(element => !element.textContent);

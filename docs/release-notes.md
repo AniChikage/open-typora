@@ -1,4 +1,4 @@
-Open Typora 0.9.0 adds selection commands, cross-platform image management, and more complete document imports.
+Open Typora 0.10.0 improves Chinese composition handling and the community plugin compatibility host.
 
 > **Independent, unofficial project. Open Typora is not developed, endorsed or supported by Typora. If you can afford it, please [buy Typora](https://store.typora.io/) and support its official developers.**
 
@@ -6,25 +6,23 @@ Open Typora 0.9.0 adds selection commands, cross-platform image management, and 
 
 | Platform | Installer | Alternative |
 | --- | --- | --- |
-| macOS 14+, Apple Silicon | `Open-Typora-0.9.0-arm64.dmg` | macOS ZIP |
-| Windows 10/11, x64 | `Open-Typora-0.9.0-windows-x64-Setup.exe` | Windows ZIP |
-| Linux x64 | `Open-Typora-0.9.0-linux-x64.deb` | AppImage |
+| macOS 14+, Apple Silicon | `Open-Typora-0.10.0-arm64.dmg` | macOS ZIP |
+| Windows 10/11, x64 | `Open-Typora-0.10.0-windows-x64-Setup.exe` | Windows ZIP |
+| Linux x64 | `Open-Typora-0.10.0-linux-x64.deb` | AppImage |
 
 `SHA256SUMS.txt` covers all six downloads.
 
 ## Changes
 
-- Cmd/Ctrl+D selects a word; Cmd/Ctrl+Shift+D deletes it in one undoable edit. Chinese words and inline formatting boundaries are handled without consuming surrounding syntax.
-- Cmd/Ctrl+L selects a line or table row, Cmd/Ctrl+E expands a formatting scope or selects a table cell, and Cmd/Ctrl+J scrolls back to the selection. Source and local code views support word/line selection and navigation; source scopes follow the syntax tree. Selection remains available in read-only mode.
-- Windows/Linux now support local image copy, move, rename and Trash operations, bulk copy/move, and HTTP image downloads. Existing destination files are never overwritten. Failed batch copies roll back their new files before any originals are moved.
-- Windows/Linux DOCX, ODT and EPUB imports extract embedded media into persistent local storage. Saved imported documents retain their images after restart.
-- Windows imports and image operations accept normal case variations and 8.3 short paths while continuing to reject symbolic-link and junction escapes.
-- Legacy DOC/RTF import on Windows/Linux uses optional LibreOffice plus Pandoc. Older Pandoc 2.x ODT imports also use the LibreOffice bridge to retain equations and table headers. Preferences reports detected converters and explains missing dependencies. macOS retains its native conversion path.
-- Pandoc imports avoid its newer GitHub-specific math syntax so formulas render in the editor. Double-dollar formulas inside paragraphs retain the following text; HTML local images and portable export use the document resource bridge.
-- Both READMEs prominently identify this as unofficial and link to the official Typora purchase page.
+- Chinese candidate commits wait for the final input event before updating the document. Cancelling a candidate creates no empty undo entry; separate commits remain separate undo steps. Cross-paragraph replacement retains the surrounding Markdown.
+- Source and local code editors preserve composition undo groups. A pending source/live switch waits for commit; hidden documents no longer steal the active editor's selection during a mode change. Editing preferences and read-only changes wait for composition to finish.
+- IME key 229 and active composition do not trigger host editing or plugin shortcuts. Plugin adapter writes are refused with a notice while composition is pending, protecting the marked text.
+- Adds the pinned, unmodified upstream list-folding plugin. Click the triangle beside a list to fold its remaining items; optional per-document session state survives editor refreshes.
+- Adds **Plugin commands**, including upstream static/dynamic actions, selection metadata, labels, checked states and disabled actions.
+- Plugin events distinguish file loading from editing, support ordered/once/removable listeners and cross-plugin publishing, and isolate asynchronous callback failures. Dynamic hotkeys support registration, arrays, removal and pause/resume with collision checks. Owned timers and debounced callbacks stop when a plugin is disabled or fails.
 
 ## Validation and limits
 
-The release workflow runs real Pandoc/LibreOffice DOC/RTF/DOCX/ODT/EPUB conversions, then exercises imports and embedded images in the installed Windows application, installed Ubuntu 22.04 DEB and extracted AppImage payload. It also verifies image copy/download/move and document restart, alongside existing editing, export, recovery, theme, plugin and installer checks. Native AppKit/WebKit and Chromium regressions run locally on macOS.
+Kernel tests cover delayed final input, cancellation, separate commits, key 229 and cross-paragraph replacement. Native WebKit regressions cover Chinese composition in formatted text, lists and table cells, alongside actual module loading and plugin commands. Installed Windows/Linux acceptance uses Chromium's composition protocol in live text, lists, tables, local code and source mode, including pending mode switches, autosave, undo/redo and plugin-write protection. These protocol tests are distinct from physical input-method candidate-window testing.
 
-Converters are optional and are not bundled. Import can change formatting; retain original documents. WMF/EMF images require conversion to PNG/JPEG. AppImage FUSE mounting, other Linux desktops and physical input-method candidates on Windows/Linux remain unverified. Windows builds are unsigned; macOS is ad hoc signed and not Apple-notarized. Full Typora feature, plugin and behavior parity is still in progress; see [the checklist](https://github.com/AniChikage/open-typora/blob/main/docs/feature-parity.md).
+Full plugin packages, Node/Electron modules and arbitrary Typora private interfaces are not supported. Session state recording is not a complete replacement for the upstream disk service. Plugins are trusted code; direct DOM writes and arbitrary global aliases remain outside tracked adapter cleanup. Other physical IMEs, all input positions, cross-app clipboards, architectures and Linux desktops are not exhaustively verified. AppImage acceptance exercises its extracted payload, not FUSE mounting. Windows builds are unsigned; macOS is ad hoc signed and not Apple-notarized. See [the checklist](https://github.com/AniChikage/open-typora/blob/main/docs/feature-parity.md) for remaining differences.

@@ -32,6 +32,7 @@ import { bundledPlugins, loadPluginPreferences, pluginPreferenceKey } from "./pl
 import type { PluginDefinition, PluginState } from "./plugins/types";
 import { PluginsDialog } from "./components/PluginsDialog";
 import { backgroundRevisionKey, backgroundStyle } from "./background";
+import { imeKey } from "./editor/composition";
 import type { BackgroundAsset } from "./background";
 export default function App() {
   const editors = useRef(new Map<string, EditorHandle>());
@@ -73,6 +74,8 @@ export default function App() {
     const runtime = new PluginRuntime({
       getMarkdown: () => pluginContext.current.active?.content || "", getPath: () => pluginContext.current.active?.path || null,
       getSelection: () => pluginContext.current.editor()?.selectionText() || "",
+      getDocumentId: () => pluginContext.current.active?.id || "",
+      composing: () => !!pluginContext.current.editor()?.composing(),
       insert: text => pluginContext.current.editor()?.insert(text), replace: text => pluginContext.current.editor()?.transform(() => text),
       setReadOnly, notify: text => pluginContext.current.notify(text), changed: (id, state) => setPluginStates(previous => ({ ...previous, [id]: state })),
       reservedHotkeys: [...commandsByAction.values()].map(command => commandKey(command) || "").filter(Boolean),
@@ -91,6 +94,8 @@ export default function App() {
     for (const definition of pluginDefinitions) void pluginRuntime.current?.setEnabled(definition, !!pluginPreferences[definition.id]?.enabled);
   }, [pluginDefinitions, pluginPreferences, session.ready, !!active]);
   useEffect(() => { pluginRuntime.current?.documentChanged(); }, [active?.id, active?.content]);
+  useEffect(() => { pluginRuntime.current?.event("beforeToggleSourceMode", !rendered); }, [rendered]);
+  useEffect(() => { pluginRuntime.current?.event("afterToggleSidebar", sidebar); }, [sidebar]);
   async function installPlugin() { const installed = await host.installPlugin(); if (installed) setInstalledPlugins(previous => [...previous.filter(item => item.id !== installed.id), { ...installed, description: "本地单文件插件，通过兼容接口运行。", config: {} }]); }
   async function removePlugin(id: string) {
     const definition = pluginDefinitions.find(item => item.id === id); if (!definition || definition.builtin) return;
@@ -246,7 +251,7 @@ export default function App() {
   useEffect(() => host.onCommand((command) => commands.current(command)), []);
   useEffect(() => {
     const shortcut = (event: KeyboardEvent) => {
-      if (event.isComposing || (event.target as HTMLElement)?.closest('input,textarea,select,[role="dialog"]')) return;
+      if (imeKey(event) || pluginContext.current.editor()?.composing() || (event.target as HTMLElement)?.closest('input,textarea,select,[role="dialog"]')) return;
       if (event.key === "Escape") {
         setFocus(false);
         setAbout(false);
@@ -408,7 +413,7 @@ export default function App() {
       {dialog === "recent" && <RecentDialog entries={session.recent} action={session.recentAction} close={closeDialog} />}
       {dialog === "global-search" && <GlobalSearch folder={session.folder} close={closeDialog} open={async match => { const record = await session.openToken(match.token); if (record) requestAnimationFrame(() => editors.current.get(record.id)?.jump(match.line)); }} />}
       {dialog === "preferences" && <PreferencesDialog value={preferences} change={changePreferences} theme={theme} changeTheme={setTheme} themes={themes} installTheme={installTheme} background={background} chooseBackground={chooseBackground} clearBackground={clearBackground} plugins={() => setDialog("plugins")} close={closeDialog} />}
-      {dialog === "plugins" && <PluginsDialog definitions={pluginDefinitions} preferences={pluginPreferences} states={pluginStates} toggle={(id, enabled) => setPluginPreferences(previous => ({ ...previous, [id]: { ...previous[id], enabled } }))} configure={(id, config) => setPluginPreferences(previous => ({ ...previous, [id]: { ...previous[id], config } }))} invoke={id => void pluginRuntime.current?.invoke(id)} install={installPlugin} remove={removePlugin} close={closeDialog} />}
+      {dialog === "plugins" && <PluginsDialog definitions={pluginDefinitions} preferences={pluginPreferences} states={pluginStates} toggle={(id, enabled) => setPluginPreferences(previous => ({ ...previous, [id]: { ...previous[id], enabled } }))} configure={(id, config) => setPluginPreferences(previous => ({ ...previous, [id]: { ...previous[id], config } }))} invoke={async (id,action) => { await pluginRuntime.current?.invoke(id,action); }} actions={id => pluginRuntime.current?.actions(id) || []} install={installPlugin} remove={removePlugin} close={closeDialog} />}
       {dialog === "quick-open" && <QuickOpen documents={session.documents} files={session.files} recent={session.recent} openRecent={path => session.recentAction("open", path)} select={session.setActiveId} open={session.openToken} close={closeDialog} />}
       {dialog && ["table", "link", "reference-link", "footnote"].includes(dialog) && <InsertDialog kind={dialog as InsertKind} selected={selectedText} close={closeDialog} submit={value => {
         if (dialog === "link") editor()?.insert(`[${(value.label || value.value || "链接").replace(/[\[\]]/g, character => "\\" + character)}](${value.value})`);

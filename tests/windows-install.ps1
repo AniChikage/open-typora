@@ -16,6 +16,9 @@ node tests/parity-desktop.mjs
 $parityExit = $LASTEXITCODE
 node tests/compatibility-desktop.mjs
 $compatibilityExit = $LASTEXITCODE
+node tests/ime-desktop.mjs
+$imeExit = $LASTEXITCODE
+if ($imeExit -ne 0) { throw 'Installed composition and plugin regression failed' }
 if ($desktopExit -ne 0) { throw 'Installed desktop regression failed' }
 if ($shellExit -ne 0) { throw 'Windows shell and plugin regression failed' }
 if ($compatibilityExit -ne 0) { throw 'Installed image and office-format regression failed' }

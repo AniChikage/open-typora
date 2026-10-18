@@ -165,7 +165,7 @@ test("composition keeps the edited DOM leaf alive, commits once, and undoes as o
       data: "组合",
     }),
   );
-  await new Promise((resolve) => queueMicrotask(resolve));
+  await new Promise((resolve) => setTimeout(resolve, 5));
   assert.equal(f.model.text, "中文组合输入\n");
   assert.equal(f.changes(), 1);
   f.editor.undo();
@@ -186,13 +186,60 @@ test("composition at an empty paragraph element commits and restores through und
   empty.dispatchEvent(new window.InputEvent("input", { bubbles: true, isComposing: true, inputType: "insertCompositionText", data: "你好" }));
   assert.equal(f.model.text, before);
   empty.dispatchEvent(new window.CompositionEvent("compositionend", { bubbles: true, data: "你好" }));
-  await new Promise(resolve => queueMicrotask(resolve));
+  await new Promise(resolve => setTimeout(resolve, 5));
   assert.equal(f.model.text, before + "你好");
   f.editor.undo();
   assert.equal(f.model.text, before);
   f.editor.redo();
   assert.equal(f.model.text, before + "你好");
   f.close();
+});
+test("IME key 229 cannot split a paragraph before compositionstart", () => {
+  const f = fixture("中文输入\n"); point(f.editor,2);
+  const event = new window.KeyboardEvent("keydown",{bubbles:true,cancelable:true,key:"Enter",keyCode:229});
+  f.root.dispatchEvent(event);
+  assert.equal(event.defaultPrevented,false); assert.equal(f.model.text,"中文输入\n"); f.close();
+});
+test("composition final input after compositionend microtasks commits once and cancel creates no undo", async () => {
+  const f = fixture("输入\n"); point(f.editor,2);
+  const leaf = f.root.querySelector("[data-leaf]"), node = leaf.firstChild;
+  leaf.dispatchEvent(new window.CompositionEvent("compositionstart",{bubbles:true}));
+  node.data = "输入ni";
+  leaf.dispatchEvent(new window.CompositionEvent("compositionend",{bubbles:true,data:"你"}));
+  await Promise.resolve();
+  assert.equal(f.editor.composing,true); assert.equal(f.model.text,"输入\n");
+  node.data = "输入你"; window.getSelection().collapse(node,3);
+  leaf.dispatchEvent(new window.InputEvent("beforeinput",{bubbles:true,cancelable:true,inputType:"insertText",data:"你"}));
+  leaf.dispatchEvent(new window.InputEvent("input",{bubbles:true,inputType:"insertText",data:"你"}));
+  await new Promise(resolve => setTimeout(resolve,5));
+  assert.equal(f.model.text,"输入你\n"); assert.equal(f.changes(),1);
+  f.editor.undo(); assert.equal(f.model.text,"输入\n");
+  const original = f.changes();
+  f.root.dispatchEvent(new window.CompositionEvent("compositionstart",{bubbles:true}));
+  f.root.dispatchEvent(new window.CompositionEvent("compositionend",{bubbles:true,data:""}));
+  await new Promise(resolve => setTimeout(resolve,5));
+  assert.equal(f.changes(),original); assert.equal(f.model.canUndo,false); f.close();
+});
+test("Chinese replacement across paragraphs removes the selected source range in one undoable edit", async () => {
+  const source = "第一段\n\n第二段\n", f = fixture(source);
+  f.model.selection={anchor:1,head:7}; f.editor.restore();
+  const first=f.root.querySelectorAll("[data-leaf]")[0], second=f.root.querySelectorAll("[data-leaf]")[1];
+  first.dispatchEvent(new window.CompositionEvent("compositionstart",{bubbles:true}));
+  first.textContent="第替换段"; second.remove(); window.getSelection().collapse(first.firstChild,3);
+  first.dispatchEvent(new window.CompositionEvent("compositionend",{bubbles:true,data:"替换"}));
+  await new Promise(resolve => setTimeout(resolve,5));
+  assert.equal(f.model.text,"第替换段\n"); f.editor.undo(); assert.equal(f.model.text,source); assert.deepEqual(f.model.selection,{anchor:1,head:7}); f.close();
+});
+test("separate Chinese candidate commits remain separate undo groups", async () => {
+  const f=fixture("输入\n"); point(f.editor,2);
+  for(const value of ["你","好"]) {
+    const leaf=f.root.querySelector("[data-leaf]");
+    leaf.dispatchEvent(new window.CompositionEvent("compositionstart",{bubbles:true})); leaf.firstChild.data+=value;
+    window.getSelection().collapse(leaf.firstChild,leaf.firstChild.length);
+    leaf.dispatchEvent(new window.CompositionEvent("compositionend",{bubbles:true,data:value}));
+    await new Promise(resolve=>setTimeout(resolve,5));
+  }
+  assert.equal(f.model.text,"输入你好\n"); f.editor.undo(); assert.equal(f.model.text,"输入你\n"); f.editor.undo(); assert.equal(f.model.text,"输入\n"); f.close();
 });
 test("task checkboxes update their own marker and undo without changing other tasks", () => {
   const f = fixture("- [ ] 第一项\n- [x] 第二项\n");
@@ -312,7 +359,7 @@ test("composition in a multiline quote retains the untouched container prefixes"
       data: "测试",
     }),
   );
-  await new Promise((resolve) => queueMicrotask(resolve));
+  await new Promise((resolve) => setTimeout(resolve, 5));
   assert.equal(f.model.text, "> 第测试一行\n> 第二行\n");
   f.editor.undo();
   assert.equal(f.model.text, "> 第一行\n> 第二行\n");
