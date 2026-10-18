@@ -79,6 +79,8 @@ try {
   checks.push('Source composition delays mode switching until commit and preserves one source-session undo');
   await page.getByRole('button',{name:'源码',exact:true}).click();
   await source.press(mod==='Meta'?'Meta+ArrowUp':'Control+Home');
+  await page.waitForTimeout(60);
+  assert.equal(await source.evaluate(element=>element.contains(getSelection()?.anchorNode)),true,'An older mode transition must not steal the new source selection');
   await page.keyboard.insertText('redo'); await saved('redo'+original); await page.keyboard.press(`${mod}+z`); await saved(original);
   await mark('quxiao'); await mark(''); await page.waitForTimeout(50); await saved(original);
   await page.keyboard.press(`${mod}+Shift+z`); await saved('redo'+original); await page.keyboard.press(`${mod}+z`); await saved(original);

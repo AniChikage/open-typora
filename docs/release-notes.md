@@ -15,7 +15,7 @@ Open Typora 0.10.0 improves Chinese composition handling and the community plugi
 ## Changes
 
 - Chinese candidate commits wait for the final input event before updating the document. Cancelling a candidate creates no empty undo entry; separate commits remain separate undo steps. Cross-paragraph replacement retains the surrounding Markdown.
-- Source and local code editors preserve composition undo groups. A pending source/live switch waits for commit; hidden documents no longer steal the active editor's selection during a mode change. Editing preferences and read-only changes wait for composition to finish.
+- Source and local code editors preserve composition undo groups, and cancelling source composition retains existing redo history. A pending source/live switch waits for commit; hidden documents no longer steal the active editor's selection during a mode change. Editing preferences and read-only changes wait for composition to finish. Plugins receive the final committed Markdown rather than provisional candidates.
 - IME key 229 and active composition do not trigger host editing or plugin shortcuts. Plugin adapter writes are refused with a notice while composition is pending, protecting the marked text.
 - Adds the pinned, unmodified upstream list-folding plugin. Click the triangle beside a list to fold its remaining items; optional per-document session state survives editor refreshes.
 - Adds **Plugin commands**, including upstream static/dynamic actions, selection metadata, labels, checked states and disabled actions.

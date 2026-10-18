@@ -116,6 +116,9 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
   var titleObservation: NSKeyValueObservation?
   func show(hidden: Bool = false) {
     let configuration = WKWebViewConfiguration()
+    #if WEBTEST
+      configuration.websiteDataStore = .nonPersistent()
+    #endif
     let content = WKUserContentController()
     content.add(self, name: "opentypora")
     let script = try! String(

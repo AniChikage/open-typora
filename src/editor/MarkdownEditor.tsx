@@ -396,7 +396,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
         requestAnimationFrame(() => {
           // Inactive documents also receive the global mode preference.
           // Their delayed focus must never steal a live IME selection.
-          if (root.current?.closest(".document-editor")?.hasAttribute("hidden")) return;
+          if (activeMode.current !== value || root.current?.closest(".document-editor")?.hasAttribute("hidden")) return;
           if (value) rich.current?.restore();
           else source.current?.focus();
         });

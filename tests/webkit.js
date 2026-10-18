@@ -5,7 +5,8 @@ window.addEventListener("unhandledrejection", (event) =>
   errors.push(String(event.reason)),
 );
 const wait = async (predicate) => {
-  for (let n = 0; n < 200; n++) {
+  const deadline=Date.now()+10000;
+  while (Date.now()<deadline) {
     if (predicate()) return;
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
@@ -122,7 +123,8 @@ try {
     if (id === 'collapse_list') {
       [...pluginCard(name).querySelectorAll('button')].find(button=>button.textContent==='插件命令…').click();
       const command=()=>[...pluginCard(name).querySelectorAll('button')].find(button=>button.textContent==='记住折叠状态');
-      await wait(()=>command());
+      await wait(()=>command() || pluginCard(name).querySelector('[role="alert"]')).catch(()=>{throw new Error('Missing plugin command: '+pluginCard(name).textContent);});
+      if (!command()) throw new Error('Missing plugin action: '+pluginCard(name).textContent);
       check(command()?.getAttribute('aria-pressed')==='true','upstream dynamic command is visible with its checked state');
       command().click(); await wait(()=>command()?.getAttribute('aria-pressed')==='false');
       check(true,'plugin command calls the original plugin and persists the changed setting');
