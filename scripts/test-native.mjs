@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, cp } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 const directory = await mkdtemp(
@@ -7,6 +7,7 @@ const directory = await mkdtemp(
 );
 try {
   const executable = path.join(directory, "OpenTypora");
+  await cp("shared/plugin-loader.js", path.join(directory, "plugin-loader.js"));
   execFileSync(
     "/usr/bin/xcrun",
     [

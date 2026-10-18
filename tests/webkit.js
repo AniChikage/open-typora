@@ -116,6 +116,17 @@ try {
   window.__openTypora.command({action:'undo'}); check(!root().textContent.includes('插件'), 'plugin edits undo without changing surrounding Markdown');
   await openPlugins(); pluginCard('Native-plugin-fixture').querySelector('input[type="checkbox"]').click(); await wait(() => !document.querySelector('style[data-plugin^="local-"]'));
   check(true, 'disabling an installed plugin removes its styles');
+  await wait(()=>pluginCard('Package fixture'));
+  pluginCard('Package fixture').querySelector('input[type="checkbox"]').click();
+  await wait(()=>window.packageProbe?.ticks>0 && getComputedStyle(root()).getPropertyValue('--package-fixture').trim()==='loaded');
+  check(window.packageProbe.cached && window.packageProbe.marker==='/*__ENTRY__*/ /*__MODULES__*/','native folder modules resolve JS JSON CSS and cache shared dependencies under the existing CSP');
+  pluginCard('Package fixture').querySelector('.plugin-actions button').click();closePlugins();
+  await wait(()=>root().textContent.includes('插件中文😀42'));
+  window.__openTypora.command({action:'undo'});check(!root().textContent.includes('插件中文'),'native package command produces a single undoable Unicode edit');
+  await openPlugins();pluginCard('Package fixture').querySelector('input[type="checkbox"]').click();
+  await wait(()=>!document.querySelector('style[data-plugin^="local-"]'));
+  const stoppedTicks=window.packageProbe.ticks;await new Promise(resolve=>setTimeout(resolve,100));
+  check(window.packageProbe.ticks===stoppedTicks,'native installed plugin timers stop when disabled');
   for (const [name, id] of [['列表折叠','collapse_list'],['只读模式','read_only'],['无图阅读','no_image'],['段落聚焦','blur'],['常显语法标记','static_markers'],['反色夜间模式','dark']]) {
     pluginCard(name).querySelector('input[type="checkbox"]').click();
     await wait(() => !pluginCard(name).querySelector('.plugin-actions button').disabled);
@@ -179,6 +190,17 @@ try {
   await sourceMode(true);
   check(readSource() === original, "composition regression restores the original fixture exactly");
   await sourceMode(false);
+  const repeatedSource='# 重复输入\n\n同\n\n同\n', repeatedRecord={id:'repeat-ime',path:null,name:'Repeated-IME.md',content:repeatedSource,savedContent:repeatedSource,diskHash:null,lineEnding:'\n'};
+  const repeatedRegistration=await window.desktop.registerDraft(repeatedRecord);if(!repeatedRegistration.ok)throw Error(repeatedRegistration.error);
+  window.__openTypora.command({action:'opened',document:repeatedRecord});await wait(()=>document.querySelector('.document-title')?.textContent==='Repeated-IME.md');
+  for(const candidate of ['同','同同','中文😀']) {
+    const [first,second]=root().querySelectorAll(':scope > p');root().focus();getSelection().setBaseAndExtent(first.firstChild,0,second.firstChild,1);
+    first.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true}));first.textContent=candidate;second.remove();getSelection().collapse(first.firstChild,candidate.length);
+    first.dispatchEvent(new CompositionEvent('compositionend',{bubbles:true,data:candidate}));
+    await sourceMode(true);check(readSource()==='# 重复输入\n\n'+candidate+'\n','native repeated-text composition replaces the selected paragraph boundaries: '+candidate);
+    await sourceMode(false);window.__openTypora.command({action:'undo'});await sourceMode(true);check(readSource()===repeatedSource,'native repeated-text composition undoes once: '+candidate);await sourceMode(false);
+  }
+  window.__openTypora.command({action:'opened',document:originalResponse.value.documents[0]});await wait(()=>document.querySelector('.document-title')?.textContent==='WebKit-fixture.md');
   pointText("粗体", 1);
   document.dispatchEvent(new Event("selectionchange"));
   check(

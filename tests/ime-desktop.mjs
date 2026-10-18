@@ -88,6 +88,18 @@ try {
   checks.push('Cancelling source composition preserves the existing redo stack');
   await expect.poll(()=>page.evaluate(()=>window.imeProbe.edits)).toBeGreaterThan(0);
   assert.equal(await page.evaluate(()=>window.imeProbe.loads),1);
+  await page.getByRole('button',{name:'即时渲染',exact:true}).click();
+  const repeatFile=path.join(data,'重复中文选区.md'),prefix='# Replacement\n\n',repeatSource=prefix+'同\n\n同\n';await writeFile(repeatFile,repeatSource);
+  await app.evaluate(({dialog},file)=>{dialog.showOpenDialog=async()=>({canceled:false,filePaths:[file]});},repeatFile);
+  await page.getByRole('button',{name:'更多操作',exact:true}).click();await page.getByRole('menuitem',{name:'打开文件',exact:true}).click();
+  await expect(root.getByRole('heading',{name:'Replacement',exact:true})).toBeVisible();
+  for(const candidate of ['同','同同','中文😀']) {
+    await root.evaluate(root=>{const nodes=root.querySelectorAll(':scope > p');root.focus();getSelection().setBaseAndExtent(nodes[0].firstChild,0,nodes[1].firstChild,1);document.dispatchEvent(new Event('selectionchange'));});
+    await mark('tong');await page.waitForTimeout(100);assert.equal(await readFile(repeatFile,'utf8'),repeatSource);
+    await cdp.send('Input.insertText',{text:candidate});await expect.poll(()=>readFile(repeatFile,'utf8')).toBe(prefix+candidate+'\n');
+    await page.keyboard.press(`${mod}+z`);await expect.poll(()=>readFile(repeatFile,'utf8')).toBe(repeatSource);
+  }
+  checks.push('Repeated Chinese and emoji replace the selected paragraphs, preserve the surrounding Markdown and undo once');
   assert.deepEqual(errors,[]); assert.equal(await page.locator('vite-error-overlay').count(),0);
   await page.screenshot({path:path.join(qa,'ime-and-plugins.png')});
   await writeFile(path.join(qa,'ime-results.json'),JSON.stringify({platform:process.platform,checks,errors,mechanism:'Chromium Input.imeSetComposition and Input.insertText; not physical IME candidate acceptance'},null,2));

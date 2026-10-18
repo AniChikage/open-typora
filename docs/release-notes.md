@@ -1,4 +1,4 @@
-Open Typora 0.10.0 improves Chinese composition handling and the community plugin compatibility host.
+Open Typora 0.11.0 adds local plugin folders and improves Chinese replacement across paragraph boundaries.
 
 > **Independent, unofficial project. Open Typora is not developed, endorsed or supported by Typora. If you can afford it, please [buy Typora](https://store.typora.io/) and support its official developers.**
 
@@ -6,23 +6,23 @@ Open Typora 0.10.0 improves Chinese composition handling and the community plugi
 
 | Platform | Installer | Alternative |
 | --- | --- | --- |
-| macOS 14+, Apple Silicon | `Open-Typora-0.10.0-arm64.dmg` | macOS ZIP |
-| Windows 10/11, x64 | `Open-Typora-0.10.0-windows-x64-Setup.exe` | Windows ZIP |
-| Linux x64 | `Open-Typora-0.10.0-linux-x64.deb` | AppImage |
+| macOS 14+, Apple Silicon | `Open-Typora-0.11.0-arm64.dmg` | macOS ZIP |
+| Windows 10/11, x64 | `Open-Typora-0.11.0-windows-x64-Setup.exe` | Windows ZIP |
+| Linux x64 | `Open-Typora-0.11.0-linux-x64.deb` | AppImage |
 
 `SHA256SUMS.txt` covers all six downloads.
 
 ## Changes
 
-- Chinese candidate commits wait for the final input event before updating the document. Cancelling a candidate creates no empty undo entry; separate commits remain separate undo steps. Cross-paragraph replacement retains the surrounding Markdown.
-- Source and local code editors preserve composition undo groups, and cancelling source composition retains existing redo history. A pending source/live switch waits for commit; mode focus is applied as the visible editor is committed, avoiding stale callbacks that reset keyboard navigation. Hidden documents no longer steal the active editor's selection. Editing preferences and read-only changes wait for composition to finish. Plugins receive the final committed Markdown rather than provisional candidates.
-- IME key 229 and active composition do not trigger host editing or plugin shortcuts. Plugin adapter writes are refused with a notice while composition is pending, protecting the marked text.
-- Adds the pinned, unmodified upstream list-folding plugin. Click the triangle beside a list to fold its remaining items; optional per-document session state survives editor refreshes.
-- Adds **Plugin commands**, including upstream static/dynamic actions, selection metadata, labels, checked states and disabled actions.
-- Plugin events distinguish file loading from editing, support ordered/once/removable listeners and cross-plugin publishing, and isolate asynchronous callback failures. Dynamic hotkeys support registration, arrays, removal and pause/resume with collision checks. Owned timers and debounced callbacks stop when a plugin is disabled or fails.
+- **Install plugin folders.** Select a folder with `index.js`, `index.cjs`, or a `package.json` main entry. Relative JS/CJS modules, JSON configuration and CSS strings are embedded in a managed module, with shared-module caching and circular CommonJS references. Installed plugins work after their original folder is removed and after an application restart.
+- **Consistent plugin cleanup on macOS.** Both file and folder installations receive the host's tracked timers, matching Windows/Linux. Disabling a plugin stops timers created through those bindings and removes its owned styles.
+- **Correct Chinese replacement across paragraphs.** Repeated characters no longer shift an IME replacement past the original selection or retain an unwanted paragraph separator. Replacing two paragraphs with the same visible characters remains an undoable source edit. Chinese and emoji commits are retained when the browser replaces an entire paragraph element.
+- Keeps the existing composition guards, candidate cancellation, source/live switching and single-commit undo behavior. The six bundled upstream plugins and six original themes remain available.
 
 ## Validation and limits
 
-Kernel tests cover delayed final input, cancellation, separate commits, key 229 and cross-paragraph replacement. Native WebKit regressions cover Chinese composition in formatted text, lists and table cells, alongside actual module loading and plugin commands. Installed Windows/Linux acceptance uses Chromium's composition protocol in live text, lists, tables, local code and source mode, including pending mode switches, autosave, undo/redo and plugin-write protection. These protocol tests are distinct from physical input-method candidate-window testing.
+Unit tests cover repeated Chinese selections, emoji, paragraph element replacement, package installation, module caching/cycles, cleanup and invalid paths. Native WebKit checks the actual installed module under the application script policy, including relative JS/JSON/CSS, an undoable Unicode command and timer cleanup. Installed Windows/Linux acceptance exercises the folder picker, enabling/disabling, source removal, restart, and Chromium composition protocols in body/list/table/local-code/source editors and repeated paragraph selections. Physical candidate-window testing is distinct from these automated protocols.
 
-Full plugin packages, Node/Electron modules and arbitrary Typora private interfaces are not supported. Session state recording is not a complete replacement for the upstream disk service. Plugins are trusted code; direct DOM writes and arbitrary global aliases remain outside tracked adapter cleanup. Other physical IMEs, all input positions, cross-app clipboards, architectures and Linux desktops are not exhaustively verified. AppImage acceptance exercises its extracted payload, not FUSE mounting. Windows builds are unsigned; macOS is ad hoc signed and not Apple-notarized. See [the checklist](https://github.com/AniChikage/open-typora/blob/main/docs/feature-parity.md) for remaining differences.
+Plugin folders are limited to 64 JS/CJS/JSON/CSS files, 4 MB total, 1 MB each and 8 directory levels. Hidden entries and `node_modules` are skipped. CSS font/image URLs are not automatically embedded. Node/Electron built-ins, npm dependencies, full upstream plugin distributions and arbitrary Typora private APIs are not supported. Plugins remain trusted application code; direct global or DOM mutations outside owned helpers require plugin-managed cleanup. See [plugin compatibility](https://github.com/AniChikage/open-typora/blob/main/docs/plugins.md).
+
+All physical IMEs and editing positions, cross-app clipboards, arbitrary conversion combinations, architectures and Linux desktops are not exhaustively verified. AppImage acceptance runs the extracted payload, not FUSE mounting. Windows builds are unsigned; macOS is ad hoc signed and not Apple-notarized. The [feature checklist](https://github.com/AniChikage/open-typora/blob/main/docs/feature-parity.md) records remaining differences; this release does not establish complete Typora parity.

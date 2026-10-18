@@ -98,7 +98,7 @@ const handlers = {
   },
   plugins: async () => (await plugins(store.dataDir)).map(authorizedPlugin),
   removePlugin: async (_, id) => { if (!/^local-[a-f0-9]{64}$/.test(id)) throw new Error("插件标识无效。"); const root = await realpath(path.join(store.dataDir, "plugins")); if (path.dirname(root) !== await realpath(store.dataDir)) throw new Error("插件目录无效。"); for (const suffix of [".json", ".mjs"]) { const file = path.join(root, id + suffix); try { if (path.dirname(await realpath(file)) !== root) throw new Error("插件资源路径无效。"); await shell.trashItem(file); } catch (error) { if (error.code !== "ENOENT") throw error; } } return true; },
-  installPlugin: async () => { const result = await dialog.showOpenDialog(window, { filters: [{ name: "JavaScript", extensions: ["js", "cjs"] }], properties: ["openFile"] }); return result.canceled ? null : authorizedPlugin(await installPlugin(result.filePaths[0], store.dataDir)); },
+  installPlugin: async (folder = false) => { const result = await dialog.showOpenDialog(window, folder ? { title: "安装插件文件夹", properties: ["openDirectory"] } : { filters: [{ name: "JavaScript", extensions: ["js", "cjs"] }], properties: ["openFile"] }); return result.canceled ? null : authorizedPlugin(await installPlugin(result.filePaths[0], store.dataDir)); },
   themes: () => themes(store.dataDir),
   installTheme: async () => { const result = await dialog.showOpenDialog(window, { filters: [{ name: "CSS", extensions: ["css"] }], properties: ["openFile"] }); return result.canceled ? null : installTheme(result.filePaths[0], store.dataDir); },
   readResource: async (_, address) => exportResource(address,store,path.join(root,"dist")),

@@ -227,6 +227,7 @@ final class Interchange {
     }
   }
   static func installPlugin(_ file: URL, directory: URL) throws -> [String: String] {
+    if (try file.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true { return try installPluginPackage(file, directory: directory) }
     guard ["js", "cjs"].contains(file.pathExtension.lowercased()), (try file.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 1_000_001) <= 1_000_000 else { throw NativeFailure("请选择小于 1 MB 的 JavaScript 插件。") }
     let bytes = try Data(contentsOf: file)
     guard let source = String(data: bytes, encoding: .utf8), !source.contains("\0") else { throw NativeFailure("插件必须使用 UTF-8 编码。") }
@@ -236,13 +237,59 @@ final class Interchange {
     guard contained(canonicalFileURL(directory), canonicalFileURL(root)) else { throw NativeFailure("插件目录无效。") }
     let module = """
     export default function(context) {
-    const {BasePlugin,BaseCustomPlugin,utils,File,$,document,window} = context;
+    const {BasePlugin,BaseCustomPlugin,utils,File,$,document,window,setTimeout,setInterval,clearTimeout,clearInterval} = context;
     const require=context.require; const module={exports:{}}; const exports=module.exports;
     \(source)
     ;return module.exports.plugin || module.exports.default || module.exports;
     }
     """
     try atomicWrite(root.appendingPathComponent(id + ".mjs"), Data(module.utf8))
+    try atomicWrite(root.appendingPathComponent(id + ".json"), JSONSerialization.data(withJSONObject: ["id": id, "name": name]))
+    return ["id": id, "name": name, "url": "opentypora://app/_plugins/" + id + ".mjs"]
+  }
+  static func installPluginPackage(_ folder: URL, directory: URL) throws -> [String: String] {
+    let base = canonicalFileURL(folder)
+    var files: [String: String] = [:], total = 0
+    func collect(_ current: URL, depth: Int = 0) throws {
+      guard depth <= 8 else { throw NativeFailure("插件文件夹最多支持 8 层。") }
+      for file in try FileManager.default.contentsOfDirectory(at: current, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey]).sorted(by: {$0.lastPathComponent < $1.lastPathComponent}) {
+        if file.lastPathComponent.hasPrefix(".") || file.lastPathComponent == "node_modules" { continue }
+        let values = try file.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey])
+        guard values.isSymbolicLink != true, contained(base, canonicalFileURL(file)) else { throw NativeFailure("插件文件夹不能包含符号链接或外部路径。") }
+        if values.isDirectory == true { try collect(file, depth: depth + 1); continue }
+        guard ["js", "cjs", "json", "css"].contains(file.pathExtension.lowercased()) else { continue }
+        guard (values.fileSize ?? 1_000_001) <= 1_000_000, files.count < 64 else { throw NativeFailure("插件文件夹最多 64 个文件、共 4 MB，单文件不超过 1 MB。") }
+        let bytes = try Data(contentsOf: file); total += bytes.count
+        guard total <= 4_000_000, let source = String(data: bytes, encoding: .utf8), !source.contains("\0") else { throw NativeFailure("插件文件夹超过 4 MB，或包含无效 UTF-8 文件。") }
+        files[String(file.path.dropFirst(base.path.count + 1))] = source
+      }
+    }
+    try collect(base)
+    let metadata = try files["package.json"].map { try JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any] ?? [:] } ?? [:]
+    guard let requested = metadata["main"] as? String ?? (metadata["main"] == nil ? (files["index.js"] != nil ? "index.js" : "index.cjs") : nil), !requested.hasPrefix("/"), !requested.contains("\\"), !requested.components(separatedBy: "/").contains("..") else { throw NativeFailure("插件入口必须位于所选文件夹内。") }
+    let entry = (requested as NSString).standardizingPath
+    guard ["js", "cjs"].contains((entry as NSString).pathExtension.lowercased()), files[entry] != nil else { throw NativeFailure("插件文件夹需要 index.js、index.cjs 或 package.json 中的 main 入口。") }
+    func json(_ value: Any) throws -> String { String(data: try JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed, .withoutEscapingSlashes]), encoding: .utf8)! }
+    var modules: [String] = []
+    for name in files.keys.sorted() {
+      let source = files[name]!, ext = (name as NSString).pathExtension.lowercased()
+      let body: String
+      if ext == "json" { _ = try JSONSerialization.jsonObject(with: Data(source.utf8), options: [.fragmentsAllowed]); body = "module.exports=JSON.parse(" + (try json(source)) + ");" }
+      else if ext == "css" { body = "module.exports=" + (try json(source)) + ";" }
+      else { body = source }
+      modules.append("[" + (try json(name)) + ",function(module,exports,require){\n" + body + "\n}]")
+    }
+    guard let loader = Bundle.main.resourceURL?.appendingPathComponent("plugin-loader.js") else { throw NativeFailure("插件加载器资源缺失。") }
+    let template = try String(contentsOf: loader, encoding: .utf8), module = NSMutableString(string: template)
+    for (marker, replacement) in [("/*__ENTRY__*/", try json(entry)), ("/*__MODULES__*/", modules.joined(separator: ",\n"))] {
+      module.replaceCharacters(in: (template as NSString).range(of: marker), with: replacement)
+    }
+    let digest = files.keys.sorted().map { [$0, hashData(Data(files[$0]!.utf8))] }
+    let id = "local-" + hashData(Data(try json(digest).utf8)), name = String(((metadata["name"] as? String) ?? folder.lastPathComponent).prefix(96))
+    let root = directory.appendingPathComponent("plugins")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    guard contained(canonicalFileURL(directory), canonicalFileURL(root)) else { throw NativeFailure("插件目录无效。") }
+    try atomicWrite(root.appendingPathComponent(id + ".mjs"), Data((module as String).utf8))
     try atomicWrite(root.appendingPathComponent(id + ".json"), JSONSerialization.data(withJSONObject: ["id": id, "name": name]))
     return ["id": id, "name": name, "url": "opentypora://app/_plugins/" + id + ".mjs"]
   }

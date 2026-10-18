@@ -230,6 +230,34 @@ test("Chinese replacement across paragraphs removes the selected source range in
   await new Promise(resolve => setTimeout(resolve,5));
   assert.equal(f.model.text,"第替换段\n"); f.editor.undo(); assert.equal(f.model.text,source); assert.deepEqual(f.model.selection,{anchor:1,head:7}); f.close();
 });
+test("repeated Chinese replacement across paragraphs stays anchored to the selected source", async () => {
+  for (const value of ['同','同同','中文😀']) {
+    const source='同\n\n同\n', f=fixture(source);
+    try {
+      f.model.selection={anchor:0,head:4}; f.editor.restore();
+      const [first,second]=f.root.querySelectorAll('[data-leaf]');
+      first.dispatchEvent(new window.CompositionEvent('compositionstart',{bubbles:true}));
+      first.textContent=value; second.remove(); window.getSelection().collapse(first.firstChild,value.length);
+      first.dispatchEvent(new window.CompositionEvent('compositionend',{bubbles:true,data:value}));
+      await new Promise(resolve=>setTimeout(resolve,5));
+      assert.equal(f.model.text,value+'\n'); assert.equal(f.changes(),1);
+      f.editor.undo(); assert.equal(f.model.text,source); assert.deepEqual(f.model.selection,{anchor:0,head:4});
+      f.editor.redo(); assert.equal(f.model.text,value+'\n');
+    } finally { f.close(); }
+  }
+});
+test("composition survives the browser replacing the edited paragraph element",async()=>{
+  const f=fixture('输入区：end\n');
+  try {
+    point(f.editor,4);const leaf=f.root.querySelector('[data-leaf]');
+    leaf.dispatchEvent(new window.CompositionEvent('compositionstart',{bubbles:true}));
+    const replacement=document.createElement('p');replacement.textContent='输入区：你好😀end';leaf.replaceWith(replacement);
+    window.getSelection().collapse(replacement.firstChild,8);
+    f.root.dispatchEvent(new window.CompositionEvent('compositionend',{bubbles:true,data:'你好😀'}));
+    await new Promise(resolve=>setTimeout(resolve,5));
+    assert.equal(f.model.text,'输入区：你好😀end\n');f.editor.undo();assert.equal(f.model.text,'输入区：end\n');
+  } finally {f.close();}
+});
 test("separate Chinese candidate commits remain separate undo groups", async () => {
   const f=fixture("输入\n"); point(f.editor,2);
   for(const value of ["你","好"]) {

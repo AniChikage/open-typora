@@ -1,11 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import vm from "node:vm";
-import { readFile, mkdtemp, mkdir, writeFile, rm, symlink } from "node:fs/promises";
+import { readFile, mkdtemp, mkdir, writeFile, rm, symlink, cp } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { JSDOM } from "jsdom";
-import { pluginModule } from "../shared/plugin-module.mjs";
+import { pluginModule, pluginPackage } from "../shared/plugin-module.mjs";
 import { installPlugin, plugins } from "../electron/plugins.mjs";
 import { installTheme, themes } from "../electron/interchange.mjs";
 import { pluginResource } from "../electron/resources.mjs";
@@ -183,6 +183,42 @@ test("local CommonJS installation preserves original source, is content addresse
     await writeFile(entry, Buffer.from([0xff, 0xfe])); await assert.rejects(installPlugin(entry, directory));
     await writeFile(entry, "\0"); await assert.rejects(installPlugin(entry, directory));
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+test("folder installation resolves nested CommonJS, JSON and CSS, caches modules, and owns helper timers",async()=>{
+  const root=await mkdtemp(path.join(os.tmpdir(),'open-typora-package-')), profile=path.join(root,'profile'), folder=path.join(root,'source');await mkdir(profile);
+  await cp(new URL('./fixtures/plugin-package',import.meta.url),folder,{recursive:true});
+  let text='original'; const states={};
+  const run=new PluginRuntime({getMarkdown:()=>text,getPath:()=>'/tmp/doc.md',getSelection:()=>'',insert:value=>text+=value,replace:value=>text=value,setReadOnly(){},notify(){},changed:(id,state)=>states[id]=state,saveConfig(){}});
+  try {
+    const installed=await installPlugin(folder,profile);assert.equal((await installPlugin(folder,profile)).id,installed.id);
+    const compiled=await readFile(path.join(profile,'plugins',installed.id+'.mjs'),'utf8');
+    await rm(folder,{recursive:true}); // The installed copy is independent of source.
+    const sandbox=vm.createContext({});new vm.Script(compiled.replace('export default function(context)','globalThis.factory = function(context)')).runInContext(sandbox);
+    const definition={...installed,description:'',config:{},factory:sandbox.factory};await run.setEnabled(definition,true);assert.equal(states[installed.id].status,'ready');
+    assert.equal(window.packageProbe.cached,true);assert.match(window.packageProbe.marker,/__ENTRY__/);assert.match(document.querySelector(`style[data-plugin="${installed.id}"]`).textContent,/package-fixture/);
+    await run.invoke(installed.id);assert.equal(text,'original插件中文😀42');
+    await new Promise(resolve=>setTimeout(resolve,60));assert.ok(window.packageProbe.ticks>0);
+    await run.setEnabled(definition,false);const stopped=window.packageProbe.ticks;await new Promise(resolve=>setTimeout(resolve,60));assert.equal(window.packageProbe.ticks,stopped);
+    assert.equal(document.querySelector(`style[data-plugin="${installed.id}"]`),null);
+  } finally {await run.destroy();await rm(root,{recursive:true,force:true});}
+});
+test("folder module loading supports circular CommonJS and rejects external or escaping requests",()=>{
+  const files={'index.js':"exports.initial='A'; const b=require('./b'); module.exports.plugin=class { constructor(){this.seen=b.seen} };",'b.js':"exports.seen=require('./index').initial;"};
+  const sandbox=vm.createContext({});const execute=code=>{new vm.Script(code.replace('export default function(context)','globalThis.factory=function(context)')).runInContext(sandbox);return sandbox.factory({require:name=>{throw Error('Unsupported '+name)}});};
+  assert.equal(new (execute(pluginPackage('index.js',files)))().seen,'A');
+  assert.throws(()=>execute(pluginPackage('index.js',{'index.js':"require('../outside');"})),/文件夹之外/);
+  assert.throws(()=>execute(pluginPackage('index.js',{'index.js':"require('node:fs');"})),/Unsupported node:fs/);
+  assert.throws(()=>execute(pluginPackage('index.js',{'index.js':"require('./missing');"})),/缺少模块/);
+});
+test("folder installation refuses symlinks, invalid entry paths and excessive bundles without partial records",async()=>{
+  const root=await mkdtemp(path.join(os.tmpdir(),'open-typora-package-limits-')),profile=path.join(root,'profile'),folder=path.join(root,'source');await mkdir(profile);await mkdir(folder);
+  try {
+    await writeFile(path.join(folder,'index.js'),'module.exports.plugin=class {};');
+    await writeFile(path.join(folder,'package.json'),'{"main":"../outside.js"}');await assert.rejects(installPlugin(folder,profile),/文件夹内/);
+    await rm(path.join(folder,'package.json'));await symlink(path.join(root,'outside.js'),path.join(folder,'link.js'));await assert.rejects(installPlugin(folder,profile),/符号链接/);
+    await rm(path.join(folder,'link.js'));for(let i=0;i<64;i++)await writeFile(path.join(folder,i+'.js'),'');
+    await assert.rejects(installPlugin(folder,profile),/64/);assert.deepEqual(await plugins(profile),[]);
+  } finally {await rm(root,{recursive:true,force:true});}
 });
 test("Windows theme installation embeds local imports, fonts and images and refuses cycles and path escapes", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "open-typora-theme-"));

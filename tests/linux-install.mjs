@@ -13,7 +13,7 @@ const run = (command,args,options={}) => execFileSync(command,args,{stdio:"inher
 const exercise = async (executable,kind) => {
   const evidence = path.join(qa,kind); await mkdir(evidence,{recursive:true});
   const env = {...process.env, OPEN_TYPORA_EXECUTABLE:executable, OPEN_TYPORA_QA_DIR:evidence};
-  for (const file of ["desktop.mjs","electron-shell.mjs","parity-desktop.mjs","compatibility-desktop.mjs","ime-desktop.mjs"]) run(process.execPath,[`tests/${file}`],{env});
+  for (const file of ["desktop.mjs","electron-shell.mjs","parity-desktop.mjs","compatibility-desktop.mjs","ime-desktop.mjs","plugin-package-desktop.mjs"]) run(process.execPath,[`tests/${file}`],{env});
   const {dataDir} = JSON.parse(await readFile(path.join(evidence,"desktop-results.json"),"utf8"));
   const session = path.join(dataDir,"session.json");
   return {session,hash:createHash("sha256").update(await readFile(session)).digest("hex")};

@@ -18,6 +18,9 @@ node tests/compatibility-desktop.mjs
 $compatibilityExit = $LASTEXITCODE
 node tests/ime-desktop.mjs
 $imeExit = $LASTEXITCODE
+node tests/plugin-package-desktop.mjs
+$packageExit = $LASTEXITCODE
+if ($packageExit -ne 0) { throw 'Installed plugin package regression failed' }
 if ($imeExit -ne 0) { throw 'Installed composition and plugin regression failed' }
 if ($desktopExit -ne 0) { throw 'Installed desktop regression failed' }
 if ($shellExit -ne 0) { throw 'Windows shell and plugin regression failed' }

@@ -423,7 +423,9 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       }
       return true
     case "installPlugin":
-      let panel = NSOpenPanel(); panel.title = "安装本地 JavaScript 插件"; panel.allowedContentTypes = [UTType(filenameExtension: "js") ?? .plainText, UTType(filenameExtension: "cjs") ?? .plainText]
+      let folder = args.first as? Bool ?? false
+      let panel = NSOpenPanel(); panel.title = folder ? "安装插件文件夹" : "安装本地 JavaScript 插件"; panel.canChooseDirectories = folder; panel.canChooseFiles = !folder
+      if !folder { panel.allowedContentTypes = [UTType(filenameExtension: "js") ?? .plainText, UTType(filenameExtension: "cjs") ?? .plainText] }
       guard panel.runModal() == .OK, let file = panel.url else { return nil }
       return try Interchange.installPlugin(file, directory: owner.directory)
     case "installTheme":

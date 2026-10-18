@@ -86,7 +86,7 @@ export default function App() {
   }, []);
   useEffect(() => {
     if (!session.ready) return;
-    void host.plugins().then(items => setInstalledPlugins(items.map(item => ({ ...item, description: "本地单文件插件，通过兼容接口运行。", config: {} })))).catch(error => session.setMessage(error.message));
+    void host.plugins().then(items => setInstalledPlugins(items.map(item => ({ ...item, description: "本地插件，通过兼容接口运行。", config: {} })))).catch(error => session.setMessage(error.message));
   }, [session.ready, dialog === "plugins"]);
   useEffect(() => {
     localStorage.setItem(pluginPreferenceKey, JSON.stringify(pluginPreferences));
@@ -96,7 +96,7 @@ export default function App() {
   useEffect(() => { pluginRuntime.current?.documentChanged(); }, [active?.id, active?.path, active?.content]);
   useEffect(() => { pluginRuntime.current?.event("beforeToggleSourceMode", !rendered); }, [rendered]);
   useEffect(() => { pluginRuntime.current?.event("afterToggleSidebar", sidebar); }, [sidebar]);
-  async function installPlugin() { const installed = await host.installPlugin(); if (installed) setInstalledPlugins(previous => [...previous.filter(item => item.id !== installed.id), { ...installed, description: "本地单文件插件，通过兼容接口运行。", config: {} }]); }
+  async function installPlugin(folder = false) { const installed = await host.installPlugin(folder); if (installed) setInstalledPlugins(previous => [...previous.filter(item => item.id !== installed.id), { ...installed, description: "本地插件，通过兼容接口运行。", config: {} }]); }
   async function removePlugin(id: string) {
     const definition = pluginDefinitions.find(item => item.id === id); if (!definition || definition.builtin) return;
     await pluginRuntime.current?.setEnabled(definition, false); await host.removePlugin(id);

@@ -63,7 +63,7 @@ export interface Host {
   chooseBackground(): Promise<import("./background").BackgroundAsset | null>;
   clearBackground(): Promise<unknown>;
   plugins(): Promise<{ id: string; name: string; url: string }[]>;
-  installPlugin(): Promise<{ id: string; name: string; url: string } | null>;
+  installPlugin(folder?: boolean): Promise<{ id: string; name: string; url: string } | null>;
   removePlugin(id: string): Promise<unknown>;
   conversionSettings(choose?: boolean): Promise<{ pandoc: string; word: boolean; libreOffice?: string }>;
   importDocument(): Promise<{ html?: string; markdown?: string; name: string } | null>;

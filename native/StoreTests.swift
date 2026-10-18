@@ -194,6 +194,22 @@ func runStoreTests() throws {
   try expect(try Interchange.plugins(store.dataDirectory).contains { $0["id"] == installedPlugin["id"] }, "plugin installation persists a content-addressed module")
   let module = try String(contentsOf: store.dataDirectory.appendingPathComponent("plugins/" + installedPlugin["id"]! + ".mjs"), encoding: .utf8)
   try expect(module.contains(pluginSource) && module.contains("export default function(context)"), "plugin module preserves source without eval")
+  try expect(module.contains("window,setTimeout,setInterval,clearTimeout,clearInterval"), "native single-file modules receive owned composition-safe timers")
+  let packageFolder = directory.appendingPathComponent("owned-package")
+  try fm.copyItem(at: URL(fileURLWithPath: fm.currentDirectoryPath).appendingPathComponent("tests/fixtures/plugin-package"), to: packageFolder)
+  let installedPackage = try Interchange.installPlugin(packageFolder, directory: store.dataDirectory)
+  let packageModule = try String(contentsOf: store.dataDirectory.appendingPathComponent("plugins/" + installedPackage["id"]! + ".mjs"), encoding: .utf8)
+  try expect(try Interchange.installPlugin(packageFolder, directory: store.dataDirectory)["id"] == installedPackage["id"], "native plugin folders are content addressed")
+  try expect(packageModule.contains("lib/main.cjs") && packageModule.contains("JSON.parse") && packageModule.contains("--package-fixture") && packageModule.contains("'/*__ENTRY__*/ /*__MODULES__*/'"), "native package compiler embeds local JS JSON CSS and preserves source marker strings")
+  try atomicWrite(packageFolder.appendingPathComponent("package.json"), Data("{\"main\":\"../outside.js\"}".utf8))
+  do { _ = try Interchange.installPlugin(packageFolder, directory: store.dataDirectory); throw NativeFailure("Unexpected escaped package") }
+  catch let error as NativeFailure { try expect(error.message.contains("文件夹内"), "native package installation refuses escaping entries") }
+  try fm.removeItem(at: packageFolder.appendingPathComponent("package.json"))
+  try fm.createSymbolicLink(at: packageFolder.appendingPathComponent("link.js"), withDestinationURL: pluginFile)
+  do { _ = try Interchange.installPlugin(packageFolder, directory: store.dataDirectory); throw NativeFailure("Unexpected symlink package") }
+  catch let error as NativeFailure { try expect(error.message.contains("符号链接"), "native package installation refuses symbolic links") }
+  try fm.removeItem(at: packageFolder)
+  try expect(try Interchange.plugins(store.dataDirectory).contains { $0["id"] == installedPackage["id"] }, "installed native plugin package survives source folder removal")
   let pluginResources = Resources(directory, store: store)
   let (_, pluginMime) = try pluginResources.read(URL(string: installedPlugin["url"]!)!)
   try expect(pluginMime == "application/javascript", "installed plugin modules load through the existing same-origin resource scheme")

@@ -38,7 +38,8 @@ export class RichEditor {
   composing = false;
   private composingLeaf: Leaf | null = null;
   private compositionTimer: ReturnType<typeof setTimeout> | null = null;
-  private compositionSnapshot: { raw: string; positions: number[] } | null = null;
+  private compositionSnapshot: { raw: string; positions: number[]; from: number; to: number; start: number; end: number; crossBlock: boolean } | null = null;
+  private compositionText: string | null = null;
   private mutating = false;
   private pointing = false;
   private html = new Map<string, string>();
@@ -609,8 +610,9 @@ export class RichEditor {
     this.model.closeGroup();
     if ((event.target as Element)?.closest(".cm-editor")) this.model.beginComposition();
     this.compositionSnapshot = null;
+    this.compositionText = null;
     const selection = window.getSelection();
-    if (!(event.target as Element)?.closest(".cm-editor") && selection && this.leafElement(selection.anchorNode) !== this.leafElement(selection.focusNode)) {
+    if (!(event.target as Element)?.closest(".cm-editor") && selection) {
       let raw = ""; const positions: number[] = [];
       for (const element of this.root.querySelectorAll<HTMLElement>("[data-leaf]")) {
         const leaf = this.leaves.get(element.dataset.leaf!);
@@ -619,15 +621,18 @@ export class RichEditor {
         raw += leaf.raw;
         positions[raw.length] = leaf.positions.at(-1)!;
       }
-      this.compositionSnapshot = { raw, positions };
+      const from = Math.min(this.model.selection.anchor,this.model.selection.head), to = Math.max(this.model.selection.anchor,this.model.selection.head);
+      const project = (offset: number) => { const found = positions.findIndex(position=>position>=offset); return found<0?raw.length:found; };
+      this.compositionSnapshot = { raw, positions, from, to, start:project(from), end:project(to), crossBlock:this.leafElement(selection.anchorNode)!==this.leafElement(selection.focusNode) };
     }
     this.composingLeaf = element
       ? this.leaves.get(element.dataset.leaf!) || null
       : null;
     this.composing = true;
   };
-  private compositionEnd = () => {
+  private compositionEnd = (event: CompositionEvent) => {
     if (!this.composing) return;
+    this.compositionText = event.data;
     if (this.compositionTimer !== null) clearTimeout(this.compositionTimer);
     // WebKit may deliver the final input after compositionend's microtasks.
     this.compositionTimer = setTimeout(() => this.finishComposition(), 0);
@@ -638,14 +643,20 @@ export class RichEditor {
       let changed = false;
       const leaf = this.composingLeaf,
         element = leaf && this.root.querySelector(`[data-leaf="${leaf.id}"]`);
-      if (this.compositionSnapshot) {
+      if (this.compositionSnapshot && (this.compositionSnapshot.crossBlock || !element)) {
         const before = this.compositionSnapshot, raw = this.raw(this.root);
         let start = 0, end = 0;
-        while (start < before.raw.length && start < raw.length && before.raw[start] === raw[start]) start++;
-        while (end < before.raw.length - start && end < raw.length - start && before.raw.at(-1-end) === raw.at(-1-end)) end++;
+        // Repeated Chinese text can share a prefix/suffix across paragraph
+        // boundaries. Keep the replacement anchored to the original selection.
+        while (start < before.start && start < raw.length && before.raw[start] === raw[start]) start++;
+        while (end < before.raw.length - before.end && end < raw.length - start && before.raw.at(-1-end) === raw.at(-1-end)) end++;
         if (raw !== before.raw) {
-          const from = before.positions[start], to = before.positions[before.raw.length-end];
+          const from = start===before.start?before.from:before.positions[start], to = before.raw.length-end===before.end?before.to:before.positions[before.raw.length-end];
           changed = this.model.replace(from, to, raw.slice(start,raw.length-end), "composition");
+        } else if (before.crossBlock && this.compositionText) {
+          // Replacing two paragraphs with the same visible characters still
+          // removes their Markdown separator and must be undoable.
+          changed = this.model.replace(before.from,before.to,this.compositionText,"composition");
         }
       } else if (leaf && element) {
         const raw = this.raw(element),
@@ -662,9 +673,10 @@ export class RichEditor {
       this.composing = false;
       this.composingLeaf = null;
       this.compositionSnapshot = null;
+      this.compositionText = null;
       changed = this.model.endComposition() || changed;
       this.model.closeGroup();
-      if (changed) this.publish();
+      if (changed) this.publish(); else if (leaf) this.render();
       this.callbacks.compositionFinished();
   }
   private paste = (event: ClipboardEvent) => {
