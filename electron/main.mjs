@@ -360,7 +360,7 @@ app
     const accelerator = key => key?.replaceAll("Mod-", "CommandOrControl+").replaceAll("Ctrl-", "Control+").replaceAll("Alt-", "Alt+").replaceAll("Shift-", "Shift+");
     Menu.setApplicationMenu(Menu.buildFromTemplate([
       { label: "Open Typora", submenu: [{ label: "关于 Open Typora", click: command("about") }, { label: "偏好设置…", accelerator: "CommandOrControl+,", click: command("preferences") }, ...(process.platform === "darwin" ? [{ type: "separator" }, { role: "hide", label: "隐藏 Open Typora" }, { role: "hideOthers", label: "隐藏其他应用" }] : []), { type: "separator" }, { label: "退出 Open Typora", accelerator: "CommandOrControl+Q", click: command("quit") }] },
-...groups.map(group => ({ label: group.title, submenu: group.items.filter(item => item.action !== "preferences").map(item => ({ label: item.label, accelerator: accelerator(process.platform === "darwin" ? item.key : item.pcKey ?? item.key), ...(item.selector ? { role: roles[item.selector] } : { click: command(item.action) }) })) })),
+      ...groups.map(group => ({ label: group.title, submenu: group.items.filter(item => item.action !== "preferences").map(item => ({ label: item.label, accelerator: accelerator(process.platform === "darwin" ? item.key : item.pcKey ?? item.key), ...(item.selector ? { role: roles[item.selector] } : { click: command(item.action) }) })) })),
       { role: "windowMenu", label: "窗口" }
     ]));
     createWindow();

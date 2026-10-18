@@ -1,6 +1,6 @@
-# 编辑架构（0.5.2）
+# 编辑架构（0.8.0）
 
-macOS 的发布包使用 Swift/AppKit + WKWebView。Windows 发布包使用 Electron/Chromium，并保留为跨平台开发与回归测试宿主；macOS 的 `package:mac` 与 `install:app` 仍使用原生宿主。Windows 使用系统标题栏、Ctrl 快捷键与单实例文件打开，`package:win` 生成 NSIS 安装包与 ZIP。
+macOS 的发布包使用 Swift/AppKit + WKWebView。Windows/Linux 发布包使用 Electron/Chromium，并保留为跨平台开发与回归测试宿主；macOS 的 `package:mac` 与 `install:app` 仍使用原生宿主。Windows 使用系统标题栏、Ctrl 快捷键与单实例文件打开，`package:win` 生成 NSIS 安装包与 ZIP。
 
 ```mermaid
 flowchart TD
@@ -82,3 +82,11 @@ HTML 导出在请求时生成独立正文，等待公式和图表，通过本地
 RTF 由 Cocoa 解析表格，提前保留 PNG/JPEG、脚注、语义标题和等宽代码，再恢复为 Markdown；解析器限制分组深度、数量与时间。无法保留的图片格式明确报错。发布仍是 AppKit/WebKit；Chromium 回归和合成 composition 检查不作为实体输入法成功的证据。
 
 0.5.1 修复组合开始时的空元素光标：选择节点本身是元素时，从该元素查找编辑叶，避免跳到父段落后漏记提交；浏览器原生输入同步共用同一定位。回归覆盖新建空段落、一次组合提交、撤销/重做及源码保真。本机搜狗人工输入的“你好，中国”另经安装版正文、历史、源码往返和 UTF-8 文件字节检查；该结果不代表所有候选状态与编辑位置已穷尽。
+
+## 0.8 平台发布与交互
+
+Windows/Linux 共用受限 Electron 桥与最小依赖打包，Linux 增加 DEB/AppImage、desktop 文件与 Markdown MIME 类型。`launchFiles` 解码本地文件 URL，第二实例将文档交给已有窗口。`shared/commands.json` 的 `key` 保留 Mac 绑定，`pcKey` 提供 Windows/Linux 绑定；菜单、前端与插件快捷键预留使用对应平台配置。
+
+列表多行缩进复用块级事务和选区映射，引用前缀只消耗一个分隔空格；局部代码使用 CodeMirror 的行缩进命令。表格 Cmd/Ctrl+Enter 使用现有插行事务，Shift+Enter 写入 `<br>`，不创建新的 Markdown 源行。
+
+`legacyDiagrams.ts` 将 sequence/flow 的公开常用语法转为 Mermaid，仅影响渲染与导出，不重写原文。不支持的语法拒绝整张图，保留原文并显示错误；范围见 [diagrams.md](diagrams.md)。

@@ -48,7 +48,8 @@ Additional suites:
 | --- | --- | --- |
 | `npm run test:native` | File bytes, atomic saves, recovery, conflicts, and workspace operations | macOS |
 | `npm run test:webkit` | Actual WKWebView, native bridge, document conversion, and PDF export | macOS + Pandoc |
-| `npm run test:desktop` | Editing, images, saving, recovery, and export in Electron | macOS or Windows desktop |
+| `npm run test:desktop` | Editing, images, saving, recovery, and export in Electron | macOS, Windows or Linux desktop |
+| `npm run test:parity` | Multi-line list/code indentation, table keyboard operations, legacy diagrams and portable HTML | Electron desktop |
 | `npm run test:kernel-desktop` | Code/formula editing, keyboard interactions, and mode history | macOS desktop |
 | `npm run test:features` | Outline, tables, preferences, navigation, and writing modes | macOS desktop |
 | `npm run test:alignment` | File workflows, themes, images, and conversion | macOS desktop + Pandoc |
@@ -81,7 +82,7 @@ After packaging on Windows, `npm run test:windows` installs the EXE into an isol
 | `src/editor/` | Markdown model, rendering, source mapping, and edit transactions |
 | `src/components/` | Dialogs and navigation |
 | `native/` | AppKit/WebKit host, files, images, and conversion |
-| `electron/` | Windows release host, development, and desktop regression |
+| `electron/` | Windows/Linux release host, development, and desktop regression |
 | `shared/` | Commands and starter documents shared by the hosts |
 | `tests/` | Unit, native, and desktop integration tests |
 | `design/` | Original icon and design sources |
@@ -92,4 +93,6 @@ Do not commit generated bundles, test output, credentials, personal documents, o
 
 ## Publish a release
 
-Set the package version, commit the change, and push a matching `v<version>` tag. The [release workflow](.github/workflows/release.yml) builds on Apple Silicon macOS and Windows x64 runners. Both builds and all required tests, including installation and installed-app regression on Windows, must pass before the publication job merges the checksums and publishes the DMG, Windows EXE, both ZIPs, and `SHA256SUMS.txt`. Update `docs/release-notes.md` for each version. Main-branch host changes also run the Windows acceptance job without publishing. An existing draft keeps its curated release notes. Published assets are never overwritten by a rerun.
+Set the package version, commit the change, and push a matching `v<version>` tag. The [release workflow](.github/workflows/release.yml) builds on Apple Silicon macOS, Windows x64 and Ubuntu 22.04 x64 runners. All three builds and required tests must pass before publication. Windows is installed and uninstalled; Linux tests the installed DEB and extracted AppImage payload, including recovery preservation on uninstall. The publisher verifies combined checksums before publishing DMG, EXE, two ZIPs, DEB, AppImage and `SHA256SUMS.txt`. Published assets are never overwritten by a rerun.
+
+Main and `codex/**` branch changes run Windows/Linux acceptance without publishing. Update `docs/release-notes.md` for each version. Linux builds use `npm run package:linux`; in an isolated Ubuntu x64 environment, `xvfb-run -a node tests/linux-install.mjs` installs/removes the DEB with sudo and runs both packaged payloads. Never run that installer test against your ordinary Linux installation.
