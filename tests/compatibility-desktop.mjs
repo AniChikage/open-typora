@@ -1,3 +1,4 @@
+import sharp from "sharp";
 import {_electron as electron,expect} from 'playwright/test';
 import assert from 'node:assert/strict';
 import {mkdtemp,mkdir,writeFile,readFile,stat,copyFile} from 'node:fs/promises';
@@ -12,7 +13,8 @@ const exec = promisify(execFile), pandoc = await pandocPath(), office = await li
 assert.ok(pandoc && office,'Install Pandoc and LibreOffice for actual conversion acceptance');
 const data = await mkdtemp(path.join(os.tmpdir(),'open-typora-compatibility-'));
 const qa = process.env.OPEN_TYPORA_QA_DIR || path.join(data,'evidence'); await mkdir(qa,{recursive:true});
-const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aNNsAAAAASUVORK5CYII=','base64');
+const pixels = Buffer.from(Array.from({length:12*8*3},(_,index)=>(index*37)%256));
+const png = await sharp(pixels,{raw:{width:12,height:8,channels:3}}).png().toBuffer();
 await writeFile(path.join(data,'figure.png'),png);
 const markdown = '# 兼容验收\n\n中文、English **bold**, $E=mc^2$ and note[^n].\n\n| A | B |\n|---|---|\n| cell one | 中文 |\n\n![Figure](figure.png)\n\n```javascript\nlet answer = 42;\n```\n\n[^n]: Footnote text\n';
 const md = path.join(data,'input.md'); await writeFile(md,markdown);
