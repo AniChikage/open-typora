@@ -15,7 +15,7 @@
 
 Open Typora 是一款开源 Markdown 编辑器，受 Typora 的行内编辑体验启发。直接修改排版后的正文，需要时切换源码，文档以普通 `.md` 文件保存在自己的文件夹中。
 
-**项目状态：**当前为早期开发版本 **0.7.1**，发布目标为 **macOS 14+、Apple Silicon** 和 **Windows 10/11 x64**，界面目前为简体中文。本项目独立实现，与 Typora 无隶属关系；功能和交互仍在持续完善。
+**项目状态：**当前为早期开发版本 **0.8.0**，发布目标为 **macOS 14+、Apple Silicon**、**Windows 10/11 x64** 和 **Linux x64**，界面目前为简体中文。本项目独立实现，与 Typora 无隶属关系；功能和交互仍在持续完善。
 
 ## 功能
 
@@ -24,7 +24,7 @@ Open Typora 是一款开源 Markdown 编辑器，受 Typora 的行内编辑体�
 - **自定义背景**：选择本地图片，预览不透明度、模糊、显示方式和位置；重启后保留，正文与源码模式共用，导出不带个人背景。
 - **社区插件**：内置五款已适配的 typora_plugin 原版插件，支持本地单文件插件安装、设置、快捷键和禁用清理；[查看兼容范围](docs/plugins.md)。
 - **本地文件管理**：文件树、全文搜索、快速打开、最近文件、自动保存、会话恢复和外部修改冲突检测。
-- **图片、公式与图表**：本地图片与粘贴插图、路径和尺寸设置、离线 MathJax、Mermaid；可选配置 PicGo Server 上传图片。
+- **图片、公式与图表**：本地图片与粘贴插图、路径和尺寸设置、离线 MathJax、Mermaid 和 [sequence/flow 常用语法](docs/diagrams.md)；可选配置 PicGo Server 上传图片。
 - **多种文本编码**：UTF-8、UTF-16 LE/BE、GB18030、GBK、Big5、Shift JIS 和 Windows-1252；保留 BOM 与换行，阻止会丢失字符的保存。
 - **导入与导出**：内置 HTML、PDF 导出；通过 [Pandoc](https://pandoc.org/) 支持 DOCX、ODT、RTF、EPUB 等格式。
 
@@ -46,10 +46,25 @@ Open Typora 是一款开源 Markdown 编辑器，受 Typora 的行内编辑体�
 
 | 平台 | 安装包 | 其他方式 |
 | --- | --- | --- |
-| Windows 10/11 · x64 | **[下载 Setup.exe](https://github.com/AniChikage/open-typora/releases/download/v0.7.1/Open-Typora-0.7.1-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.7.1/Open-Typora-0.7.1-windows-x64.zip) |
-| macOS 14+ · Apple Silicon | **[下载 DMG](https://github.com/AniChikage/open-typora/releases/download/v0.7.1/Open-Typora-0.7.1-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.7.1/Open-Typora-0.7.1-arm64.zip) |
+| Windows 10/11 · x64 | **[下载 Setup.exe](https://github.com/AniChikage/open-typora/releases/download/v0.8.0/Open-Typora-0.8.0-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.8.0/Open-Typora-0.8.0-windows-x64.zip) |
+| macOS 14+ · Apple Silicon | **[下载 DMG](https://github.com/AniChikage/open-typora/releases/download/v0.8.0/Open-Typora-0.8.0-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.8.0/Open-Typora-0.8.0-arm64.zip) |
+| Linux · x64 | **[下载 DEB](https://github.com/AniChikage/open-typora/releases/download/v0.8.0/Open-Typora-0.8.0-linux-x64.deb)** | [AppImage](https://github.com/AniChikage/open-typora/releases/download/v0.8.0/Open-Typora-0.8.0-linux-x64.AppImage) |
 
-[SHA-256 校验文件](https://github.com/AniChikage/open-typora/releases/download/v0.7.1/SHA256SUMS.txt) · [所有版本](https://github.com/AniChikage/open-typora/releases)
+[SHA-256 校验文件](https://github.com/AniChikage/open-typora/releases/download/v0.8.0/SHA256SUMS.txt) · [所有版本](https://github.com/AniChikage/open-typora/releases)
+
+### 安装 Linux 版
+
+以 Ubuntu 22.04 x64 为验收基线，下载 DEB 后运行：
+
+```sh
+sudo apt install ./Open-Typora-0.8.0-linux-x64.deb
+```
+
+安装后可从桌面启动器打开，并关联 Markdown 文件。`sudo apt remove open-typora` 卸载保留文档和恢复数据。
+
+其他兼容发行版可以使用 AppImage：先执行 `chmod +x Open-Typora-0.8.0-linux-x64.AppImage`，再运行文件。可能需要 FUSE 2；没有 FUSE 时可通过 `./Open-Typora-0.8.0-linux-x64.AppImage --appimage-extract` 解包，再运行 `./squashfs-root/AppRun`。CI 验证解包后的实际应用；FUSE 挂载和所有桌面环境尚未人工验收。请勿通过关闭 Chromium 沙箱来运行。
+
+Linux 的更多文档转换需安装 Pandoc；Electron 宿主的旧 DOC/RTF 导入和批量图片操作仍有限。
 
 ### 安装 Windows 版
 
@@ -59,7 +74,7 @@ Windows 版目前**没有代码签名证书**，系统可能显示未知发布�
 
 ### 安装 macOS 版
 
-1. 从 [Releases](https://github.com/AniChikage/open-typora/releases/latest) 下载 **[Open-Typora-0.7.1-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.7.1/Open-Typora-0.7.1-arm64.dmg)**。
+1. 从 [Releases](https://github.com/AniChikage/open-typora/releases/latest) 下载 **[Open-Typora-0.8.0-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.8.0/Open-Typora-0.8.0-arm64.dmg)**。
 2. 打开 DMG，把 **Open Typora** 拖入 **Applications（应用程序）**。
 3. 从应用程序中启动 Open Typora。
 
@@ -69,7 +84,7 @@ Windows 版目前**没有代码签名证书**，系统可能显示未知发布�
 
 ### 从源码构建
 
-两个平台均需 **Node.js 26** 和 npm。macOS 还需 **Xcode Command Line Tools**（`xcode-select --install`），无需安装 Typora。
+所有平台均需 **Node.js 26** 和 npm。macOS 还需 **Xcode Command Line Tools**（`xcode-select --install`），无需安装 Typora。
 
 ```sh
 git clone https://github.com/AniChikage/open-typora.git
@@ -92,7 +107,9 @@ node scripts/install.mjs
 npm run package:win
 ```
 
-安装 EXE 和 ZIP 输出至 `release/windows/`。Windows 发布包需在 Windows x64 上构建；Intel Mac、Windows ARM 和 Linux 暂无经过验收的发布构建。
+安装 EXE 和 ZIP 输出至 `release/windows/`。Windows 发布包需在 Windows x64 上构建；Intel Mac 和 Windows/Linux ARM 暂无经过验收的发布构建。
+
+Linux x64 上运行 `npm run package:linux`，DEB 与 AppImage 输出至 `release/linux/`，由 Ubuntu 22.04 构建和验收。
 
 需要额外文档格式时，请安装 [Pandoc](https://pandoc.org/installing.html)。若未自动识别，可在偏好设置中指定可执行文件。Markdown 写作与 HTML/PDF 导出不依赖 Pandoc。
 
@@ -100,7 +117,7 @@ npm run package:win
 
 打开 Markdown 文件或文件夹，也可以试用[示例文档](examples/welcome.md)。点击正文开始编辑；Enter 继续列表或创建段落，Tab 在表格单元格间移动。
 
-| 操作 | macOS | Windows |
+| 操作 | macOS | Windows / Linux |
 | --- | --- | --- |
 | 新建文档 | `⌘N` | `Ctrl+N` |
 | 打开文件 | `⌘O` | `Ctrl+O` |
@@ -108,7 +125,7 @@ npm run package:win
 | 切换源码 | `⌘/` | `Ctrl+/` |
 | 文档内查找 | `⌘F` | `Ctrl+F` |
 | 搜索文件夹 | `⌘⇧F` | `Ctrl+Shift+F` |
-| 快速打开 | `⌘⇧O` | `Ctrl+Shift+O` |
+| 快速打开 | `⌘⇧O` | `Ctrl+P` |
 
 ## 开发
 
@@ -119,7 +136,7 @@ npm run dev:app
 
 运行 `npm run dev:demo` 开发独立网页试玩，`npm run build:demo` 将静态站点输出到 `dist-demo/`。入口在 `src/demo/`，独立内容安全策略位于 `web/index.html`。
 
-Windows 发布应用和开发宿主采用 **Electron/Chromium**；macOS 发布应用采用 **Swift/AppKit + WKWebView**。二者共用 TypeScript/React 界面及独立实现的编辑模型。
+Windows/Linux 发布应用和开发宿主采用 **Electron/Chromium**；macOS 发布应用采用 **Swift/AppKit + WKWebView**。二者共用 TypeScript/React 界面及独立实现的编辑模型。
 
 ```sh
 npm test                  # 编辑内核与文件层单元测试
@@ -136,7 +153,7 @@ npm run test:webkit       # 原生 WebKit 集成测试，需要 Pandoc
 - 没有 BOM 的传统编码需要手动选择。
 - 正文和源码具有独立撤销历史；返回正文时，源码修改合并为一次事务。
 - 格式转换可能改变排版或不支持的文档结构；部分 RTF 图片格式会明确拒绝。导入时请保留原文件。
-- Windows 暂不支持旧 DOC/RTF 导入及图片批量文件操作；Windows 输入法候选交互仍需人工验收，自动输入文本不能替代该检查。
+- Windows/Linux 暂不支持旧 DOC/RTF 导入及图片批量文件操作；Windows/Linux 输入法候选交互仍需人工验收，自动输入文本不能替代该检查。
 - 第三方主题、嵌入媒体、输入法和图床服务存在兼容性差异，具体工作流请先查阅[功能清单](docs/feature-parity.md)。
 
 ## 参与贡献

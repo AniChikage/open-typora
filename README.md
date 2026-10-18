@@ -15,7 +15,7 @@
 
 Open Typora is an open-source Markdown editor inspired by Typora's inline editing experience. Write directly in the rendered document, switch to source when you need it, and save ordinary `.md` files in your own folders.
 
-**Status:** early development, version **0.7.1**. Release builds support **macOS 14+ on Apple Silicon** and **Windows 10/11 x64**. The interface is currently in Simplified Chinese. This is an independent project, unaffiliated with Typora; full feature and behavior parity is still in progress.
+**Status:** early development, version **0.8.0**. Release builds support **macOS 14+ on Apple Silicon**, **Windows 10/11 x64**, and **Linux x64**. The interface is currently in Simplified Chinese. This is an independent project, unaffiliated with Typora; full feature and behavior parity is still in progress.
 
 ## Features
 
@@ -24,7 +24,7 @@ Open Typora is an open-source Markdown editor inspired by Typora's inline editin
 - **Personal backgrounds** — choose a local image, preview opacity, blur and placement, and keep it across restarts. Live and source modes share the background; exported documents stay free of it.
 - **Community plugins** — five bundled, adapted typora_plugin plugins; local single-file CommonJS installation, configuration, shortcuts, and unloading. [Compatibility scope](docs/plugins.md).
 - **Files you control** — folder tree, full-text search, quick open, recent files, autosave, session recovery, and external-change conflict detection.
-- **Images, math, and diagrams** — local and pasted images, path and size controls, offline MathJax, and Mermaid rendering. Optional image uploads use a configured PicGo Server.
+- **Images, math, and diagrams** — local and pasted images, path and size controls, offline MathJax, Mermaid, and a [legacy sequence/flow subset](docs/diagrams.md). Optional image uploads use a configured PicGo Server.
 - **More than UTF-8** — UTF-16 LE/BE, GB18030, GBK, Big5, Shift JIS, and Windows-1252. Preserve BOM and line endings; reject saves that would lose characters.
 - **Import and export** — built-in HTML and PDF export; additional formats such as DOCX, ODT, RTF, and EPUB through [Pandoc](https://pandoc.org/).
 
@@ -46,10 +46,25 @@ The demo keeps documents in the current tab's memory; it does not upload or pers
 
 | Platform | Installer | Alternative |
 | --- | --- | --- |
-| Windows 10/11 · x64 | **[Download Setup.exe](https://github.com/AniChikage/open-typora/releases/download/v0.7.1/Open-Typora-0.7.1-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.7.1/Open-Typora-0.7.1-windows-x64.zip) |
-| macOS 14+ · Apple Silicon | **[Download DMG](https://github.com/AniChikage/open-typora/releases/download/v0.7.1/Open-Typora-0.7.1-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.7.1/Open-Typora-0.7.1-arm64.zip) |
+| Windows 10/11 · x64 | **[Download Setup.exe](https://github.com/AniChikage/open-typora/releases/download/v0.8.0/Open-Typora-0.8.0-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.8.0/Open-Typora-0.8.0-windows-x64.zip) |
+| macOS 14+ · Apple Silicon | **[Download DMG](https://github.com/AniChikage/open-typora/releases/download/v0.8.0/Open-Typora-0.8.0-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.8.0/Open-Typora-0.8.0-arm64.zip) |
+| Linux · x64 | **[Download DEB](https://github.com/AniChikage/open-typora/releases/download/v0.8.0/Open-Typora-0.8.0-linux-x64.deb)** | [AppImage](https://github.com/AniChikage/open-typora/releases/download/v0.8.0/Open-Typora-0.8.0-linux-x64.AppImage) |
 
-[SHA-256 checksums](https://github.com/AniChikage/open-typora/releases/download/v0.7.1/SHA256SUMS.txt) · [All releases](https://github.com/AniChikage/open-typora/releases)
+[SHA-256 checksums](https://github.com/AniChikage/open-typora/releases/download/v0.8.0/SHA256SUMS.txt) · [All releases](https://github.com/AniChikage/open-typora/releases)
+
+### Install on Linux
+
+Ubuntu 22.04 or a compatible x64 distribution is the tested baseline. Download the DEB and install it with:
+
+```sh
+sudo apt install ./Open-Typora-0.8.0-linux-x64.deb
+```
+
+The desktop launcher and Markdown file association are included. Uninstalling with `sudo apt remove open-typora` retains your documents and recovery data.
+
+For other compatible distributions, make the AppImage executable (`chmod +x Open-Typora-0.8.0-linux-x64.AppImage`) and run it. FUSE 2 may be required. If FUSE is unavailable, extract it with `./Open-Typora-0.8.0-linux-x64.AppImage --appimage-extract` and run `./squashfs-root/AppRun`. CI exercises the extracted AppImage payload; FUSE mounting and every desktop environment have not been manually verified. Do not disable Chromium's sandbox to run the application.
+
+Additional document conversion on Linux requires Pandoc. Legacy DOC/RTF import and bulk image file operations remain limited in the Electron host.
 
 ### Install on Windows
 
@@ -59,7 +74,7 @@ The Windows build is currently **not code-signed**. Windows may display an unkno
 
 ### Install on macOS
 
-1. Download **[Open-Typora-0.7.1-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.7.1/Open-Typora-0.7.1-arm64.dmg)** from [Releases](https://github.com/AniChikage/open-typora/releases/latest).
+1. Download **[Open-Typora-0.8.0-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.8.0/Open-Typora-0.8.0-arm64.dmg)** from [Releases](https://github.com/AniChikage/open-typora/releases/latest).
 2. Open the DMG and drag **Open Typora** into **Applications**.
 3. Launch Open Typora from Applications.
 
@@ -69,7 +84,7 @@ The application is locally signed and **not Apple-notarized**. macOS may ask you
 
 ### Build from source
 
-Both platforms need **Node.js 26** and npm. A Typora installation is not required. On macOS, also install the **Xcode Command Line Tools** (`xcode-select --install`).
+All platforms need **Node.js 26** and npm. A Typora installation is not required. On macOS, also install the **Xcode Command Line Tools** (`xcode-select --install`).
 
 ```sh
 git clone https://github.com/AniChikage/open-typora.git
@@ -92,7 +107,9 @@ On Windows, use the same clone and install steps, then build the installer:
 npm run package:win
 ```
 
-The EXE installer and ZIP are written to `release/windows/`. Build Windows releases on Windows x64. Intel Macs, Windows ARM, and Linux do not yet have verified release builds.
+The EXE installer and ZIP are written to `release/windows/`. Build Windows releases on Windows x64. Intel Macs and Windows/Linux ARM do not yet have verified release builds.
+
+On Linux x64, run `npm run package:linux` to produce DEB and AppImage files in `release/linux/`. Linux releases are built and tested on Ubuntu 22.04.
 
 For additional document formats, install [Pandoc](https://pandoc.org/installing.html), then select its executable in Preferences if it is not detected. Pandoc is optional for writing Markdown and exporting HTML/PDF.
 
@@ -100,7 +117,7 @@ For additional document formats, install [Pandoc](https://pandoc.org/installing.
 
 Open a Markdown file or a folder, or try [the example document](examples/a-quiet-morning.md). Click the text to edit it. Enter continues a list or creates a paragraph; Tab moves through table cells.
 
-| Action | macOS | Windows |
+| Action | macOS | Windows / Linux |
 | --- | --- | --- |
 | New document | `⌘N` | `Ctrl+N` |
 | Open a file | `⌘O` | `Ctrl+O` |
@@ -108,7 +125,7 @@ Open a Markdown file or a folder, or try [the example document](examples/a-quiet
 | Toggle source view | `⌘/` | `Ctrl+/` |
 | Find in the document | `⌘F` | `Ctrl+F` |
 | Search the folder | `⌘⇧F` | `Ctrl+Shift+F` |
-| Quick open | `⌘⇧O` | `Ctrl+Shift+O` |
+| Quick open | `⌘⇧O` | `Ctrl+P` |
 
 ## Development
 
@@ -119,7 +136,7 @@ npm run dev:app
 
 To work on the standalone browser demo, use `npm run dev:demo`; `npm run build:demo` writes the static site to `dist-demo/`. Its entry point is `src/demo/`, with a separate content security policy in `web/index.html`.
 
-The Windows app and development host use **Electron/Chromium**. The macOS app uses **Swift/AppKit + WKWebView**. Both share the same TypeScript/React interface and independently implemented editing model.
+The Windows/Linux apps and development host use **Electron/Chromium**. The macOS app uses **Swift/AppKit + WKWebView**. Both share the same TypeScript/React interface and independently implemented editing model.
 
 ```sh
 npm test                  # Editor and file-layer unit tests
@@ -136,7 +153,7 @@ More editor and desktop suites, test isolation, and build details are in [CONTRI
 - Legacy encodings without a BOM require an explicit encoding choice.
 - Rich editing and source editing have separate undo histories; changes made in source mode join the rich history as one transaction when returning.
 - Format conversion can change layout or unsupported document structures. Some RTF image formats are rejected explicitly. Keep the original file when importing.
-- Windows legacy DOC/RTF import and bulk image file operations are not yet supported. Windows input-method candidate interaction still needs manual acceptance; automated text input is not equivalent to that check.
+- Windows/Linux legacy DOC/RTF import and bulk image file operations are not yet supported. Windows/Linux input-method candidate interaction still needs manual acceptance; automated text input is not equivalent to that check.
 - Third-party themes, embedded media, input methods, and image-host integrations vary in compatibility. Consult the [checklist](docs/feature-parity.md) before depending on a specific workflow.
 
 ## Contributing

@@ -17,7 +17,7 @@ await build({
     electronVersion: pkg.devDependencies.electron,
     linux: {
       executableName: "open-typora", icon: "build/icon.png", category: "Office",
-      artifactName: "Open-Typora-${version}-linux-${arch}.${ext}",
+      artifactName: "Open-Typora-${version}-linux-x64.${ext}",
       maintainer: "AniChikage <15864698+AniChikage@users.noreply.github.com>",
       mimeTypes: ["text/markdown", "text/x-markdown"],
       syncDesktopName: true,
