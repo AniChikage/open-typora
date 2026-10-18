@@ -12,7 +12,8 @@ import {
 } from "electron";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { pandocPath, convertExport, convertImport, themes, installTheme } from "./interchange.mjs";
+import { imageAction, imageName } from "./image-actions.mjs";
+import { libreOfficePath, pandocPath, convertExport, convertImport, themes, installTheme } from "./interchange.mjs";
 import { Workspace } from "./workspace.mjs";
 import { randomUUID } from "node:crypto";
 import { atomicWrite, DocumentStore } from "./store.mjs";
@@ -100,10 +101,20 @@ const handlers = {
   installPlugin: async () => { const result = await dialog.showOpenDialog(window, { filters: [{ name: "JavaScript", extensions: ["js", "cjs"] }], properties: ["openFile"] }); return result.canceled ? null : authorizedPlugin(await installPlugin(result.filePaths[0], store.dataDir)); },
   themes: () => themes(store.dataDir),
   installTheme: async () => { const result = await dialog.showOpenDialog(window, { filters: [{ name: "CSS", extensions: ["css"] }], properties: ["openFile"] }); return result.canceled ? null : installTheme(result.filePaths[0], store.dataDir); },
-  conversionSettings: async (_, choose) => { if (choose) { const result = await dialog.showOpenDialog(window, { title: "选择 Pandoc 可执行文件", properties: ["openFile"] }); if (!result.canceled) process.env.OPEN_TYPORA_PANDOC = result.filePaths[0]; } return { word: process.platform === "darwin", pandoc: await pandocPath() }; },
-  importDocument: async () => { const result = await dialog.showOpenDialog(window, { title: "导入文档", properties: ["openFile"], filters: [{ name: "文档", extensions: ["docx", "doc", "rtf", "odt", "epub", "tex", "rst", "html", "txt"] }] }); return result.canceled ? null : convertImport(result.filePaths[0]); },
+  conversionSettings: async (_, choose) => { if (choose) { const result = await dialog.showOpenDialog(window, { title: "选择 Pandoc 可执行文件", properties: ["openFile"] }); if (!result.canceled) process.env.OPEN_TYPORA_PANDOC = result.filePaths[0]; } return { word: process.platform === "darwin", libreOffice: await libreOfficePath(), pandoc: await pandocPath() }; },
+  importDocument: async () => { const result = await dialog.showOpenDialog(window, { title: "导入文档", properties: ["openFile"], filters: [{ name: "文档", extensions: ["docx", "doc", "rtf", "odt", "epub", "tex", "rst", "html", "txt"] }] }); return result.canceled ? null : convertImport(result.filePaths[0], store.dataDir); },
   exportConverted: async (_, id, format, source, html) => { const record = store.require(id), ext = { latex: "tex", revealjs: "html", mediawiki: "wiki" }[format] || format; const result = await dialog.showSaveDialog(window, { defaultPath: record.name.replace(/\.[^.]+$/, "." + ext) }); return result.canceled ? null : convertExport(store.dataDir, format, source, html, result.filePath); },
-  imageAction: async (_, id, sources, action, options) => { if (action !== "upload") throw new Error("图片文件管理请使用原生安装版。"); const mapping = {}; for (const source of sources) { const file = await store.asset(id, source); const response = await fetch(options?.imageUploader || "http://127.0.0.1:36677/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ list: [file] }), signal: AbortSignal.timeout(30000) }); const result = await response.json(); if (!response.ok || !result.success || !/^https?:\/\//.test(result.result?.[0] || "")) throw new Error("PicGo 未返回有效图片地址。"); mapping[source] = result.result[0]; } return mapping; },
+  imageAction: async (_, id, sources, action, options) => {
+    store.require(id);
+    if (!Array.isArray(sources) || !sources.length || sources.length > 200 || sources.some(source => typeof source !== "string") || !["copy", "move", "delete", "upload"].includes(action)) throw new Error("图片操作无效。");
+    let destination, directory;
+    if (["copy", "move"].includes(action)) {
+      if (sources.length > 1) { const result = await dialog.showOpenDialog(window, {title:"选择图片目标文件夹",properties:["openDirectory"]}); if (result.canceled) return null; directory = result.filePaths[0]; }
+      else { const result = await dialog.showSaveDialog(window, {title:action === "move" ? "移动或重命名图片" : "复制图片",defaultPath:imageName(sources[0])}); if (result.canceled) return null; destination = result.filePath; }
+    }
+    if (action === "delete") { const result = await dialog.showMessageBox(window,{type:"warning",message:"删除图片文件？",detail:"图片文件会移到废纸篓，文档中的引用也会移除。",buttons:["取消","移到废纸篓"],defaultId:0,cancelId:0}); if(result.response !== 1) return null; }
+    return imageAction({store,id,sources,action,options,destination,directory,trash:file=>shell.trashItem(file),notice:message=>window.webContents.send("app:command",{action:"notice",message})});
+  },
   ready: async () => { rendererReady = true; for (const file of pending.splice(0)) {
     try { send({ action: "opened", document: await store.open(file) }); }
     catch (error) { showError(error); }

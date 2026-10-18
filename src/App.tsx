@@ -172,7 +172,7 @@ export default function App() {
   commands.current = ({ action, document: opened, anchor, line, message }) => {
     if (["new", "newWindow", "newTab", "open"].includes(action) && window.desktop?.windowAction) { void host.windowAction(action).catch((error: Error) => session.setMessage(error.message)); return; }
     const context = commandsByAction.get(action)?.context;
-    if (readOnly && ((context && context !== "document") || ["undo", "redo", "paste-plain", "image", "table", "link", "reference-link", "footnote", "copy-all-images", "move-all-images", "upload-all-images"].includes(action))) { session.setMessage("只读模式已开启，请先在插件管理中关闭或切换只读效果。"); return; }
+    if (readOnly && ((context && context !== "document") || ["delete-word", "undo", "redo", "paste-plain", "image", "table", "link", "reference-link", "footnote", "copy-all-images", "move-all-images", "upload-all-images"].includes(action))) { session.setMessage("只读模式已开启，请先在插件管理中关闭或切换只读效果。"); return; }
     if (context && !active) return;
     if (["rich", "table"].includes(context || "") && !editor()?.richMode()) return;
     if (action === "notice") { if (message) session.setMessage(message); }

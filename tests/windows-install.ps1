@@ -14,8 +14,11 @@ node tests/electron-shell.mjs
 $shellExit = $LASTEXITCODE
 node tests/parity-desktop.mjs
 $parityExit = $LASTEXITCODE
+node tests/compatibility-desktop.mjs
+$compatibilityExit = $LASTEXITCODE
 if ($desktopExit -ne 0) { throw 'Installed desktop regression failed' }
 if ($shellExit -ne 0) { throw 'Windows shell and plugin regression failed' }
+if ($compatibilityExit -ne 0) { throw 'Installed image and office-format regression failed' }
 if ($parityExit -ne 0) { throw 'Installed editing parity regression failed' }
 $extension = Get-ItemPropertyValue 'HKCU:\Software\Classes\.md' '(default)'
 $command = Get-ItemPropertyValue "HKCU:\Software\Classes\$extension\shell\open\command" '(default)'

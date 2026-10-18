@@ -1,3 +1,4 @@
+import { codeSelectionCommand, selectionActions, wordRange } from "./selectionCommands.ts";
 import emojiNames from "markdown-it-emoji/lib/data/full.mjs";
 import { clearInlineFormats } from "./inlineFormats.ts";
 import type { InlineFormat } from "./inlineFormats.ts";
@@ -1138,8 +1139,66 @@ export class RichEditor {
     )
       this.publish();
   }
+  private selectionCommand(action: string) {
+    if (this.fence?.view.hasFocus) { codeSelectionCommand(this.fence.view,action); this.model.selection = this.bookmark(); this.reportCursor(); return; }
+    const selection = this.bookmark();
+    if (action === "jump-selection") {
+      this.restore(selection);
+      const range = window.getSelection()?.rangeCount ? window.getSelection()!.getRangeAt(0) : null;
+      const element = range?.endContainer.nodeType === Node.ELEMENT_NODE ? range.endContainer as Element : range?.endContainer.parentElement;
+      element?.scrollIntoView({block:"center"}); return;
+    }
+    const head = selection.head, start = Math.min(selection.anchor,head), end = Math.max(selection.anchor,head);
+    const leaf = [...this.leaves.values()].find(item => !item.kind && item.positions[0] <= head && item.positions.at(-1)! >= head);
+    if (!leaf) return;
+    const element = this.root.querySelector<HTMLElement>(`[data-leaf="${leaf.id}"]`);
+    if (!element) return;
+    let from = leaf.positions[0], to = leaf.positions.at(-1)!;
+    const cell = element.closest("td,th");
+    if (action === "select-line" && cell) {
+      const row = cell.closest("tr")!;
+      const leaves = [...row.querySelectorAll<HTMLElement>("[data-leaf]")].map(element=>this.leaves.get(element.dataset.leaf!)!).filter(Boolean);
+      from = leaves[0].positions[0]; to = leaves.at(-1)!.positions.at(-1)!;
+    } else if (action === "select-scope" && !cell) {
+      const scopes = [...element.querySelectorAll<HTMLElement>(".md-inline")].map(inline => {
+        const open = inline.firstElementChild?.classList.contains("md-meta") ? inline.firstElementChild.textContent!.length : 0;
+        const close = inline.lastElementChild?.classList.contains("md-meta") ? inline.lastElementChild.textContent!.length : 0;
+        return {from:leaf.positions[Number(inline.dataset.inlineFrom)+open],to:leaf.positions[Number(inline.dataset.inlineTo)-close]};
+      }).filter(scope=>scope.from <= start && scope.to >= end && (scope.from < start || scope.to > end)).sort((a,b)=>(a.to-a.from)-(b.to-b.from));
+      if (scopes.length) ({from,to} = scopes[0]);
+    } else if (action === "select-word" || action === "delete-word") {
+      if (action === "delete-word" && start !== end) { from = start; to = end; }
+      else {
+        // Segment rendered text and map the result back to source positions;
+        // hidden Markdown delimiters must never become part of a word deletion.
+        const texts = this.textNodes(element).filter(text=>!text.parentElement?.closest(".md-meta,.md-object-source"));
+        const text = texts.find(text=>this.point(text,0) <= head && this.point(text,text.length) >= head);
+        if (!text) return;
+        const offsets = Array.from({length:text.length+1},(_,i)=>this.point(text,i));
+        const caret = Math.max(0,offsets.findLastIndex(position=>position<=head));
+        const range = wordRange(text.data,caret);
+        from = offsets[range.from]; to = offsets[range.to];
+      }
+    }
+    this.model.closeGroup();
+    if (action === "delete-word") {
+      // Remove an emptied enclosing mark as part of the same transaction.
+      // Leaving **** behind can turn an ordinary paragraph into a thematic break.
+      for (const inline of [...element.querySelectorAll<HTMLElement>(".md-inline")].reverse()) {
+        const open = inline.firstElementChild, close = inline.lastElementChild;
+        if (!open?.classList.contains("md-meta") || !close?.classList.contains("md-meta")) continue;
+        const first = Number(inline.dataset.inlineFrom), last = Number(inline.dataset.inlineTo);
+        if (leaf.positions[first+open.textContent!.length] === from && leaf.positions[last-close.textContent!.length] === to) {
+          from = leaf.positions[first]; to = leaf.positions[last];
+        }
+      }
+      if (!this.readOnly && this.model.replace(from,to,"","delete-word",{anchor:from,head:from})) this.publish();
+    } else { this.model.selection = {anchor:from,head:to}; this.restore(); this.reportCursor(); }
+  }
   command(action: string, args: BlockArguments = {}) {
     if (this.composing) return;
+    if (selectionActions.has(action)) { this.selectionCommand(action); return; }
+    if (this.readOnly) return;
     this.model.selection = this.bookmark();
     this.pendingFormat.clear();
     if (action.startsWith("table-")) { this.tableAction(action.slice(6)); return; }

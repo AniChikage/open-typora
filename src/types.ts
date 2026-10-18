@@ -65,7 +65,7 @@ export interface Host {
   plugins(): Promise<{ id: string; name: string; url: string }[]>;
   installPlugin(): Promise<{ id: string; name: string; url: string } | null>;
   removePlugin(id: string): Promise<unknown>;
-  conversionSettings(choose?: boolean): Promise<{ pandoc: string; word: boolean }>;
+  conversionSettings(choose?: boolean): Promise<{ pandoc: string; word: boolean; libreOffice?: string }>;
   importDocument(): Promise<{ html?: string; markdown?: string; name: string } | null>;
   exportConverted(id: string, format: string, source: string, html: string): Promise<string | null>;
   restore(): Promise<Recovery | null>;

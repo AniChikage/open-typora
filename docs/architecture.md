@@ -1,4 +1,4 @@
-# 编辑架构（0.8.0）
+# 编辑架构（0.9.0）
 
 macOS 的发布包使用 Swift/AppKit + WKWebView。Windows/Linux 发布包使用 Electron/Chromium，并保留为跨平台开发与回归测试宿主；macOS 的 `package:mac` 与 `install:app` 仍使用原生宿主。Windows 使用系统标题栏、Ctrl 快捷键与单实例文件打开，`package:win` 生成 NSIS 安装包与 ZIP。
 
@@ -90,3 +90,9 @@ Windows/Linux 共用受限 Electron 桥与最小依赖打包，Linux 增加 DEB/
 列表多行缩进复用块级事务和选区映射，引用前缀只消耗一个分隔空格；局部代码使用 CodeMirror 的行缩进命令。表格 Cmd/Ctrl+Enter 使用现有插行事务，Shift+Enter 写入 `<br>`，不创建新的 Markdown 源行。
 
 `legacyDiagrams.ts` 将 sequence/flow 的公开常用语法转为 Mermaid，仅影响渲染与导出，不重写原文。不支持的语法拒绝整张图，保留原文并显示错误；范围见 [diagrams.md](diagrams.md)。
+
+## 0.9 选区与跨平台导入
+
+选词通过 Unicode 分词找到文字范围，再映射回正文源位置；清空整个行内样式时同步移除空分隔符，删除与撤销保持单事务。表格选择限制在单元格或当前行；源码和局部代码通过 CodeMirror 选区 API 处理。只读状态保留选择和定位，阻止删词。
+
+Electron 图片文件管理先检查全部目标冲突，再复制；失败清理本次新文件，全部复制成功后才将原文件移到系统废纸篓。DOC/RTF 通过独立配置目录中的 LibreOffice 转为 DOCX，再交给 Pandoc。DOCX/ODT/EPUB 导入媒体保存在应用目录，解析 AST 后仅重写资源目标；清理转换临时文件不移除成功导入的媒体。HTML 中的本地图片在清理前改为文档资源协议，保持本地授权与脚本清理边界。

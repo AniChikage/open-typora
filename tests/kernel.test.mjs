@@ -664,3 +664,49 @@ test("table modified Enter inserts a row and soft Enter stays inside one Markdow
     assert.equal(f.model.toMarkdown(),source);
   } finally {f.close();}
 });
+test("selection commands respect inline scopes, CJK words and single-step deletion undo", () => {
+  const source = 'Hello **brave *new* world** today\n\n中文输入测试。';
+  const f = fixture(source);
+  point(f.editor,source.indexOf('new')+1);
+  f.editor.command('select-word');
+  assert.equal(f.editor.clipboard().plain,'new');
+  f.editor.command('select-scope');
+  assert.equal(f.editor.clipboard().plain,'brave new world');
+  f.editor.command('select-scope');
+  assert.equal(f.editor.clipboard().plain,'Hello brave new world today');
+  point(f.editor,source.indexOf('brave')+2);
+  f.editor.command('delete-word');
+  assert.equal(f.model.text,source.replace('brave',''));
+  f.editor.undo(); assert.equal(f.model.text,source);
+  point(f.editor,source.indexOf('输入')+1);
+  f.editor.command('select-word'); assert.equal(f.editor.clipboard().plain,'输入');
+  f.close();
+});
+test("word deletion beside adjacent formatting never consumes Markdown delimiters", () => {
+  const f = fixture('**hello**world');
+  point(f.editor,4); f.editor.command('select-word');
+  assert.equal(f.editor.clipboard().plain,'hello');
+  f.editor.command('delete-word'); assert.equal(f.model.text,'world');
+  f.editor.undo(); assert.equal(f.model.text,'**hello**world'); f.close();
+});
+test("table scope and line selection stay in the current cell and row; readonly still permits selection", () => {
+  const source = '| A | B |\n| --- | --- |\n| **one** two | 三四 |\n| next | last |';
+  const f = fixture(source);
+  point(f.editor,source.indexOf('one')+1); f.editor.command('select-scope');
+  assert.equal(f.editor.clipboard().plain,'one two');
+  point(f.editor,source.indexOf('one')+1); f.editor.command('select-line');
+  assert.ok(f.editor.clipboard().plain.includes('one two') && f.editor.clipboard().plain.includes('三四'));
+  assert.ok(!f.editor.clipboard().plain.includes('next'));
+  f.editor.setOptions({spellcheck:false,tabSize:2,typewriter:false,readOnly:true});
+  point(f.editor,source.indexOf('one')+1); f.editor.command('select-word'); assert.equal(f.editor.clipboard().plain,'one');
+  f.editor.command('delete-word'); assert.equal(f.model.text,source);
+  f.editor.command('jump-selection'); assert.equal(f.editor.clipboard().plain,'one'); f.close();
+});
+test("HTML file URL images use the document resource bridge without enabling active URL schemes", async () => {
+  const {renderMarkdown} = await import('../src/editor/markdown.ts');
+  const source = '<figure><img src="file:///tmp/中文%20image.png" onerror="evil()"><figcaption>Local figure</figcaption></figure>\n\n<img src="javascript:evil()">';
+  const template = document.createElement('template'); template.innerHTML=renderMarkdown(source,'owned-document');
+  assert.equal(template.content.querySelector('img').getAttribute('src'),'open-typora-asset://local/owned-document/'+encodeURIComponent('file:///tmp/中文%20image.png'));
+  assert.equal(template.content.querySelector('[onerror],script'),null);
+  assert.ok(!template.innerHTML.includes('javascript:'));
+});

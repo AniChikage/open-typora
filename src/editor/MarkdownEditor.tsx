@@ -1,3 +1,4 @@
+import { codeSelectionCommand, selectionActions } from "./selectionCommands";
 import { ImageDialog } from "../components/ImageDialog";
 import { imageReferences } from "./images";
 import type { ImageReference } from "./images";
@@ -416,7 +417,11 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
           if (viewOptions.current.readOnly) return;
           if (activeMode.current) rich.current?.codeBlock();
         },
-        command: (action, args) => { if (activeMode.current && !viewOptions.current.readOnly) rich.current?.command(action, args); },
+        command: (action, args) => {
+          if (viewOptions.current.readOnly && (!selectionActions.has(action) || action === "delete-word")) return;
+          if (activeMode.current) rich.current?.command(action, args);
+          else if (source.current) codeSelectionCommand(source.current, action);
+        },
         insert: (text) => insert(text),
         selectionText: (markdown = false) => {
           if (activeMode.current) { const value = rich.current?.clipboard(); return (markdown ? value?.markdown : value?.plain) || ""; }

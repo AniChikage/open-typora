@@ -11,11 +11,16 @@
   <a href="https://open-typora.comicyueyu.chatgpt.site">Try in your browser</a> · <a href="https://github.com/AniChikage/open-typora/releases/latest">Download</a> · <a href="#features">Features</a> · <a href="CONTRIBUTING.md">Contributing</a> · <a href="LICENSE">MIT License</a>
 </p>
 
+> [!IMPORTANT]
+> **Open Typora is an independent, unofficial project. It is not developed, endorsed, or supported by Typora, and is not an official free edition.**
+>
+> If you can afford it, please **[buy Typora](https://store.typora.io/)** and support its official developers. Visit **[typora.io](https://typora.io/)** for the official product and support.
+
 ![Open Typora — live Markdown editing in the native macOS app](docs/images/hero.png)
 
 Open Typora is an open-source Markdown editor inspired by Typora's inline editing experience. Write directly in the rendered document, switch to source when you need it, and save ordinary `.md` files in your own folders.
 
-**Status:** early development, version **0.8.0**. Release builds support **macOS 14+ on Apple Silicon**, **Windows 10/11 x64**, and **Linux x64**. The interface is currently in Simplified Chinese. This is an independent project, unaffiliated with Typora; full feature and behavior parity is still in progress.
+**Status:** early development, version **0.9.0**. Release builds support **macOS 14+ on Apple Silicon**, **Windows 10/11 x64**, and **Linux x64**. The interface is currently in Simplified Chinese. This is an independent project, unaffiliated with Typora; full feature and behavior parity is still in progress.
 
 ## Features
 
@@ -46,25 +51,25 @@ The demo keeps documents in the current tab's memory; it does not upload or pers
 
 | Platform | Installer | Alternative |
 | --- | --- | --- |
-| Windows 10/11 · x64 | **[Download Setup.exe](https://github.com/AniChikage/open-typora/releases/download/v0.8.0/Open-Typora-0.8.0-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.8.0/Open-Typora-0.8.0-windows-x64.zip) |
-| macOS 14+ · Apple Silicon | **[Download DMG](https://github.com/AniChikage/open-typora/releases/download/v0.8.0/Open-Typora-0.8.0-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.8.0/Open-Typora-0.8.0-arm64.zip) |
-| Linux · x64 | **[Download DEB](https://github.com/AniChikage/open-typora/releases/download/v0.8.0/Open-Typora-0.8.0-linux-x64.deb)** | [AppImage](https://github.com/AniChikage/open-typora/releases/download/v0.8.0/Open-Typora-0.8.0-linux-x64.AppImage) |
+| Windows 10/11 · x64 | **[Download Setup.exe](https://github.com/AniChikage/open-typora/releases/download/v0.9.0/Open-Typora-0.9.0-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.9.0/Open-Typora-0.9.0-windows-x64.zip) |
+| macOS 14+ · Apple Silicon | **[Download DMG](https://github.com/AniChikage/open-typora/releases/download/v0.9.0/Open-Typora-0.9.0-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.9.0/Open-Typora-0.9.0-arm64.zip) |
+| Linux · x64 | **[Download DEB](https://github.com/AniChikage/open-typora/releases/download/v0.9.0/Open-Typora-0.9.0-linux-x64.deb)** | [AppImage](https://github.com/AniChikage/open-typora/releases/download/v0.9.0/Open-Typora-0.9.0-linux-x64.AppImage) |
 
-[SHA-256 checksums](https://github.com/AniChikage/open-typora/releases/download/v0.8.0/SHA256SUMS.txt) · [All releases](https://github.com/AniChikage/open-typora/releases)
+[SHA-256 checksums](https://github.com/AniChikage/open-typora/releases/download/v0.9.0/SHA256SUMS.txt) · [All releases](https://github.com/AniChikage/open-typora/releases)
 
 ### Install on Linux
 
 Ubuntu 22.04 or a compatible x64 distribution is the tested baseline. Download the DEB and install it with:
 
 ```sh
-sudo apt install ./Open-Typora-0.8.0-linux-x64.deb
+sudo apt install ./Open-Typora-0.9.0-linux-x64.deb
 ```
 
 The desktop launcher and Markdown file association are included. Uninstalling with `sudo apt remove open-typora` retains your documents and recovery data.
 
-For other compatible distributions, make the AppImage executable (`chmod +x Open-Typora-0.8.0-linux-x64.AppImage`) and run it. FUSE 2 may be required. If FUSE is unavailable, extract it with `./Open-Typora-0.8.0-linux-x64.AppImage --appimage-extract` and run `./squashfs-root/AppRun`. CI exercises the extracted AppImage payload; FUSE mounting and every desktop environment have not been manually verified. Do not disable Chromium's sandbox to run the application.
+For other compatible distributions, make the AppImage executable (`chmod +x Open-Typora-0.9.0-linux-x64.AppImage`) and run it. FUSE 2 may be required. If FUSE is unavailable, extract it with `./Open-Typora-0.9.0-linux-x64.AppImage --appimage-extract` and run `./squashfs-root/AppRun`. CI exercises the extracted AppImage payload; FUSE mounting and every desktop environment have not been manually verified. Do not disable Chromium's sandbox to run the application.
 
-Additional document conversion on Linux requires Pandoc. Legacy DOC/RTF import and bulk image file operations remain limited in the Electron host.
+Additional document conversion on Windows/Linux requires [Pandoc](https://pandoc.org/installing.html). Legacy DOC/RTF imports also require [LibreOffice](https://www.libreoffice.org/download/download-libreoffice/), detected from its standard installation or PATH. Image copy, move, rename, download and Trash operations are available on all three platforms.
 
 ### Install on Windows
 
@@ -74,7 +79,7 @@ The Windows build is currently **not code-signed**. Windows may display an unkno
 
 ### Install on macOS
 
-1. Download **[Open-Typora-0.8.0-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.8.0/Open-Typora-0.8.0-arm64.dmg)** from [Releases](https://github.com/AniChikage/open-typora/releases/latest).
+1. Download **[Open-Typora-0.9.0-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.9.0/Open-Typora-0.9.0-arm64.dmg)** from [Releases](https://github.com/AniChikage/open-typora/releases/latest).
 2. Open the DMG and drag **Open Typora** into **Applications**.
 3. Launch Open Typora from Applications.
 
@@ -111,7 +116,7 @@ The EXE installer and ZIP are written to `release/windows/`. Build Windows relea
 
 On Linux x64, run `npm run package:linux` to produce DEB and AppImage files in `release/linux/`. Linux releases are built and tested on Ubuntu 22.04.
 
-For additional document formats, install [Pandoc](https://pandoc.org/installing.html), then select its executable in Preferences if it is not detected. Pandoc is optional for writing Markdown and exporting HTML/PDF.
+For additional document formats, install [Pandoc](https://pandoc.org/installing.html), then select its executable in Preferences if it is not detected. Pandoc is optional for writing Markdown and exporting HTML/PDF. On Windows/Linux, install LibreOffice as well to import legacy DOC/RTF. Imported embedded images are extracted to persistent local storage; conversions can change formatting.
 
 ### First steps
 
@@ -126,6 +131,10 @@ Open a Markdown file or a folder, or try [the example document](examples/a-quiet
 | Find in the document | `⌘F` | `Ctrl+F` |
 | Search the folder | `⌘⇧F` | `Ctrl+Shift+F` |
 | Quick open | `⌘⇧O` | `Ctrl+P` |
+| Select word / delete word | `⌘D` / `⌘⇧D` | `Ctrl+D` / `Ctrl+Shift+D` |
+| Select line / table row | `⌘L` | `Ctrl+L` |
+| Select scope / table cell | `⌘E` | `Ctrl+E` |
+| Jump to selection | `⌘J` | `Ctrl+J` |
 
 ## Development
 
@@ -153,7 +162,7 @@ More editor and desktop suites, test isolation, and build details are in [CONTRI
 - Legacy encodings without a BOM require an explicit encoding choice.
 - Rich editing and source editing have separate undo histories; changes made in source mode join the rich history as one transaction when returning.
 - Format conversion can change layout or unsupported document structures. Some RTF image formats are rejected explicitly. Keep the original file when importing.
-- Windows/Linux legacy DOC/RTF import and bulk image file operations are not yet supported. Windows/Linux input-method candidate interaction still needs manual acceptance; automated text input is not equivalent to that check.
+- Windows/Linux DOC/RTF import requires both Pandoc and LibreOffice. Embedded WMF/EMF images need conversion to PNG/JPEG first. Physical input-method candidates on Windows/Linux still need manual acceptance; automated text input is not equivalent to that check.
 - Third-party themes, embedded media, input methods, and image-host integrations vary in compatibility. Consult the [checklist](docs/feature-parity.md) before depending on a specific workflow.
 
 ## Contributing

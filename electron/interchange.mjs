@@ -1,7 +1,8 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { readFile, writeFile, mkdir, mkdtemp, rm, access, readdir, realpath } from "node:fs/promises";
+import { readFile, writeFile, mkdir, mkdtemp, rm, access, readdir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { atomicWrite } from "./store.mjs";
 const exec = promisify(execFile);
 export async function pandocPath() {
@@ -22,18 +23,86 @@ export async function convertExport(directory, format, source, html, destination
     return destination;
   } finally { await rm(temporary, { recursive: true, force: true }); }
 }
-export async function convertImport(file) {
+export async function libreOfficePath() {
+  const names = process.platform === "win32" ? ["soffice.com", "soffice.exe"] : ["soffice", "libreoffice"];
+  const roots = process.platform === "win32" ? [process.env.ProgramFiles, process.env["ProgramFiles(x86)"]].filter(Boolean).map(root => path.join(root,"LibreOffice","program")) : ["/Applications/LibreOffice.app/Contents/MacOS", "/usr/bin", "/opt/homebrew/bin"];
+  const candidates = [process.env.OPEN_TYPORA_LIBREOFFICE, ...roots.flatMap(root => names.map(name => path.join(root,name))), ...(process.env.PATH || "").split(path.delimiter).filter(Boolean).flatMap(root => names.map(name => path.join(root,name)))].filter(Boolean);
+  for (const file of candidates) try { await access(file); return file; } catch {}
+  return "";
+}
+async function checkMedia(directory) {
+  let count = 0, total = 0;
+  async function walk(folder) {
+    for (const entry of await readdir(folder,{withFileTypes:true})) {
+      const file = path.join(folder,entry.name);
+      if (entry.isSymbolicLink()) throw new Error("导入资源包含不支持的符号链接。");
+      if (entry.isDirectory()) await walk(file);
+      else { const size = (await stat(file)).size; if (++count > 200 || size > 20*1024*1024 || (total += size) > 50*1024*1024) throw new Error("导入资源过多或超过大小限制。"); }
+    }
+  }
+  await walk(directory);
+}
+async function importFormat(pandoc) {
+  const {stdout} = await exec(pandoc,["--list-extensions=gfm"],{timeout:10000,maxBuffer:100000});
+  return "gfm+tex_math_dollars+footnotes" + (stdout.includes("tex_math_gfm") ? "-tex_math_gfm" : "");
+}
+export async function convertImport(file, directory) {
   const name = path.basename(file).replace(/\.[^.]+$/, ".md");
+  if ((await stat(file)).size > 20*1024*1024) throw new Error("导入文档必须小于 20 MB。");
   if (/\.html?$/i.test(file)) return { html: await readFile(file, "utf8"), name };
   if (/\.txt$/i.test(file)) return { markdown: await readFile(file, "utf8"), name };
-  const pandoc = await pandocPath();
-  if (pandoc && !/\.(doc|rtf)$/i.test(file)) {
-    const { stdout } = await exec(pandoc, [file, "--to=gfm+tex_math_dollars", "--wrap=none"], { timeout: 30000, maxBuffer: 20 * 1024 * 1024 });
-    return { markdown: stdout, name };
+  const pandoc = await pandocPath(), legacy = /\.(doc|rtf)$/i.test(file);
+  const office = legacy ? await libreOfficePath() : "";
+  if (!pandoc || (legacy && !office)) {
+    if (process.platform === "darwin") { const {stdout} = await exec("/usr/bin/textutil",["-convert","html","-stdout",file],{timeout:30000,maxBuffer:20*1024*1024}); return {html:stdout,name}; }
+    throw new Error(legacy ? "导入 DOC / RTF 需要安装 LibreOffice 和 Pandoc；也可先另存为 DOCX。" : "导入此格式需要安装 Pandoc，可在偏好设置中选择其可执行文件。");
   }
-  if (process.platform !== "darwin") throw new Error(/\.(doc|rtf)$/i.test(file) ? "请先将 DOC / RTF 另存为 DOCX，再用 Pandoc 导入。" : "导入此格式需要安装 Pandoc，可在偏好设置中选择其可执行文件。");
-  const { stdout } = await exec("/usr/bin/textutil", ["-convert", "html", "-stdout", file], { timeout: 30000, maxBuffer: 20 * 1024 * 1024 });
-  return { html: stdout, name };
+  if (!directory) throw new Error("缺少导入资源存储目录。");
+  const imports = path.join(directory,"Imported"); await mkdir(imports,{recursive:true});
+  const media = await mkdtemp(path.join(imports,"document-"));
+  const temporary = await mkdtemp(path.join(directory,"conversion-"));
+  let success = false;
+  try {
+    let input = path.resolve(file);
+    if (legacy) {
+      // An isolated profile prevents a running LibreOffice GUI from absorbing
+      // the conversion request or opening a user's active document.
+      await exec(office,["-env:UserInstallation="+pathToFileURL(path.join(temporary,"profile")).href,"--headless","--nologo","--norestore","--convert-to","docx","--outdir",temporary,input],{timeout:60000,maxBuffer:2*1024*1024});
+      input = path.join(temporary,path.basename(file,path.extname(file))+".docx");
+      const converted = await stat(input).catch(()=>null);
+      if (!converted?.size || converted.size > 50*1024*1024) throw new Error("LibreOffice 未生成有效的 DOCX 文件。");
+    }
+    const {stdout} = await exec(pandoc,[input,"--to=json","--extract-media=media"],{cwd:media,timeout:30000,maxBuffer:20*1024*1024});
+    const document = JSON.parse(stdout);
+    // Rewrite only parsed image/link destinations, never Markdown text or code.
+    function resources(value) {
+      if (!value || typeof value !== "object") return;
+      if (["Image","Link"].includes(value.t)) {
+        const target = value.c?.at(-1);
+        if (Array.isArray(target) && typeof target[0] === "string" && target[0].startsWith("media/")) {
+          if (value.t === "Image" && !/\.(?:png|jpe?g|gif|webp|avif|svg)$/i.test(target[0])) throw new Error("导入图片格式不受支持，请先将 WMF / EMF 等图片转换为 PNG 或 JPEG。");
+          const resource = path.resolve(media,target[0]);
+          if (!resource.startsWith(media+path.sep)) throw new Error("导入资源路径无效。");
+          target[0] = pathToFileURL(resource).href;
+        }
+      }
+      for (const child of Object.values(value)) if (Array.isArray(child)) child.forEach(resources); else if (child && typeof child === "object") resources(child);
+    }
+    resources(document);
+    function unwrap(value) {
+      if (Array.isArray(value)) return value.flatMap(child => child && ["Div","Span"].includes(child.t) ? unwrap(child.c[1]) : [unwrap(child)]);
+      if (!value || typeof value !== "object") return value;
+      if (value.t === "Header") value.c[1] = ["",[],[]];
+      for (const key of Object.keys(value)) value[key] = unwrap(value[key]);
+      return value;
+    }
+    unwrap(document); await checkMedia(media);
+    const json = path.join(temporary,"document.json"); await writeFile(json,JSON.stringify(document));
+    const result = await exec(pandoc,[json,"--from=json","--to="+await importFormat(pandoc),"--wrap=none"],{cwd:media,timeout:30000,maxBuffer:20*1024*1024});
+    success = true;
+    if (!(await readdir(media)).length) await rm(media,{recursive:true,force:true});
+    return {markdown:result.stdout,name};
+  } finally { await rm(temporary,{recursive:true,force:true}); if (!success) await rm(media,{recursive:true,force:true}); }
 }
 export async function themes(directory) { const root = path.join(directory, "themes"); await mkdir(root, { recursive: true }); return Promise.all((await readdir(root)).filter(name => name.endsWith(".css")).map(async id => ({ id, name: id.slice(0, -4), css: await readFile(path.join(root, id), "utf8") }))); }
 export async function installTheme(file, directory) {

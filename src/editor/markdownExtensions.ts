@@ -1,4 +1,4 @@
-import DOMPurify from "dompurify";
+import { safeDocumentHtml } from "./htmlResources.ts";
 import type { MarkdownIt } from "markdown-it";
 export interface DocumentHeading { line: number; level: number; text: string; id: string }
 export interface FootnoteDefinition { id: string; text: string; line: number }
@@ -21,7 +21,7 @@ export function configureDocumentSyntax(md: MarkdownIt) {
     state.pos += match[0].length; return true;
   });
   md.renderer.rules.html_break = () => "<br>";
-  md.renderer.rules.html_block = (tokens, index) => DOMPurify.sanitize(tokens[index].content, { ALLOW_DATA_ATTR: false, FORBID_ATTR: ["contenteditable"], ADD_TAGS: ["video", "audio", "source", "iframe"], ADD_ATTR: ["allowfullscreen", "sandbox"] });
+  md.renderer.rules.html_block = (tokens, index, _options, env) => safeDocumentHtml(tokens[index].content, typeof env?.documentId === "string" ? env.documentId : undefined);
   md.renderer.rules.alert_marker = (tokens, index) => alertTitle(tokens[index].content);
   md.core.ruler.after("inline", "alert_blocks", state => {
     for (let i = 0; i < state.tokens.length - 2; i++) {
@@ -123,7 +123,7 @@ export function configureDocumentSyntax(md: MarkdownIt) {
     if (!silent) { const token = state.push("html_embed", "span", 0); token.content = match[0]; token.markup = match[0]; }
     state.pos += match[0].length; return true;
   });
-  md.renderer.rules.html_embed = (tokens, index) => DOMPurify.sanitize(tokens[index].content, { ALLOW_DATA_ATTR: false, FORBID_ATTR: ["contenteditable"] });
+  md.renderer.rules.html_embed = (tokens, index, _options, env) => safeDocumentHtml(tokens[index].content, typeof env?.documentId === "string" ? env.documentId : undefined, false);
   md.inline.ruler.before("emphasis", "safe_inline_html", (state, silent) => {
     const raw = state.src.slice(state.pos), close = /^<\/(u|sub|sup|mark|kbd|span)>/i.exec(raw), open = /^<(u|sub|sup|mark|kbd)>/i.exec(raw), span = /^<span\s+style\s*=\s*(["'])\s*color\s*:\s*(#[0-9a-f]{3,8}|[a-z]+)\s*;?\s*\1\s*>/i.exec(raw);
     const match = close || open || span;

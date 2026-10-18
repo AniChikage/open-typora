@@ -1,36 +1,29 @@
-Open Typora 0.8.0 — editing improvements and the first Linux packages.
+Open Typora 0.9.0 adds selection commands, cross-platform image management, and more complete document imports.
 
-### Downloads
+> **Independent, unofficial project. Open Typora is not developed, endorsed or supported by Typora. If you can afford it, please [buy Typora](https://store.typora.io/) and support its official developers.**
+
+## Downloads
 
 | Platform | Installer | Alternative |
 | --- | --- | --- |
-| macOS 14+, Apple Silicon | `Open-Typora-0.8.0-arm64.dmg` | macOS ZIP |
-| Windows 10/11, x64 | `Open-Typora-0.8.0-windows-x64-Setup.exe` | Windows ZIP |
-| Linux x64 | `Open-Typora-0.8.0-linux-x64.deb` | AppImage |
+| macOS 14+, Apple Silicon | `Open-Typora-0.9.0-arm64.dmg` | macOS ZIP |
+| Windows 10/11, x64 | `Open-Typora-0.9.0-windows-x64-Setup.exe` | Windows ZIP |
+| Linux x64 | `Open-Typora-0.9.0-linux-x64.deb` | AppImage |
 
-Checksums for all six downloads are in `SHA256SUMS.txt`. No Node.js or Typora installation is required.
+`SHA256SUMS.txt` covers all six downloads.
 
-### What's new
+## Changes
 
-- Linux x64 DEB and AppImage packages, desktop launcher, Markdown association and single-instance file opening, including file URLs with spaces and Unicode names.
-- Windows/Linux shortcuts now follow the documented platform profile: Ctrl+P for quick open, Ctrl+T for tables, Ctrl+Shift+K/M/Q for code/math/quotes, Ctrl+Shift+1/2/3 for sidebar views, and F3/Shift+F3 for find navigation. Menus, toolbar hints and plugin shortcut reservations use the same mapping. Mac bindings are retained.
-- Tab and Shift+Tab indent every selected list line, including quoted lists, preserve the selection and undo as one operation. Fixed quoted-list outdent consuming the quote prefix's spacing.
-- Local code-block editing now indents/outdents a multi-line selection without replacing the selected code.
-- Cmd/Ctrl+Enter inserts a table row below the current row. Shift+Enter inserts an inline cell break without splitting the Markdown table.
-- Common legacy `sequence` and `flow` diagrams render offline and participate in export. Original Markdown is retained. Layout uses Mermaid; unsupported legacy extensions report an error instead of silently omitting content. [Compatibility scope](https://github.com/AniChikage/open-typora/blob/main/docs/diagrams.md).
+- Cmd/Ctrl+D selects a word; Cmd/Ctrl+Shift+D deletes it in one undoable edit. Chinese words and inline formatting boundaries are handled without consuming surrounding syntax.
+- Cmd/Ctrl+L selects a line or table row, Cmd/Ctrl+E expands a formatting scope or selects a table cell, and Cmd/Ctrl+J scrolls back to the selection. Source and local code views support word/line selection and navigation; source scopes follow the syntax tree. Selection remains available in read-only mode.
+- Windows/Linux now support local image copy, move, rename and Trash operations, bulk copy/move, and HTTP image downloads. Existing destination files are never overwritten. Failed batch copies roll back their new files before any originals are moved.
+- Windows/Linux DOCX, ODT and EPUB imports extract embedded media into persistent local storage. Saved imported documents retain their images after restart.
+- Legacy DOC/RTF import on Windows/Linux uses optional LibreOffice plus Pandoc. Preferences reports detected converters and explains missing dependencies. macOS retains its native conversion path.
+- Pandoc imports avoid its newer GitHub-specific math syntax so formulas render in the editor.
+- Both READMEs prominently identify this as unofficial and link to the official Typora purchase page.
 
-### Validation
+## Validation and limits
 
-86 unit tests and 91 native checks passed. macOS 26.5.2 native WebKit regression covers editing, undo, plugin/background behavior, encoding, PDF pagination and actual Pandoc conversions/reimports; new native checks cover legacy diagrams, quoted-list Tab, table row insertion, cell breaks and exact source restoration. Electron interaction tests additionally exercise multi-line code indentation and portable HTML diagrams with no renderer errors.
+The release workflow runs real Pandoc/LibreOffice DOC/RTF/DOCX/ODT/EPUB conversions, then exercises imports and embedded images in the installed Windows application, installed Ubuntu 22.04 DEB and extracted AppImage payload. It also verifies image copy/download/move and document restart, alongside existing editing, export, recovery, theme, plugin and installer checks. Native AppKit/WebKit and Chromium regressions run locally on macOS.
 
-Windows CI installs the NSIS build, exercises the installed application, checks Markdown association, and uninstalls while retaining recovery data. Linux CI installs the DEB on Ubuntu 22.04 x64, exercises both the installed DEB application and extracted AppImage payload, then verifies uninstall preserves recovery data. AppImage FUSE mounting and physical input-method candidates on Windows/Linux remain unverified.
-
-### Installation and limits
-
-Quit the old app before replacing it. Application updates preserve your documents and configuration.
-
-For Ubuntu 22.04 x64 or a compatible system: `sudo apt install ./Open-Typora-0.8.0-linux-x64.deb`. Other compatible distributions may use AppImage; see the README for FUSE and extracted execution instructions.
-
-The interface is currently Simplified Chinese. Windows is not code-signed; macOS is ad hoc signed and not Apple-notarized. Additional conversions on Windows/Linux require Pandoc; legacy DOC/RTF import and bulk image file operations remain limited in the Electron host. This independent early-stage project does not yet provide complete Typora feature or behavior parity.
-
-[Documentation](https://github.com/AniChikage/open-typora#readme) · [简体中文](https://github.com/AniChikage/open-typora/blob/main/README.zh-CN.md)
+Converters are optional and are not bundled. Import can change formatting; retain original documents. WMF/EMF images require conversion to PNG/JPEG. AppImage FUSE mounting, other Linux desktops and physical input-method candidates on Windows/Linux remain unverified. Windows builds are unsigned; macOS is ad hoc signed and not Apple-notarized. Full Typora feature, plugin and behavior parity is still in progress; see [the checklist](https://github.com/AniChikage/open-typora/blob/main/docs/feature-parity.md).

@@ -106,6 +106,7 @@ final class Interchange {
   // Cocoa reads RTF tables that Pandoc's RTF reader currently omits. Preserve
   // pictures, notes, outline paragraphs and code before passing the body through Cocoa.
   static func importRTF(_ file: URL, directory: URL, converter: URL) throws -> [String: String] {
+    let outputFormat = try importMarkdownFormat(converter, directory: directory)
     let data = try Data(contentsOf: file), bytes = [UInt8](data), fm = FileManager.default
     let media = directory.appendingPathComponent("Imported/" + UUID().uuidString)
     try fm.createDirectory(at: media, withIntermediateDirectories: true)
@@ -139,7 +140,7 @@ final class Interchange {
       let input = (prefix + value + "}").data(using: .isoLatin1)!
       let output = try run(URL(fileURLWithPath: "/usr/bin/textutil"), arguments: ["-convert", plain ? "txt" : "html", "-format", "rtf", "-stdin", "-stdout"], input: input, directory: directory)
       if plain { return String(data: output, encoding: .utf8) ?? "" }
-      return String(data: try run(converter, arguments: ["--from=html", "--to=gfm+tex_math_dollars+footnotes", "--wrap=none"], input: output, directory: directory), encoding: .utf8) ?? ""
+      return String(data: try run(converter, arguments: ["--from=html", "--to=" + outputFormat, "--wrap=none"], input: output, directory: directory), encoding: .utf8) ?? ""
     }
     let modernFonts = groups.filter { raw($0).contains("\\fmodern") && matches(#"^\{\\f\d+"#, raw($0)) }.compactMap { group -> String? in let text = raw(group); return text.range(of: #"\\f\d+"#, options: .regularExpression).map { String(text[$0]) } }
     var edits = [(Range<Int>, String)](), replacements = [(String, String)](), notes = [String](), end = -1
@@ -184,11 +185,15 @@ final class Interchange {
       let row = (html as NSString).substring(with: match.range(at: 2)).replacingOccurrences(of: "<td", with: "<th").replacingOccurrences(of: "</td>", with: "</th>")
       html = (html as NSString).replacingCharacters(in: match.range(at: 2), with: row)
     }
-    var markdown = String(data: try run(converter, arguments: ["--from=html", "--to=gfm+tex_math_dollars+footnotes", "--wrap=none"], input: Data(html.utf8), directory: directory), encoding: .utf8) ?? ""
+    var markdown = String(data: try run(converter, arguments: ["--from=html", "--to=" + outputFormat, "--wrap=none"], input: Data(html.utf8), directory: directory), encoding: .utf8) ?? ""
     for (token, value) in replacements { markdown = markdown.replacingOccurrences(of: token, with: value) }
     if !notes.isEmpty { markdown += "\n\n" + notes.joined(separator: "\n\n") + "\n" }
     complete = true
     return ["markdown": markdown, "name": file.deletingPathExtension().lastPathComponent + ".md"]
+  }
+  static func importMarkdownFormat(_ converter: URL, directory: URL) throws -> String {
+    let extensions = try run(converter, arguments: ["--list-extensions=gfm"], input: nil, directory: directory)
+    return "gfm+tex_math_dollars+footnotes" + ((String(data: extensions, encoding: .utf8) ?? "").contains("tex_math_gfm") ? "-tex_math_gfm" : "")
   }
   static func importFile(_ file: URL, directory: URL) throws -> [String: String] {
     let fm = FileManager.default
@@ -200,7 +205,7 @@ final class Interchange {
       try fm.createDirectory(at: media, withIntermediateDirectories: true)
       var complete = false
       defer { if !complete { try? fm.removeItem(at: media) } }
-      let output = try run(converter, arguments: [file.path, "--from=" + (["tex": "latex", "html": "html", "htm": "html", "txt": "markdown"][file.pathExtension.lowercased()] ?? file.pathExtension.lowercased()), "--to=gfm+tex_math_dollars+footnotes", "--markdown-headings=atx", "--wrap=none", "--extract-media=" + media.path], input: nil, directory: directory)
+      let output = try run(converter, arguments: [file.path, "--from=" + (["tex": "latex", "html": "html", "htm": "html", "txt": "markdown"][file.pathExtension.lowercased()] ?? file.pathExtension.lowercased()), "--to=" + (try importMarkdownFormat(converter, directory: directory)), "--markdown-headings=atx", "--wrap=none", "--extract-media=" + media.path], input: nil, directory: directory)
       guard let text = String(data: output, encoding: .utf8) else { throw NativeFailure("导入结果不是 UTF-8。") }
       complete = true
       return ["markdown": text, "name": file.deletingPathExtension().lastPathComponent + ".md"]

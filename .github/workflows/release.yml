@@ -33,9 +33,11 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npm test
       - name: Install desktop runtime libraries
-        run: sudo apt-get update && sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2 libgbm1 libxss1 libxtst6 xdg-utils desktop-file-utils fonts-noto-cjk
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2 libgbm1 libxss1 libxtst6 xdg-utils desktop-file-utils fonts-noto-cjk pandoc libreoffice-writer
+      - run: npm test
+        env:
+          OPEN_TYPORA_REQUIRE_CONVERTERS: "1"
       - name: Build Linux x64 DEB and AppImage
         run: npm run package:linux
       - name: Install DEB, exercise both packaged payloads, and uninstall
@@ -73,7 +75,15 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - name: Install conversion tools for actual DOC, RTF and media acceptance
+        shell: pwsh
+        run: |
+          choco install pandoc libreoffice-fresh -y --no-progress
+          if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 3010) { exit $LASTEXITCODE }
+          exit 0
       - run: npm test
+        env:
+          OPEN_TYPORA_REQUIRE_CONVERTERS: "1"
       - name: Build Windows x64 installer and ZIP
         run: npm run package:win
       - name: Install, exercise the installed app, and uninstall
