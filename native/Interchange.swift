@@ -207,7 +207,8 @@ final class Interchange {
       try fm.createDirectory(at: media, withIntermediateDirectories: true)
       var complete = false
       defer { if !complete { try? fm.removeItem(at: media) } }
-      let output = try run(converter, arguments: [file.path, "--from=" + (["tex": "latex", "html": "html", "htm": "html", "txt": "markdown"][file.pathExtension.lowercased()] ?? file.pathExtension.lowercased()), "--to=" + (try importMarkdownFormat(converter, directory: directory)), "--markdown-headings=atx", "--wrap=none", "--extract-media=" + media.path], input: nil, directory: directory)
+      let format = try importMarkdownFormat(converter, directory: directory)
+      let output = try run(converter, arguments: [file.path, "--from=" + (["tex": "latex", "html": "html", "htm": "html", "txt": "markdown"][file.pathExtension.lowercased()] ?? file.pathExtension.lowercased()), "--to=" + format, format.hasPrefix("gfm") ? "--markdown-headings=atx" : "--atx-headers", "--wrap=none", "--extract-media=" + media.path], input: nil, directory: directory)
       guard let text = String(data: output, encoding: .utf8) else { throw NativeFailure("导入结果不是 UTF-8。") }
       complete = true
       return ["markdown": text, "name": file.deletingPathExtension().lastPathComponent + ".md"]

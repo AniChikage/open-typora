@@ -99,7 +99,8 @@ export async function convertImport(file, directory) {
     }
     unwrap(document); await checkMedia(media);
     const json = path.join(temporary,"document.json"); await writeFile(json,JSON.stringify(document));
-    const result = await exec(pandoc,[json,"--from=json","--to="+await importFormat(pandoc),"--markdown-headings=atx","--wrap=none"],{cwd:media,timeout:30000,maxBuffer:20*1024*1024});
+    const format = await importFormat(pandoc);
+    const result = await exec(pandoc,[json,"--from=json","--to="+format,format.startsWith("gfm") ? "--markdown-headings=atx" : "--atx-headers","--wrap=none"],{cwd:media,timeout:30000,maxBuffer:20*1024*1024});
     success = true;
     if (!(await readdir(media)).length) await rm(media,{recursive:true,force:true});
     return {markdown:result.stdout,name};
