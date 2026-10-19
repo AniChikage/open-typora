@@ -78,8 +78,16 @@ jobs:
       - name: Install conversion tools for actual DOC, RTF and media acceptance
         shell: pwsh
         run: |
-          choco install pandoc libreoffice-fresh -y --no-progress
-          if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 3010) { exit $LASTEXITCODE }
+          $ready = $false
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            choco install pandoc libreoffice-fresh -y --no-progress
+            # A failed Chocolatey feed request can still exit 0. Check the
+            # executables used by the real conversion tests before proceeding.
+            node --input-type=module -e "import {pandocPath,libreOfficePath} from './electron/interchange.mjs'; if (!(await pandocPath()) || !(await libreOfficePath())) process.exit(1)"
+            if ($LASTEXITCODE -eq 0) { $ready = $true; break }
+            if ($attempt -lt 3) { Start-Sleep -Seconds (10 * $attempt) }
+          }
+          if (!$ready) { throw 'Pandoc/LibreOffice installation did not complete after three attempts' }
           exit 0
       - run: npm test
         env:
