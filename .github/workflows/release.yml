@@ -78,16 +78,22 @@ jobs:
       - name: Install conversion tools for actual DOC, RTF and media acceptance
         shell: pwsh
         run: |
-          $ready = $false
-          for ($attempt = 1; $attempt -le 3; $attempt++) {
-            choco install pandoc libreoffice-fresh -y --no-progress
-            # A failed Chocolatey feed request can still exit 0. Check the
-            # executables used by the real conversion tests before proceeding.
-            node --input-type=module -e "import {pandocPath,libreOfficePath} from './electron/interchange.mjs'; if (!(await pandocPath()) || !(await libreOfficePath())) process.exit(1)"
-            if ($LASTEXITCODE -eq 0) { $ready = $true; break }
-            if ($attempt -lt 3) { Start-Sleep -Seconds (10 * $attempt) }
+          # Pinned upstream installers avoid the Chocolatey feed dependency.
+          # Checksums: jgm/pandoc release 3.12.1 and the LibreOffice mirror list.
+          $packages = @(
+            @{ Name = 'pandoc'; Url = 'https://github.com/jgm/pandoc/releases/download/3.12.1/pandoc-3.12.1-windows-x86_64.msi'; Sha256 = 'b6bf9f2c8408a1689272be5722e45f93ed9da17ba74321d0f7ef4e5a196605e8' },
+            @{ Name = 'libreoffice'; Url = 'https://download.documentfoundation.org/libreoffice/stable/26.8.1/win/x86_64/LibreOffice_26.8.1_Win_x86-64.msi'; Sha256 = 'c6298b10cfa1748bcbedad94c62ce771e240e5021bfd6d7a967cd571b04b5312' }
+          )
+          foreach ($package in $packages) {
+            $installer = Join-Path $env:RUNNER_TEMP ($package.Name + '.msi')
+            curl.exe --fail --location --silent --show-error --retry 3 --retry-all-errors --connect-timeout 30 --max-time 300 $package.Url --output $installer
+            if ($LASTEXITCODE -ne 0) { throw ($package.Name + ' download failed') }
+            if ((Get-FileHash $installer -Algorithm SHA256).Hash.ToLowerInvariant() -ne $package.Sha256) { throw ($package.Name + ' checksum mismatch') }
+            $install = Start-Process msiexec.exe -ArgumentList @('/i', "`"$installer`"", '/qn', '/norestart', 'ALLUSERS=1') -Wait -PassThru
+            if ($install.ExitCode -ne 0 -and $install.ExitCode -ne 3010) { throw ($package.Name + ' install failed: ' + $install.ExitCode) }
           }
-          if (!$ready) { throw 'Pandoc/LibreOffice installation did not complete after three attempts' }
+          node --input-type=module -e "import {pandocPath,libreOfficePath} from './electron/interchange.mjs'; if (!(await pandocPath()) || !(await libreOfficePath())) process.exit(1)"
+          if ($LASTEXITCODE -ne 0) { throw 'Installed conversion tools were not found' }
           exit 0
       - run: npm test
         env:
