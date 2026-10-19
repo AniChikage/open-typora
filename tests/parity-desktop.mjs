@@ -71,6 +71,23 @@ try {
   await page.keyboard.press(`${mod}+z`); await saved(original.replace('cellA','ce<br>llA'));
   await page.keyboard.press(`${mod}+z`); await saved(original);
   checks.push('Modified Enter inserts a table row; Shift-Enter stays in the cell; undo restores exact source');
+
+  await point('cellA','cellA',2); await page.keyboard.insertText('|');
+  await saved(original.replace('cellA','ce\\|llA')); await expect(root.locator('tbody td')).toHaveCount(4);
+  await page.keyboard.press('Backspace'); await saved(original);
+  await point('cellA','cellA',2);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.imeSetComposition',{text:'zhong',selectionStart:5,selectionEnd:5});
+  await cdp.send('Input.insertText',{text:'中文|输入'});
+  await saved(original.replace('cellA','ce中文\\|输入llA')); await expect(root.locator('tbody td')).toHaveCount(4);
+  await page.keyboard.press(`${mod}+z`); await saved(original);
+
+  await point('cellA','cellA',2);
+  await application.evaluate(({clipboard})=>clipboard.writeText('中文|输入\n第二行'));
+  await page.keyboard.press(`${mod}+v`);
+  await saved(original.replace('cellA','ce中文\\|输入<br>第二行llA'));await expect(root.locator('tbody td')).toHaveCount(4);await expect(root.locator('td br')).toHaveCount(1);
+  await page.keyboard.press(`${mod}+z`);await saved(original);
+  checks.push('Typed pipes and Chromium IME commits stay in one table cell; Backspace and undo preserve exact source');
   const fence = root.locator('.md-fence').filter({has:page.locator('.fence-language').filter({hasText:/^javascript$/})});
   await fence.locator('.fence-body').click();
   const code = fence.locator('.cm-content'); await expect(code).toBeVisible();
@@ -106,6 +123,24 @@ try {
     await expect(page.getByRole('button',{name:'Editing parity',exact:true})).toBeVisible();
     checks.push('PC Ctrl+P quick open and Ctrl+Shift+1 outline use the documented platform bindings');
   }
+
+  const headerFile=path.join(data,'Table header.md'), header='# Table header\n\n| Name | 中文 |';
+  await writeFile(headerFile,header);
+  await application.evaluate(({dialog},file)=>{dialog.showOpenDialog=async()=>({canceled:false,filePaths:[file]});},headerFile);
+  await menu('打开文件'); await expect(root.getByRole('heading',{name:'Table header',exact:true})).toBeVisible();
+  await point('| Name | 中文 |','| Name | 中文 |','| Name | 中文 |'.length);await page.keyboard.press('Enter');
+  await expect(root.locator('thead th')).toHaveCount(2);await expect(root.locator('tbody td')).toHaveCount(2);
+  const emptyTable=header+'\n| --- | --- |\n|  |  |';
+  await expect.poll(()=>readFile(headerFile,'utf8')).toBe(emptyTable);
+  await page.keyboard.insertText('路径|中文');
+  const filled=emptyTable.replace('|  |  |','| 路径\\|中文 |  |');
+  await expect.poll(()=>readFile(headerFile,'utf8')).toBe(filled);
+  await page.getByRole('button',{name:'源码',exact:true}).click();await expect(sourceContent).toContainText('路径\\|中文');
+  await page.getByRole('button',{name:'即时渲染',exact:true}).click();
+  await page.keyboard.press(`${mod}+z`);await expect.poll(()=>readFile(headerFile,'utf8')).toBe(emptyTable);
+  await page.keyboard.press(`${mod}+z`);await expect.poll(()=>readFile(headerFile,'utf8')).toBe(header);
+  await page.keyboard.press(`${mod}+Shift+z`);await expect(root.locator('tbody td')).toHaveCount(2);
+  checks.push('Header Enter creates a table and focuses its first body cell; Chinese/pipe typing, source round trip and separate undo/redo preserve it');
   assert.deepEqual(errors,[]);
   assert.ok(!(await page.locator('vite-error-overlay').count()));
   await page.screenshot({path:path.join(qa,'editing-parity.png')});

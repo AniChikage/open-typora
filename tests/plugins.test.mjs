@@ -233,3 +233,47 @@ test("Windows theme installation embeds local imports, fonts and images and refu
     await writeFile(css, '#write{background:url(https://example.com/a.png)}'); await assert.rejects(installTheme(css, profile), /本地/);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+
+test("disabled plugins cannot mutate documents or reacquire locks from pending async commands", async()=>{
+  let release, captured; const edits=[],locks=[];
+  const run=new PluginRuntime({getMarkdown:()=>'original',getPath:()=>null,getSelection:()=>'',insert:text=>edits.push(text),replace:text=>edits.push(text),setReadOnly:value=>locks.push(value),notify(){},changed(){},saveConfig(){}});
+  const plugin={id:'late-command',name:'late-command',description:'',config:{},factory:c=>class extends c.BasePlugin {
+    process(){captured=c;}
+    async call(){await new Promise(resolve=>release=resolve);this.utils.insertText('stale');await this.utils.editCurrentFile(()=>'stale');c.File.editor.insertText('stale');c.File.lock();}
+  }};
+  try {
+    await run.setEnabled(plugin,true); const pending=run.invoke(plugin.id);
+    await run.setEnabled(plugin,false); release(); await pending;
+    assert.deepEqual(edits,[]); assert.equal(locks.at(-1),false);
+    let events=0; captured.document.addEventListener('late-probe',()=>events++);
+    document.dispatchEvent(new Event('late-probe')); assert.equal(events,0);
+    const timer=captured.setInterval(()=>{},1000); captured.clearInterval(timer); assert.equal(timer,0);
+  } finally {await run.destroy();}
+});
+test("failed plugin cleanup releases effects immediately and cannot unlock its replacement",async()=>{
+  const run=runtime(); let release;
+  const first={id:'lock-race',name:'lock-race',description:'',config:{version:1},factory:c=>class extends c.BasePlugin {
+    process(){c.File.lock();c.document.documentElement.classList.add('old-effect');this.utils.eventHub.on('fail-now',()=>{throw Error('failed')});}
+    destroy(){return new Promise(resolve=>release=resolve);}
+  }};
+  try {
+    await run.value.setEnabled(first,true);run.value.event('fail-now');await Promise.resolve();
+    assert.equal(document.documentElement.classList.contains('old-effect'),false);
+    await run.value.setEnabled({...first,config:{version:2},factory:c=>class extends c.BasePlugin {process(){c.File.lock();}}},true);
+    assert.equal(run.locks.at(-1),true);release();await new Promise(resolve=>setTimeout(resolve,5));
+    assert.equal(run.locks.at(-1),true);assert.equal(run.states[first.id].status,'ready');
+  } finally {release?.(); await run.value.destroy();}
+});
+
+test("host shutdown invalidates plugin APIs even while initialization is awaiting",async()=>{
+  let release, started; const edits=[], locks=[];
+  const ready=new Promise(resolve=>started=resolve);
+  const run=new PluginRuntime({getMarkdown:()=>'original',getPath:()=>null,getSelection:()=>'',insert:text=>edits.push(text),replace:text=>edits.push(text),setReadOnly:value=>locks.push(value),notify(){},changed(){},saveConfig(){}});
+  const enabling=run.setEnabled({id:'shutdown',name:'shutdown',description:'',config:{},factory:c=>class extends c.BasePlugin {
+    async init(){c.File.lock();started();await new Promise(resolve=>release=resolve);this.utils.insertText('late');c.File.lock();}
+    process(){edits.push('process should not run');}
+  }},true);
+  await ready;const stopped=run.destroy();assert.equal(locks.at(-1),false);release();await Promise.all([enabling,stopped]);
+  assert.deepEqual(edits,[]);assert.equal(locks.at(-1),false);
+});

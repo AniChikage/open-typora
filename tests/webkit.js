@@ -407,6 +407,20 @@ try {
   check(readSource() === paritySource.replace('cellA',''),'native source word deletion uses source selection');
   window.__openTypora.command({action:'undo'}); check(readSource() === paritySource,'native source word deletion undo restores exact Markdown');
   await sourceMode(false);
+
+  const headerSource='# Native table header\n\n| Name | 中文 |';
+  const headerRecord={id:'native-header-table',path:null,name:'Native-table-header.md',content:headerSource,savedContent:headerSource,diskHash:null,lineEnding:'\n'};
+  const headerRegistered=await window.desktop.registerDraft(headerRecord);if(!headerRegistered.ok)throw Error(headerRegistered.error);
+  window.__openTypora.command({action:'opened',document:headerRecord});await wait(()=>document.querySelector('.document-title')?.textContent===headerRecord.name);
+  pointText('| Name | 中文 |','| Name | 中文 |'.length);input('insertParagraph');
+  check(root().querySelectorAll('th').length===2 && root().querySelectorAll('td').length===2 && !!getSelection().anchorNode.parentElement.closest('td'),'native header Enter creates a table and focuses its first body cell');
+  input('insertText','你好|中国');await sourceMode(true);
+  const emptyHeaderTable=headerSource+'\n| --- | --- |\n|  |  |';
+  check(readSource()===emptyHeaderTable.replace('|  |  |','| 你好\\|中国 |  |'),'native table pipe typing keeps Chinese content in one cell and survives source switching');
+  await sourceMode(false);window.__openTypora.command({action:'undo'});await sourceMode(true);
+  check(readSource()===emptyHeaderTable,'native table content undo is separate from table creation');
+  await sourceMode(false);window.__openTypora.command({action:'undo'});await sourceMode(true);
+  check(readSource()===headerSource,'native table creation undoes in one transaction');await sourceMode(false);
   window.__openTypora.command({action:'opened',document:saved.value});
   await wait(() => document.querySelector('.document-title')?.textContent === saved.value.name);
   pointText("粗测新体", 2);

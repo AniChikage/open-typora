@@ -272,7 +272,9 @@ export function tableRowCells(line: string) {
         break;
       const original = line.slice(start, i),
         raw = original.trim(),
-        from = start + original.length - original.trimStart().length;
+        // Empty cells have no text boundary. Keep one leading padding space
+        // so the first edit lands inside the cell rather than against its pipe.
+        from = start + (raw ? original.length - original.trimStart().length : Math.min(1, original.length));
       cells.push({ raw, start: from, end: from + raw.length });
       start = i + 1;
     }

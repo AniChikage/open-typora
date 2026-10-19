@@ -41,7 +41,7 @@ function hotkeySignature(shortcut: string, mac = /Mac/.test(navigator.platform))
 export class PluginRuntime {
   private running = new Map<string, Running>();
   private queues = new Map<string, Promise<void>>();
-  private locks = new Set<string>();
+  private locks = new Set<Running>();
   private stopped = false;
   private observer: MutationObserver;
   private options: Options;
@@ -124,7 +124,8 @@ export class PluginRuntime {
     this.options.changed(item.definition.id, { enabled: false, status: "error", error: error instanceof Error ? error.message : String(error) });
   }
   private context(item: Running) {
-    const own = (cleanup: () => void) => item.cleanup.push(cleanup);
+    const own = (cleanup: () => void) => { if (item.disposed) cleanup(); else item.cleanup.push(cleanup); };
+    const insert = (text: string) => { if (!item.disposed) this.options.insert(text); };
     const recorder = new StateRecorder(this.write, () => this.options.getDocumentId?.() || this.options.getPath() || "untitled");
     item.recorder = recorder; own(() => recorder.clear());
     const track = <T extends object>(target: T): T => new Proxy(target, { get: (object, key) => {
@@ -133,6 +134,7 @@ export class PluginRuntime {
         const list = (object as Element).classList;
         return new Proxy(list, { get(list, prop) {
           if (["add", "remove", "toggle"].includes(String(prop))) return (...args: any[]) => {
+            if (item.disposed) return;
             const names = prop === "toggle" ? [args[0]] : args;
             const previous = names.map(name => list.contains(name));
             const result = (list[prop as "toggle"] as any)(...args);
@@ -155,10 +157,12 @@ export class PluginRuntime {
       style.textContent = adaptThemeCss(css).replace(/(\d+)\s+ms\b/g, "$1ms");
     };
     const eventType = Object.fromEntries(["allPluginsHadInjected", "fileContentLoaded", "fileEdited", "beforeFileOpen", "fileOpened", "otherFileOpened", "beforeToggleSourceMode", "afterToggleSidebar", "toggleSettingPage", "outlineUpdated"].map(name => [name,name]));
-    const on = item.events.on;
+    const on = (name: string, callback: (...args: any[]) => unknown, order = 0, once = false) =>
+      item.disposed ? () => {} : item.events.on(name, callback, order, once);
     const activeTimers = new Map<number,boolean>();
     own(() => { for (const [id,repeat] of activeTimers) repeat ? window.clearInterval(id) : window.clearTimeout(id); activeTimers.clear(); });
     const timed = (repeat: boolean, callback: (...args: any[]) => unknown, delay = 0, ...args: any[]) => {
+      if (item.disposed) return 0;
       const invoke = () => { if (!repeat) activeTimers.delete(id); if (!item.disposed) { try { Promise.resolve(callback(...args)).catch(error => this.fail(item,error)); } catch(error) { void this.fail(item,error); } } };
       const id = repeat ? window.setInterval(invoke,delay) : window.setTimeout(invoke,delay);
       activeTimers.set(id,repeat); return id;
@@ -172,6 +176,7 @@ export class PluginRuntime {
       const value = Reflect.get(target,key,target); return typeof value === "function" ? value.bind(target) : value;
     } });
     const register = (bindings: any) => {
+      if (item.disposed) return;
       for (const binding of Array.isArray(bindings) ? bindings : [bindings]) {
         if (Array.isArray(binding)) { register(binding); continue; }
         if (!binding?.hotkey || typeof binding.callback !== "function") continue;
@@ -185,11 +190,11 @@ export class PluginRuntime {
       }
     };
     const file: any = {
-      lock: () => { this.locks.add(item.definition.id); this.options.setReadOnly(true); },
-      unlock: () => { this.locks.delete(item.definition.id); this.options.setReadOnly(this.locks.size > 0); },
+      lock: () => { if (item.disposed) return; this.locks.add(item); this.options.setReadOnly(true); },
+      unlock: () => { if (item.disposed) return; this.locks.delete(item); this.options.setReadOnly(this.locks.size > 0); },
       freshLock() {},
       getFilePath: () => this.options.getPath(),
-      editor: { getMarkdown: () => this.options.getMarkdown(), getValue: () => this.options.getMarkdown(), getSelection: () => this.options.getSelection(), insertText: (text: string) => this.options.insert(text) },
+      editor: { getMarkdown: () => this.options.getMarkdown(), getValue: () => this.options.getMarkdown(), getSelection: () => this.options.getSelection(), insertText: insert },
     };
     Object.defineProperty(file, "isLocked", { configurable: true, enumerable: true, get: () => this.locks.size > 0, set: value => value ? file.lock() : file.unlock() });
     item.file = file;
@@ -197,8 +202,8 @@ export class PluginRuntime {
     const utils: any = {
       PLUGIN_LOAD_ABORT: Symbol("PLUGIN_LOAD_ABORT"), supportHasSelector: CSS.supports("selector(:has(*))"), entities,
       insertStyle, upsertStyle: insertStyle, removeStyle: (name: string) => { item.styles.get(name)?.remove(); item.styles.delete(name); },
-      notification: { show: (message: string) => this.options.notify(String(message)) },
-      eventHub: { eventType, on, addEventListener: on, off: item.events.off, removeEventListener: item.events.off, once: (name: string, callback: (...args: any[]) => unknown, order?: number) => on(name,callback,order,true), emit: (name: string, ...args: any[]) => this.event(name,...args), publishEvent: (name: string, ...args: any[]) => this.event(name,...args) },
+      notification: { show: (message: string) => { if (!item.disposed) this.options.notify(String(message)); } },
+      eventHub: { eventType, on, addEventListener: on, off: item.events.off, removeEventListener: item.events.off, once: (name: string, callback: (...args: any[]) => unknown, order?: number) => on(name,callback,order,true), emit: (name: string, ...args: any[]) => { if (!item.disposed) this.event(name,...args); }, publishEvent: (name: string, ...args: any[]) => { if (!item.disposed) this.event(name,...args); } },
       hotkeyHub: { register, registerSingle: (hotkey: string | string[], callback: () => unknown) => register({hotkey,callback}), unregister: (hotkey: string) => { const signature = hotkeySignature(hotkey); item.shortcuts = item.shortcuts.filter(entry => hotkeySignature(entry.hotkey) !== signature); }, pause: () => { item.shortcutsPaused = true; }, resume: () => { item.shortcutsPaused = false; } },
       settings: {
         save: async (_name: string, values: Record<string, any>) => { if (item.disposed) return; Object.assign(item.plugin.config, values); this.options.saveConfig(item.definition.id, {...values}); },
@@ -207,14 +212,19 @@ export class PluginRuntime {
       stateRecorder: recorder,
       metaKeyPressed: (event: MouseEvent) => event.metaKey || event.ctrlKey,
       getCurrentFilePath: () => this.options.getPath(), getFilePath: () => this.options.getPath(), getCurrentFileContent: () => this.options.getMarkdown(),
-      getSelection: () => this.options.getSelection(), insertText: (text: string) => this.options.insert(text),
-      editCurrentFile: async (change: (text: string) => string) => this.options.replace(change(this.options.getMarkdown())),
+      getSelection: () => this.options.getSelection(), insertText: insert,
+      editCurrentFile: async (change: (text: string) => string) => {
+        if (item.disposed) return;
+        const text = change(this.options.getMarkdown());
+        if (!item.disposed) this.options.replace(text);
+      },
       waitUntil: async (predicate: () => any) => { for (let i = 0; i < 100 && !item.disposed; i++) { const value = predicate(); if (value) return value; await new Promise(resolve => setTimeout(resolve, 30)); } throw new Error("插件等待的编辑器接口不可用。"); },
       debounce: (callback: (...args: any[]) => unknown, delay = 100) => { let timer: number; return (...args: any[]) => { timers.clearTimeout(timer); timer = timers.setTimeout(callback,delay,...args); }; },
-      throttle: (callback: (...args: any[]) => unknown, delay = 100) => { let last = -Infinity; return (...args: any[]) => { const now = Date.now(); if (now-last >= delay) { last=now; return callback(...args); } }; },
+      throttle: (callback: (...args: any[]) => unknown, delay = 100) => { let last = -Infinity; return (...args: any[]) => { const now = Date.now(); if (!item.disposed && now-last >= delay) { last=now; return callback(...args); } }; },
       decorator: { afterCall: (target: () => any, name: string, callback: (...args: any[]) => void) => {
+        if (item.disposed) return;
         const object = target(), original = object[name]; if (typeof original !== "function") throw new Error(`尚不支持接口：${name}`);
-        object[name] = function(...args: any[]) { const result = original.apply(this, args); callback(...args); return result; };
+        object[name] = function(...args: any[]) { const result = original.apply(this, args); if (!item.disposed) callback(...args); return result; };
         own(() => { object[name] = original; });
       } },
     };
@@ -247,17 +257,23 @@ export class PluginRuntime {
       try {
         this.syncDOM();
         const factory = definition.factory || (definition.url ? (await import(/* @vite-ignore */ definition.url)).default : undefined);
+        if (item.disposed || this.stopped) return;
         if (!factory) throw new Error("插件缺少入口。");
         const context = this.context(item), Constructor = factory(context);
         if (typeof Constructor !== "function") throw new Error("插件需要导出 module.exports.plugin 类。");
         const labels: Record<string,string> = { modeEnabled: "已开启", modeDisabled: "已关闭", pluginName: definition.name, "$label.RECORD_COLLAPSE": "记住折叠状态" };
         const plugin = new Constructor(definition.id, item.definition.config, { t: (key: string) => labels[key] || key, fillActions: (actions: any[]) => actions.map(action=>({...action,act_name:action.act_name || labels[action.act_value] || action.act_value})) }); item.plugin = plugin;
         if (await plugin.prepare?.() === context.utils.PLUGIN_LOAD_ABORT) throw new Error("此插件不支持当前环境。");
+        if (item.disposed || this.stopped) return;
         await plugin.init?.();
+        if (item.disposed || this.stopped) return;
         const style = plugin.style?.(); if (typeof style === "string") context.utils.insertStyle(definition.id, style); else if (style) throw new Error("插件使用了尚未支持的外部样式资源。");
         const html = plugin.html?.(); if (html) { const node = document.createElement("div"); node.innerHTML = DOMPurify.sanitize(html); document.body.append(node); item.cleanup.push(() => node.remove()); }
         context.utils.hotkeyHub.register(plugin.hotkey?.());
-        await plugin.process?.(); await plugin.postprocess?.(); this.publish(item, "allPluginsHadInjected");
+        await plugin.process?.();
+        if (item.disposed || this.stopped) return;
+        await plugin.postprocess?.();
+        this.publish(item, "allPluginsHadInjected");
         await Promise.resolve();
         if (!item.disposed && !this.stopped) this.options.changed(definition.id, { enabled: true, status: "ready" });
       } catch (error) { await this.fail(item, error); }
@@ -271,17 +287,19 @@ export class PluginRuntime {
   private async dispose(item: Running) {
     if (item.disposed) return;
     item.disposed = true;
-    try { await item.plugin?.destroy?.(); } catch { /* Remaining owned resources are still released. */ }
+    // Release effects before awaiting plugin teardown: its promise may outlive
+    // a replacement instance, or never settle. Late host calls are inert.
     for (const cleanup of item.cleanup.reverse()) { try { cleanup(); } catch {} }
     for (const style of item.styles.values()) style.remove();
     item.events.clear(); item.shortcuts = [];
-    this.locks.delete(item.definition.id); this.options.setReadOnly(this.locks.size > 0);
+    this.locks.delete(item); this.options.setReadOnly(this.locks.size > 0);
     if (this.running.get(item.definition.id) === item) this.running.delete(item.definition.id);
     const label = document.getElementById("footer-word-count-label"); if (!this.locks.size && label) delete label.dataset.value;
+    try { await item.plugin?.destroy?.(); } catch { /* Owned resources were already released. */ }
   }
   async destroy() {
     this.stopped = true; this.observer.disconnect(); document.removeEventListener("keydown", this.keydown, true); document.removeEventListener("selectionchange", this.focus);
-    await Promise.all([...this.queues.values()].map(task => task.catch(() => {})));
-    for (const item of this.running.values()) await this.dispose(item);
+    const disposing = [...this.running.values()].map(item => this.dispose(item));
+    await Promise.all([...this.queues.values(), ...disposing].map(task => task.catch(() => {})));
   }
 }

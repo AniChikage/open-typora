@@ -375,7 +375,7 @@ test("empty table cells and escaped pipes do not steal another cell source posit
   const last = f.editor.leaves.get(spans.at(-1).dataset.leaf);
   point(f.editor, last.positions[0]);
   input(f.root, "insertText", "末");
-  assert.equal(f.model.text, source.replace("|  |  |", "|  |  末|"));
+  assert.equal(f.model.text, source.replace("|  |  |", "|  | 末 |"));
   f.editor.undo();
   assert.equal(f.model.text, source);
   f.close();
@@ -801,4 +801,80 @@ test("double-dollar math inside a paragraph retains the formula view and all fol
   assert.ok(f.root.textContent.includes(' after'));
   point(f.editor,source.length);input(f.root,'insertText','!');assert.equal(f.model.text,source+'!');
   f.editor.undo();assert.equal(f.model.text,source);f.close();
+});
+
+
+test("a pipe header followed by Enter creates an editable table with one-step undo", () => {
+  for (const header of ['| Name | 中文 |', '| **Name** | 中\\|文 |', '| Only |']) {
+    const f=fixture(header+'\n\nAfter');
+    try {
+      point(f.editor,header.length); input(f.root,'insertParagraph');
+      const width=header.includes('Only')?1:2;
+      assert.equal(f.root.querySelectorAll('th').length,width);
+      assert.equal(f.root.querySelectorAll('td').length,width);
+      assert.equal(window.getSelection().anchorNode.parentElement.closest('td')?.cellIndex,0);
+      input(f.root,'insertText','内容');
+      assert.equal(f.root.querySelector('td').textContent,'内容');
+      f.editor.undo(); f.editor.undo(); assert.equal(f.model.text,header+'\n\nAfter');
+    } finally {f.close();}
+  }
+});
+test("typing a pipe inside a table cell preserves column count and supports undo", () => {
+  const source='| A | B |\n| --- | --- |\n| alpha | beta |';
+  const f=fixture(source);
+  try {
+    point(f.editor,source.indexOf('alpha')+2); input(f.root,'insertText','|');
+    assert.equal(f.model.text,source.replace('alpha','al\\|pha'));
+    assert.equal(f.root.querySelectorAll('td').length,2);
+    const cell=f.root.querySelector('td').cloneNode(true); cell.querySelectorAll('.md-meta').forEach(node=>node.remove());
+    assert.equal(cell.textContent,'al|pha');
+    f.editor.undo(); assert.equal(f.model.text,source);
+    point(f.editor,source.indexOf('alpha')+2); f.editor.insert('中|文','paste');
+    assert.equal(f.model.text,source.replace('alpha','al中\\|文pha'));
+  } finally {f.close();}
+});
+
+test("table pipes committed by composition retain cells, caret and one undo group",async()=>{
+  const source='| A | B |\n| --- | --- |\n| alpha | beta |'; const f=fixture(source);
+  try {
+    point(f.editor,source.indexOf('alpha')+2);
+    f.root.dispatchEvent(new window.CompositionEvent('compositionstart',{bubbles:true}));
+    const text=window.getSelection().anchorNode;text.insertData(2,'中|文');window.getSelection().collapse(text,5);
+    f.root.dispatchEvent(new window.CompositionEvent('compositionend',{bubbles:true,data:'中|文'}));
+    await new Promise(resolve=>setTimeout(resolve,5));
+    assert.equal(f.model.text,source.replace('alpha','al中\\|文pha'));
+    assert.equal(f.model.selection.head,f.model.text.indexOf('文')+1);
+    assert.equal(f.root.querySelectorAll('td').length,2);
+    f.editor.undo();assert.equal(f.model.text,source);f.editor.redo();assert.equal(f.root.querySelectorAll('td').length,2);
+  } finally {f.close();}
+});
+test("deleting an escaped table pipe removes its escape atomically without changing columns",()=>{
+  const source='| A | B |\n| --- | --- |\n| al\\|pha | beta |';
+  for (const backward of [true,false]) {
+    const f=fixture(source);
+    try {
+      point(f.editor,source.indexOf('\\|')+(backward?2:0));input(f.root,backward?'deleteContentBackward':'deleteContentForward');
+      assert.equal(f.model.text,source.replace('\\|',''));assert.equal(f.root.querySelectorAll('td').length,2);
+      f.editor.undo();assert.equal(f.model.text,source);
+    } finally {f.close();}
+  }
+});
+test("soft Enter, selected headers, escaped final pipes and code never trigger table creation",()=>{
+  for (const source of ['| A | B \\|','before\n| A | B |','```text\n| A | B |\n```']) {
+    const f=fixture(source);try {point(f.editor,source.indexOf('| A')+'| A | B |'.length);input(f.root,'insertParagraph');assert.equal(f.root.querySelector('table'),null);}finally{f.close();}
+  }
+  const f=fixture('| A | B |');try {point(f.editor,f.model.text.length);input(f.root,'insertLineBreak');assert.equal(f.root.querySelector('table'),null);}finally{f.close();}
+});
+
+test("multiline text pasted into a table stays in one cell and undoes once",()=>{
+  const source='| A | B |\n| --- | --- |\n| alpha | beta |';const f=fixture(source);
+  try {
+    point(f.editor,source.indexOf('alpha')+2);f.editor.insert('中文|输入\r\n第二行','paste');
+    assert.equal(f.model.text,source.replace('alpha','al中文\\|输入<br>第二行pha'));
+    assert.equal(f.root.querySelectorAll('td').length,2);assert.equal(f.root.querySelectorAll('td br').length,1);
+    f.editor.undo();assert.equal(f.model.text,source);
+  } finally {f.close();}
+  const header=fixture('| A | B |');try {
+    header.editor.model.selection={anchor:0,head:header.model.text.length};header.editor.restore();input(header.root,'insertParagraph');assert.equal(header.root.querySelector('table'),null);
+  } finally {header.close();}
 });

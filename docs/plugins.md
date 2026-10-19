@@ -1,6 +1,6 @@
 # Themes and plugin compatibility
 
-Open Typora 0.11.0 includes six original themes and a compatibility host for a subset of [obgnail/typora_plugin](https://github.com/obgnail/typora_plugin). This is an independent integration, with no affiliation to Typora or the plugin authors. It does not load the complete Typora plugin distribution.
+Open Typora 0.12.0 includes six original themes and a compatibility host for a subset of [obgnail/typora_plugin](https://github.com/obgnail/typora_plugin). This is an independent integration, with no affiliation to Typora or the plugin authors. It does not load the complete Typora plugin distribution.
 
 ## Included community plugins
 
@@ -38,6 +38,8 @@ The host distinguishes document-load events (`fileOpened`, `otherFileOpened`, `f
 `hotkeyHub.register/registerSingle/unregister/pause/resume` supports single shortcuts and arrays, with the same collision checks as `hotkey()`. Candidate-input key 229 and active composition never trigger host shortcuts. In 0.11.0 both native macOS and Electron file/folder modules receive the same owned timer bindings, including relative helper modules. Timers created with the provided `setTimeout/setInterval` or `window` helpers stop on disable, failure or unload; `debounce` uses those owned timers. This tracking does not cover arbitrary global aliases, private workers or external asynchronous operations.
 
 **Plugin commands** in the manager exposes `staticActions` and `getDynamicActions(anchor, meta)`, including labels, disabled/checked states and metadata passed to `call(action, meta)`. `settings.autoSave` persists top-level configuration changes. `stateRecorder` preserves registered truthy DOM state within the current app session, keyed by document and block; it is not a disk-persistence implementation of the complete upstream service.
+
+On disable or failure, owned effects and read-only locks are released before awaiting `destroy()`. Pending asynchronous commands from that instance can no longer edit documents, reacquire locks, register tracked events/hotkeys/timers, or publish host events. A replacement instance owns its own lock; an older teardown cannot unlock it. Arbitrary JavaScript and direct global DOM writes are still outside this lifecycle guard.
 
 Document mutations through the host adapter are blocked while an IME composition is pending, with a notice to finish input first. A plugin must retry after commit; direct DOM writes by trusted JavaScript remain outside this protection.
 

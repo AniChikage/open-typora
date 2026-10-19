@@ -470,6 +470,9 @@ export class RichEditor {
         if (from === to) {
           const marker = [...this.root.querySelectorAll<HTMLElement>(".md-cell-break")].find(element => this.point(element, 0) + (element.textContent?.length || 0) === from);
           if (marker) { from -= marker.textContent!.length; insert = ""; kind = "structure"; break; }
+          if (this.leafElement(window.getSelection()?.anchorNode)?.closest("td,th") && /(?<!\\)(?:\\\\)*\\\|$/.test(this.model.text.slice(0, from))) {
+            from -= 2; insert = ""; kind = "structure"; break;
+          }
           const pairs: Record<string, string> = { "(": ")", "[": "]", "{": "}", '"': '"', "'": "'" };
           if (this.autoPair && pairs[this.model.text[from - 1]] && pairs[this.model.text[from - 1]] === this.model.text[to]) {
             from--; to++; insert = ""; break;
@@ -499,6 +502,9 @@ export class RichEditor {
         if (from === to) {
           const marker = [...this.root.querySelectorAll<HTMLElement>(".md-cell-break")].find(element => this.point(element, 0) === from);
           if (marker) { to += marker.textContent!.length; insert = ""; kind = "structure"; break; }
+          if (this.leafElement(window.getSelection()?.anchorNode)?.closest("td,th") && this.model.text.slice(from, from + 2) === "\\|") {
+            to += 2; insert = ""; kind = "structure"; break;
+          }
           const node = this.model.nodeAt(from),
             next = this.model.nodes[this.model.nodes.indexOf(node!) + 1];
           to =
@@ -527,6 +533,7 @@ export class RichEditor {
         break;
       case "insertText":
       case "insertReplacementText":
+        insert = this.tableText(insert, from);
         if (this.autoPair && event.inputType === "insertText" && insert.length === 1) {
           const pairs: Record<string, string> = { "(": ")", "[": "]", "{": "}", '"': '"', "'": "'" };
           if (from === to && ")]}'\"".includes(insert) && this.model.text[from] === insert) {
@@ -591,13 +598,15 @@ export class RichEditor {
       after++;
     const from = leaf.positions[before],
       to = leaf.positions[leaf.raw.length - after],
-      insert = raw.slice(before, raw.length - after);
-    const local = localHead ?? before + insert.length;
+      rawInsert = raw.slice(before, raw.length - after),
+      element = this.root.querySelector<HTMLElement>(`[data-leaf="${leaf.id}"]`),
+      insert = this.tableText(rawInsert, from, element);
+    const local = localHead ?? before + rawInsert.length;
     const head =
       local < before
         ? leaf.positions[local]
         : local <= raw.length - after
-          ? from + local - before
+          ? from + this.tableText(rawInsert.slice(0, local - before), from, element).length
           : leaf.positions[local - raw.length + leaf.raw.length] +
             insert.length -
             (to - from);
@@ -895,9 +904,23 @@ export class RichEditor {
       this.tab(event.shiftKey);
     }
   };
+  private tableText(text: string, from: number, element = this.leafElement(window.getSelection()?.anchorNode)) {
+    if (!element?.closest("td,th")) return text;
+    // A literal pipe in a rendered cell must not become a Markdown column.
+    // Preserve existing source escapes supplied by clipboard/plugin commands.
+    let slashes = /\\*$/.exec(this.model.text.slice(0, from))?.[0].length || 0, output = "";
+    for (const character of text.replace(/\r\n?/g, "\n")) {
+      if (character === "\n") { output += "<br>"; slashes = 0; continue; }
+      if (character === "|" && slashes % 2 === 0) output += "\\";
+      output += character;
+      slashes = character === "\\" ? slashes + 1 : 0;
+    }
+    return output;
+  }
   insert(text: string, kind = "command") {
     const selection = this.bookmark();
     this.model.selection = selection;
+    text = this.tableText(text, Math.min(selection.anchor, selection.head));
     if (
       this.model.replace(
         Math.min(selection.anchor, selection.head),
@@ -929,6 +952,19 @@ export class RichEditor {
         ? undefined
         : this.model.text.indexOf("\n", lineStart),
     );
+    const header = line.trimEnd();
+    if (!soft && from === to && node?.kind === "paragraph_open" && node.from === lineStart && node.to === from &&
+        /^ {0,3}\|/.test(header) && header.endsWith("|") && (/(\\*)\|$/.exec(header)?.[1].length || 0) % 2 === 0) {
+      const cells = tableRowCells(line);
+      if (cells.length > 0 && cells.length <= 30) {
+        const separator = "| " + cells.map(() => "---").join(" | ") + " |",
+          body = "| " + cells.map(() => "").join(" | ") + " |",
+          text = line + "\n" + separator + "\n" + body,
+          at = lineStart + line.length + separator.length + 4;
+        if (this.model.replace(lineStart, from, text, "table-create", {anchor:at,head:at})) this.publish();
+        return;
+      }
+    }
     const opening = /^(\s*(?:>\s*)*(?:(?:[-+*]|\d+[.)])\s+)?)(`{3,}|~{3,})[^\n]*$/.exec(line);
     if (!soft && from === to && from === lineStart + line.length && node?.kind !== "frontmatter") {
       if (opening) { const prefix = opening[1].replace(/(?:[-+*]|\d+[.)])\s+$/, marker => " ".repeat(marker.length)), at = from + 1 + prefix.length; if (this.model.replace(from, to, `\n${prefix}\n${prefix}${opening[2]}`, "structure", { anchor: at, head: at })) this.publish(); return; }

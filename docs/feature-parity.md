@@ -1,6 +1,6 @@
 # Typora 功能对齐清单
 
-当前交付版本：**0.11.0，macOS arm64 / Windows x64 / Linux x64**。基准为本机 Typora 1.14.10 的菜单、实际交互和官方公开文档。功能存在、自动化通过与完整等价是不同结论；未验证的组合不写成已对齐。
+当前交付版本：**0.12.0，macOS arm64 / Windows x64 / Linux x64**。基准为本机 Typora 1.14.10 的菜单、实际交互和官方公开文档。功能存在、自动化通过与完整等价是不同结论；未验证的组合不写成已对齐。
 
 公开依据：[Markdown](https://support.typora.io/Markdown-Reference/)、[文件管理](https://support.typora.io/File-Management/)、[图片](https://support.typora.io/Images/)、[导出](https://support.typora.io/Export/)、[HTML](https://support.typora.io/HTML/)、[快捷键](https://support.typora.io/Shortcut-Keys/)。REA 的静态证据及覆盖边界见 [research.md](research.md)。
 
@@ -12,7 +12,7 @@
 | 行内样式与清除格式 | 已实现并回归 | 跨叶格式及部分嵌套选区清除保留两侧样式；单次撤销还原 |
 | 平台快捷键与代码缩进 | 已实现并回归 | Mac 保留现有映射；Windows/Linux 使用 Ctrl+P、Ctrl+T、Ctrl+Shift+K/M/Q、Ctrl+Shift+1/2/3 等公开绑定，菜单与插件快捷键预留共用映射；局部代码多行 Tab/Shift-Tab 不替换选区内容 |
 | 选词、选行、格式范围与定位 | 已实现并回归 | Cmd/Ctrl+D 选词（包含中文分词）、Shift+D 删除词语并单次撤销；L 选行/表格行，E 扩展嵌套格式范围/选单元格，J 跳回选区；源码及局部代码共用选词/选行/定位，源码范围按语法树扩展；只读允许选择与定位 |
-| 表格 | 已实现并回归 | 行列增删/移动/对齐、Tab 导航、TSV/HTML 网格粘贴、扩展尺寸、转义管道；Cmd/Ctrl+Enter 在当前位置下方插行，Shift+Enter 保留单元格内换行；Markdown 本身没有合并单元格语法 |
+| 表格 | 已实现并回归 | 输入独立的管道表头后回车建表并定位首个正文单元格（最多 30 列）；正文输入/粘贴及组合提交的管道符自动转义，删除管道符同时删除转义符；多行文本粘贴转为单元格内换行；行列增删/移动/对齐、Tab 导航、TSV/HTML 网格粘贴、扩展尺寸、转义管道；Cmd/Ctrl+Enter 在当前位置下方插行，Shift+Enter 保留单元格内换行；Markdown 本身没有合并单元格语法 |
 | 目录、脚注、YAML、引用链接 | 已实现并回归 | 重复标题 slug、目录跳转、脚注定义编辑、前言隐藏、引用链接定义插入；复杂嵌套脚注未穷尽 |
 | 高亮、上下标、Emoji、注释、警告块 | 已实现并回归 | 可关闭扩展；Emoji 前缀建议支持方向键/Enter/Tab；NOTE/TIP/IMPORTANT/WARNING/CAUTION 预览 |
 | HTML 与媒体 | 已实现，范围有限 | CommonMark HTML 块、局部源码编辑、静态 HTML、图片尺寸、音视频与沙盒 HTTPS iframe；会清理脚本/事件属性。第三方嵌入站点及全部 CSS 组合未验收 |
@@ -33,8 +33,8 @@
 | Word/RTF/ODT 与 Pandoc | 已实现，有依赖边界 | 本机 Pandoc 3.12.1 实际生成 10 种格式，DOCX/ODT/RTF/EPUB 中文复杂样本重新导入；DOCX 原生公式、表格、脚注、图片结构已检查。导出嵌入图表与图片；文本格式保留同名资源目录。RTF 额外保留表格/脚注/PNG/JPEG/标题/代码；WMF/EMF、脚注内图片拒绝而非静默丢失。Windows/Linux 增加 LibreOffice + Pandoc 的 DOC/RTF 导入，以及 DOCX/ODT/EPUB 持久媒体提取；实际转换、渲染、HTML 导出与重启后媒体读取随安装包验收；修正新版 Pandoc 默认公式语法。其他任意格式组合未穷尽 |
 | 内置主题与 CSS 安装 | 已实现并回归 | 六套原创主题；macOS/Windows 均内嵌本地 CSS 导入、字体、图片，适配常用选择器和颜色变量；第三方主题仍是部分兼容 |
 | 可视化背景图片 | 已实现，已验收本机 WebKit | PNG/JPEG/WebP 本地选择及副本保存，不透明度、模糊、填满/完整/平铺、五种位置、重置和清除；正文/源码模式共用，个人背景不带入导出。限制 8 MB / 4000 万像素；Windows 安装后验收随发布运行 |
-| 第三方插件兼容 | 部分兼容，已有实际运行 | 六款固定版本 obgnail/typora_plugin 原版源码（增加列表折叠）；单文件与文件夹 CommonJS 安装、相对 JS/JSON/CSS 引用及模块缓存、配置、生命周期、动态命令、事件解绑/单次/有序监听、动态快捷键、定时器与异步失败清理和卸载；原生 WebKit 已验收安装模块动态导入、可撤销文档修改及只读保护。未兼容完整插件包、Node/Electron、npm 依赖及所有 Typora 私有接口；详见 [plugins.md](plugins.md) |
+| 第三方插件兼容 | 部分兼容，已有实际运行 | 六款固定版本 obgnail/typora_plugin 原版源码（增加列表折叠）；单文件与文件夹 CommonJS 安装、相对 JS/JSON/CSS 引用及模块缓存、配置、生命周期、动态命令、事件解绑/单次/有序监听、动态快捷键、定时器与异步失败清理和卸载；0.12.0 在等待异步 destroy 前立即释放样式、事件和只读锁，已停用实例的兼容 API 写入/重新加锁/注册事件与定时器均失效，旧实例清理不再解除新实例的锁；原生 WebKit 已验收安装模块动态导入、可撤销文档修改及只读保护。未兼容完整插件包、Node/Electron、npm 依赖及所有 Typora 私有接口；详见 [plugins.md](plugins.md) |
 | 安装更新与旧版本清理 | 已实现并回归 | M 图标保留；验证新包后替换安装版并删除临时回滚包；只保留当前版本归档。用户文档/草稿不属于版本清理对象 |
 | Windows、其他平台与签名 | 部分交付 | Windows x64 提供 NSIS EXE / ZIP，由 Windows runner 安装后验证编辑、保存、PDF、图片、恢复、单实例与文件关联；Windows 10/11 实体候选交互尚未人工验收。Linux x64 新增 DEB / AppImage，Ubuntu 22.04 runner 验证 DEB 安装/卸载与恢复数据保留、两个包内应用的编辑、PDF、插件、背景和第二实例打开文件；AppImage 使用解包运行验收，FUSE 挂载及不同桌面环境未人工验收。Windows/Linux ARM / Intel Mac 未交付；Windows 无代码签名证书，macOS 未公证 |
 
-剩余项为其他输入法及列表/表格/局部代码的完整候选组合、未覆盖的跨应用剪贴板/复杂跨块编辑、第三方主题与图形扩展，以及 Windows 实体输入法，Intel Mac / ARM 等其他平台发布。复杂转换覆盖已列样本和目标格式，无法代表任意格式无损往返。**0.11.0 仍不能标为 Typora 全功能完全等价**；外部图床真实上传仍需独立配置与验收。
+剩余项为其他输入法及列表/表格/局部代码的完整候选组合、未覆盖的跨应用剪贴板/复杂跨块编辑、第三方主题与图形扩展，以及 Windows 实体输入法，Intel Mac / ARM 等其他平台发布。复杂转换覆盖已列样本和目标格式，无法代表任意格式无损往返。**0.12.0 仍不能标为 Typora 全功能完全等价**；外部图床真实上传仍需独立配置与验收。
