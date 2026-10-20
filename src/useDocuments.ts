@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { host } from "./host";
-import type { DocumentRecord, FileEntry, PathChange, RecentEntry, FileOperation } from "./types";
+import type { DocumentRecord, FileEntry, FolderResult, PathChange, RecentEntry, FileOperation } from "./types";
 export function useDocuments(canPrepare: () => boolean = () => true) {
   const prepareEditor = useRef(canPrepare); prepareEditor.current = canPrepare;
   const [documents, setDocuments] = useState<DocumentRecord[]>([]),
@@ -27,6 +27,12 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
     });
   const notify = (error: unknown) =>
     setMessage(error instanceof Error ? error.message : String(error));
+  function reportFolderScan(result: FolderResult) {
+    const notices = [];
+    if (result.truncated) notices.push("目录显示前 1000 项，或最多 8 层子目录。");
+    if (result.skipped) notices.push(`已跳过 ${result.skipped} 个暂时无法读取的文件或子目录。`);
+    if (notices.length) setMessage(notices.join(" "));
+  }
   useEffect(() => {
     let disposed = false;
     void host
@@ -43,7 +49,7 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
         setFolder(session?.folder || null);
         if (session?.folder) {
           const scanned = await host.scan();
-          if (!disposed) setFiles(scanned.files);
+          if (!disposed) { setFiles(scanned.files); reportFolderScan(scanned); }
         }
         if (session?.restoreError) setMessage(session.restoreError);
         setRecent(await host.recent());
@@ -234,8 +240,7 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
         setFiles(result.files);
         setFolder(result.folder);
         setRecent(await host.recent());
-        if (result.truncated)
-          setMessage("目录显示前 1000 个文件，或最多 8 层子目录。");
+        reportFolderScan(result);
       }
     } catch (error) {
       notify(error);
@@ -309,7 +314,7 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
   async function recentAction(action: string, path?: string) {
     const result = await host.recentAction(action, path);
     if (result && !Array.isArray(result)) {
-      if ("files" in result) { setFiles(result.files); setFolder(result.folder); }
+      if ("files" in result) { setFiles(result.files); setFolder(result.folder); reportFolderScan(result); }
       else await add(result);
     }
     setRecent(await host.recent());

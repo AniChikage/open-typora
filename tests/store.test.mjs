@@ -8,6 +8,9 @@ import {
   mkdir,
   symlink,
   stat,
+  chmod,
+  rm,
+  realpath,
 } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -142,4 +145,57 @@ test("corrupt recovery is backed up before a new session is written", async () =
     name.startsWith("session-backup-"),
   );
   assert.equal(await readFile(path.join(data, backup), "utf-8"), "{bad");
+});
+
+test("failed folder scans preserve the previous root and file tokens", async t => {
+  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), "open-typora-scan-")));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const file = path.join(directory, "note.md"); await writeFile(file, "# retained");
+  const store = new DocumentStore(path.join(directory, "data")), inventory = await store.scan(directory);
+  for (const invalid of [file, path.join(directory, "missing")]) {
+    await assert.rejects(store.scan(invalid));
+    assert.equal(store.folder, directory);
+    assert.deepEqual([...store.fileTokens.keys()], inventory.files.map(file => file.token));
+    assert.equal((await store.openToken(inventory.files[0].token)).content, "# retained");
+  }
+  assert.equal((await store.scan()).folder, directory, "a rejected scan does not poison the scan queue");
+});
+test("concurrent folder switches and refreshes commit in request order", async t => {
+  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), "open-typora-scan-order-")));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const a = path.join(directory, "a"), b = path.join(directory, "b");
+  await mkdir(a); await mkdir(b); await writeFile(path.join(a, "a.md"), "A"); await writeFile(path.join(b, "b.md"), "B");
+  const store = new DocumentStore(path.join(directory, "data"));
+  const [first, second, refreshed] = await Promise.all([store.scan(a), store.scan(b), store.scan()]);
+  assert.deepEqual([first.folder, second.folder, refreshed.folder, store.folder], [a, b, b, b]);
+  assert.deepEqual([...store.fileTokens.keys()], second.files.map(file => file.token));
+  assert.equal((await store.openToken(refreshed.files[0].token)).content, "B");
+});
+test("unreadable subfolders retain readable siblings and recover on refresh", { skip: process.platform === "win32" || process.getuid?.() === 0 }, async t => {
+  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), "open-typora-scan-permissions-")));
+  const locked = path.join(directory, "a-locked"), readable = path.join(directory, "b-readable");
+  t.after(async () => { await chmod(locked, 0o700); await rm(directory, { recursive: true, force: true }); });
+  await mkdir(locked); await mkdir(readable);
+  await writeFile(path.join(locked, "private.md"), "hidden"); await writeFile(path.join(readable, "note.md"), "# readable");
+  await chmod(locked, 0);
+  const store = new DocumentStore(path.join(directory, "data")), inventory = await store.scan(directory);
+  assert.equal(inventory.skipped, 1); assert.equal(inventory.truncated, false);
+  assert.ok(inventory.files.some(file => file.relative === path.join("b-readable", "note.md")));
+  assert.ok(!inventory.files.some(file => file.name === "private.md"));
+  const note = inventory.files.find(file => file.name === "note.md");
+  assert.equal((await store.openToken(note.token)).content, "# readable");
+  await chmod(locked, 0o700);
+  const refreshed = await store.scan();
+  assert.equal(refreshed.skipped, 0); assert.ok(refreshed.files.some(file => file.name === "private.md"));
+});
+test("ignored files beyond the inventory limit do not falsely report truncation", async t => {
+  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), "open-typora-scan-limit-")));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  for (let start = 0; start < 1000; start += 100)
+    await Promise.all(Array.from({length: 100}, (_, i) => writeFile(path.join(directory, `note-${start + i}.md`), "")));
+  await writeFile(path.join(directory, "z-ignored.txt"), "ignored");
+  const store = new DocumentStore(path.join(directory, "data")), inventory = await store.scan(directory);
+  assert.equal(inventory.files.length, 1000); assert.equal(inventory.truncated, false);
+  await writeFile(path.join(directory, "z-extra.md"), "extra");
+  assert.equal((await store.scan()).truncated, true);
 });

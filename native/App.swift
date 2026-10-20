@@ -288,11 +288,16 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
     if name == "searchFiles" {
       do {
         let query = try arg(args, 0, String.self), options = try arg(args, 1, [String: Bool].self)
-        let files = try store.scan()["files"] as? [[String: String]] ?? []
+        let inventory = try store.scan()
+        let files = inventory["files"] as? [[String: String]] ?? [], skipped = inventory["skipped"] as? Int ?? 0
         let encodings = Dictionary(owner.hosts.flatMap { $0.store.records.values }.compactMap { record in record.path.map { ($0, record.encoding ?? "utf-8") } }, uniquingKeysWith: { first, _ in first })
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
           let result: [String: Any]
-          do { result = ["ok": true, "value": try Workspace.search(files, query: query, regex: options["regex"] == true, caseSensitive: options["caseSensitive"] == true, encodings: encodings)] }
+          do {
+            var value = try Workspace.search(files, query: query, regex: options["regex"] == true, caseSensitive: options["caseSensitive"] == true, encodings: encodings)
+            value["skipped"] = (value["skipped"] as? Int ?? 0) + skipped
+            result = ["ok": true, "value": value]
+          }
           catch { result = ["ok": false, "error": error.localizedDescription] }
           DispatchQueue.main.async { self?.reply(id, result) }
         }

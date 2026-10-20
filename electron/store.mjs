@@ -78,6 +78,7 @@ export class DocumentStore {
   folder = null;
   queues = new Map();
   persistQueue = Promise.resolve();
+  scanQueue = Promise.resolve();
   constructor(dataDir) {
     this.dataDir = dataDir;
   }
@@ -198,14 +199,24 @@ export class DocumentStore {
       if (this.queues.get(id) === operation) this.queues.delete(id);
     }
   }
-  async scan(folder = this.folder) {
-    if (!folder) return { folder: null, files: [], truncated: false };
-    this.folder = await realpath(folder);
-    this.fileTokens.clear();
-    const files = [];
-    let truncated = false;
+  scan(folder) {
+    // Folder switches and periodic refreshes must commit in request order.
+    const operation = this.scanQueue.then(() => this.scanFolder(folder));
+    this.scanQueue = operation.then(() => {}, () => {});
+    return operation;
+  }
+  async scanFolder(folder = this.folder) {
+    if (!folder) return { folder: null, files: [], truncated: false, skipped: 0 };
+    const root = await realpath(folder), tokens = new Map(), files = [];
+    let truncated = false, skipped = 0;
     const walk = async (directory, depth) => {
-      const entries = await readdir(directory, { withFileTypes: true });
+      let entries;
+      try { entries = await readdir(directory, { withFileTypes: true }); }
+      catch (error) {
+        if (depth === 0) throw error;
+        skipped++;
+        return;
+      }
       entries.sort((a, b) =>
         a.name.localeCompare(b.name, "zh-CN", { numeric: true }),
       );
@@ -213,7 +224,8 @@ export class DocumentStore {
         if (
           entry.name.startsWith(".") ||
           entry.name === "node_modules" ||
-          entry.isSymbolicLink()
+          entry.isSymbolicLink() ||
+          !(entry.isDirectory() || entry.isFile() && markdown.test(entry.name))
         )
           continue;
         if (files.length >= 1000) {
@@ -221,21 +233,26 @@ export class DocumentStore {
           return;
         }
         const file = path.join(directory, entry.name);
-        if (entry.isDirectory() || entry.isFile() && markdown.test(entry.name)) {
-          const token = digest(file); const metadata = await stat(file);
-          this.fileTokens.set(token, file);
-          files.push({
-            token,
-            name: entry.name,
-            relative: path.relative(this.folder, file),
-            path: file, isDirectory: String(entry.isDirectory()), modified: String(metadata.mtimeMs / 1000), created: String(metadata.birthtimeMs / 1000),
-          });
-          if (entry.isDirectory()) { if (depth < 8) await walk(file, depth + 1); else truncated = true; }
-        }
+        let metadata;
+        try { metadata = await lstat(file); }
+        catch { skipped++; continue; }
+        if (metadata.isSymbolicLink() || !(metadata.isDirectory() || metadata.isFile() && markdown.test(entry.name))) continue;
+        const token = digest(file);
+        tokens.set(token, file);
+        files.push({
+          token,
+          name: entry.name,
+          relative: path.relative(root, file),
+          path: file, isDirectory: String(metadata.isDirectory()), modified: String(metadata.mtimeMs / 1000), created: String(metadata.birthtimeMs / 1000),
+        });
+        if (metadata.isDirectory()) { if (depth < 8) await walk(file, depth + 1); else truncated = true; }
       }
     };
-    await walk(this.folder, 0);
-    return { folder: this.folder, files, truncated };
+    await walk(root, 0);
+    // A failed root scan must retain the last usable folder and token grants.
+    this.folder = root;
+    this.fileTokens = tokens;
+    return { folder: root, files, truncated, skipped };
   }
   async openToken(token) {
     const file = this.fileTokens.get(token);

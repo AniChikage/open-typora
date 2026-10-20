@@ -123,7 +123,11 @@ const handlers = {
   cancelClose: () => { closing = false; },
   recent: () => workspace.recent(),
   recentAction: async (_, action, file) => { if (action !== "open") return workspace.recentAction(action, file); const item = (await workspace.recent()).find(item => item.path === file); if (!item) throw new Error("最近项目已移除。"); await workspace.remember(file, item.folder); return item.folder ? store.scan(file) : store.open(file); },
-  searchFiles: async (_, query, options) => workspace.search((await store.scan()).files, query, { ...options, encodings: Object.fromEntries([...store.records.values()].filter(record => record.path).map(record => [record.path, record.encoding])) }),
+  searchFiles: async (_, query, options) => {
+    const inventory = await store.scan();
+    const result = await workspace.search(inventory.files, query, { ...options, encodings: Object.fromEntries([...store.records.values()].filter(record => record.path).map(record => [record.path, record.encoding])) });
+    return { ...result, skipped: result.skipped + inventory.skipped };
+  },
   reveal: async (_, file) => shell.showItemInFolder(await workspace.authorize(file, store)),
   fileOperation: async (_, operation) => {
     if (operationRunning) throw new Error("另一个文件操作正在进行。"); operationRunning = true;

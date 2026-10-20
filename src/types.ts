@@ -28,6 +28,7 @@ export interface FolderResult {
   folder: string | null;
   files: FileEntry[];
   truncated: boolean;
+  skipped?: number;
 }
 export interface Recovery {
   documents: DocumentRecord[];

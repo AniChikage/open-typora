@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 func runStoreTests() throws {
   try runWindowChromeTests()
@@ -62,6 +63,29 @@ func runStoreTests() throws {
   let scan = try store.scan(directory)
   let files = scan["files"] as! [[String: String]]
   try expect(files.allSatisfy { $0["name"] != "shortcut.md" }, "folder inventory excludes symlinks")
+  let retainedTokens = store.tokens, retainedRoot = store.folder
+  for invalid in [file, directory.appendingPathComponent("missing")] {
+    var rejected = false
+    do { _ = try store.scan(invalid) } catch { rejected = true }
+    try expect(rejected && store.folder == retainedRoot && store.tokens == retainedTokens, "failed root scan retains the previous folder and tokens")
+  }
+  let partialRoot = directory.appendingPathComponent("scan-permissions")
+  let locked = partialRoot.appendingPathComponent("a-locked"), readable = partialRoot.appendingPathComponent("b-readable.md")
+  try fm.createDirectory(at: locked, withIntermediateDirectories: true)
+  try atomicWrite(locked.appendingPathComponent("private.md"), Data("hidden".utf8))
+  try atomicWrite(readable, Data("Readable sibling".utf8))
+  let pipe = partialRoot.appendingPathComponent("not-a-document.md")
+  try expect(Darwin.mkfifo(pipe.path, 0o600) == 0, "create named pipe inventory fixture")
+  try fm.setAttributes([.posixPermissions: 0], ofItemAtPath: locked.path)
+  defer { try? fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: locked.path) }
+  let partial = try store.scan(partialRoot), partialFiles = partial["files"] as! [[String: String]]
+  try expect(partial["skipped"] as? Int == 1 && partialFiles.contains { $0["path"] == canonicalFileURL(readable).path }, "unreadable child does not hide readable siblings")
+  try expect(!partialFiles.contains { $0["name"] == "private.md" || $0["name"] == "not-a-document.md" }, "inventory excludes inaccessible descendants and non-regular Markdown entries")
+  try fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: locked.path)
+  let recoveredScan = try store.scan()
+  try expect(recoveredScan["skipped"] as? Int == 0 && (recoveredScan["files"] as! [[String: String]]).contains { $0["name"] == "private.md" }, "refresh discovers a previously unreadable child after access is restored")
+  try fm.removeItem(at: partialRoot)
+  _ = try store.scan(directory)
   let outside = fm.temporaryDirectory.appendingPathComponent("outside-\(UUID().uuidString).png")
   try atomicWrite(outside, Data(repeating: 1, count: 20))
   try fm.createSymbolicLink(

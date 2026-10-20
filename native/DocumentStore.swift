@@ -220,44 +220,55 @@ final class DocumentStore {
     return updated
   }
   func scan(_ directory: URL? = nil) throws -> [String: Any] {
-    if let directory { folder = canonicalFileURL(directory) }
-    guard let root = folder else { return ["folder": NSNull(), "files": [], "truncated": false] }
-    tokens = [:]
-    var files = [[String: String]]()
-    var truncated = false
+    guard let root = directory.map(canonicalFileURL) ?? folder else { return ["folder": NSNull(), "files": [], "truncated": false, "skipped": 0] }
+    var nextTokens = [String: URL](), files = [[String: String]]()
+    var truncated = false, skipped = 0
+    let typeKeys: Set<URLResourceKey> = [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey]
     func walk(_ parent: URL, _ depth: Int) throws {
-      let children = try FileManager.default.contentsOfDirectory(
-        at: parent, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey, .contentModificationDateKey, .creationDateKey],
-        options: [.skipsHiddenFiles]
-      ).sorted {
-        $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending
+      let children: [URL]
+      do {
+        children = try FileManager.default.contentsOfDirectory(
+          at: parent, includingPropertiesForKeys: Array(typeKeys), options: [.skipsHiddenFiles]
+        ).sorted {
+          $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending
+        }
+      } catch {
+        if depth == 0 { throw error }
+        skipped += 1
+        return
       }
       for file in children {
-        let values = try file.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey, .contentModificationDateKey, .creationDateKey])
-        if values.isSymbolicLink == true || file.lastPathComponent == "node_modules" { continue }
+        if file.lastPathComponent == "node_modules" { continue }
+        guard let values = try? file.resourceValues(forKeys: typeKeys) else { skipped += 1; continue }
+        if values.isSymbolicLink == true { continue }
+        guard values.isDirectory == true || values.isRegularFile == true && ["md", "markdown", "mdown"].contains(file.pathExtension.lowercased()) else { continue }
         if files.count >= 1000 {
           truncated = true
           return
         }
-        if values.isDirectory == true || ["md", "markdown", "mdown"].contains(file.pathExtension.lowercased()) {
-          let token = hashData(Data(file.path.utf8))
-          tokens[token] = file
-          files.append([
-            "token": token, "name": file.lastPathComponent,
-            "relative": String(file.path.dropFirst(root.path.count + 1)), "path": file.path,
-            "isDirectory": values.isDirectory == true ? "true" : "false",
-            "modified": String(values.contentModificationDate?.timeIntervalSince1970 ?? 0),
-            "created": String(values.creationDate?.timeIntervalSince1970 ?? 0),
-          ])
-          if values.isDirectory == true {
-            if depth < 8 { try walk(file, depth + 1) } else { truncated = true }
-          }
+        // Fetch timestamps only for entries that will appear in the file tree.
+        guard let dates = try? file.resourceValues(forKeys: [.contentModificationDateKey, .creationDateKey]) else { skipped += 1; continue }
+        let token = hashData(Data(file.path.utf8))
+        nextTokens[token] = file
+        files.append([
+          "token": token, "name": file.lastPathComponent,
+          "relative": String(file.path.dropFirst(root.path == "/" ? 1 : root.path.count + 1)), "path": file.path,
+          "isDirectory": values.isDirectory == true ? "true" : "false",
+          "modified": String(dates.contentModificationDate?.timeIntervalSince1970 ?? 0),
+          "created": String(dates.creationDate?.timeIntervalSince1970 ?? 0),
+        ])
+        if values.isDirectory == true {
+          if depth < 8 { try walk(file, depth + 1) } else { truncated = true }
         }
       }
     }
     try walk(root, 0)
-    return ["folder": root.path, "files": files, "truncated": truncated]
+    // Commit only after the root is readable, preserving the previous file tree on failure.
+    folder = root
+    tokens = nextTokens
+    return ["folder": root.path, "files": files, "truncated": truncated, "skipped": skipped]
   }
+
   func persist(_ incoming: SessionRecord) throws {
     guard incoming.documents.count <= 100 else { throw NativeFailure("打开的文档超过 100 份。") }
     var documents = [DocumentRecord]()
