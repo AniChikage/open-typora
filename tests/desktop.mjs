@@ -186,6 +186,8 @@ try {
     dialog.showSaveDialog = async () => ({ canceled: false, filePath: file });
   }, target);
   await page.getByRole("button", { name: "新建文档" }).click();
+  // Draft registration crosses the native bridge; target the new tab only after activation.
+  await expect(page.getByRole("tab", { name: "未命名.md", exact: true })).toHaveAttribute("aria-selected", "true");
   await mode(page, false);
   const fresh = page.locator(".document-editor:not([hidden]) .cm-content");
   await fresh.fill("# 新文档\n\n这是一份真实保存的 Markdown。\n");

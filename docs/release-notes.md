@@ -1,4 +1,4 @@
-Open Typora 0.13.0 adds document tabs and split editing, improves long-document rendering, and fixes workspace and untitled-tab recovery bugs.
+Open Typora 0.13.1 adds document tabs and split editing, improves long-document rendering, and fixes workspace and untitled-tab recovery bugs.
 
 > **Independent, unofficial project. Open Typora is not developed, endorsed or supported by Typora. If you can afford it, please [buy Typora](https://store.typora.io/) and support its official developers.**
 
@@ -6,9 +6,9 @@ Open Typora 0.13.0 adds document tabs and split editing, improves long-document 
 
 | Platform | Installer | Alternative |
 | --- | --- | --- |
-| macOS 14+, Apple Silicon | `Open-Typora-0.13.0-arm64.dmg` | macOS ZIP |
-| Windows 10/11, x64 | `Open-Typora-0.13.0-windows-x64-Setup.exe` | Windows ZIP |
-| Linux x64 | `Open-Typora-0.13.0-linux-x64.deb` | AppImage |
+| macOS 14+, Apple Silicon | `Open-Typora-0.13.1-arm64.dmg` | macOS ZIP |
+| Windows 10/11, x64 | `Open-Typora-0.13.1-windows-x64-Setup.exe` | Windows ZIP |
+| Linux x64 | `Open-Typora-0.13.1-linux-x64.deb` | AppImage |
 
 `SHA256SUMS.txt` covers all six downloads. The Windows ZIP uses the user profile for preferences and recovery data; it is not a self-contained portable profile.
 
