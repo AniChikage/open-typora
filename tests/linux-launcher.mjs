@@ -19,6 +19,8 @@ if(!process.env.OPEN_TYPORA_LAUNCHER_ROOT){
  const data=process.env.OPEN_TYPORA_LAUNCHER_ROOT,qa=process.env.OPEN_TYPORA_QA_DIR;await mkdir(qa,{recursive:true});
  const desktop='/usr/share/applications/open-typora.desktop';
  const desktopText=await readFile(desktop,'utf8');
+ const mimeXml=await readFile('/usr/share/mime/packages/open-typora.xml','utf8');
+ for(const extension of ['md','markdown','mdown'])assert.ok(mimeXml.includes(`*.${extension}`));
  assert.match(desktopText,/^Name=Open Typora$/m);assert.match(desktopText,/^Exec="?\/opt\/Open-Typora\/open-typora"? %U$/m);
  await exec('desktop-file-validate',[desktop]);
  await writeFile(path.join(process.env.XDG_CONFIG_HOME,'mimeapps.list'),'[Default Applications]\ntext/markdown=open-typora.desktop;\ntext/x-markdown=open-typora.desktop;\n');
@@ -33,7 +35,7 @@ if(!process.env.OPEN_TYPORA_LAUNCHER_ROOT){
   await exec('gio',['launch',desktop,...files.slice(1,3).map(file=>pathToFileURL(file).href)],{env,timeout:30000});
   for(const name of names.slice(1,3))await expect(page.getByRole('tab',{name,exact:true})).toBeVisible({timeout:20000});
   for(const i of [1,2]){await page.getByRole('tab',{name:names[i],exact:true}).click();await expect(page.getByRole('heading',{name:`Launcher ${i}`,exact:true})).toBeVisible();}
-  const detected=(await exec('xdg-mime',['query','filetype',files[3]],{env,timeout:10000})).stdout.trim();
+  const detected=(await exec('kmimetypefinder5',[files[3]],{env,timeout:10000})).stdout.trim();
   assert.ok(['text/markdown','text/x-markdown'].includes(detected),`Unexpected Markdown MIME type: ${detected}`);
   await exec('kioclient5',['--noninteractive','exec',pathToFileURL(files[3]).href],{env,timeout:30000});
   await expect(page.getByRole('tab',{name:names[3],exact:true})).toHaveAttribute('aria-selected','true',{timeout:20000});

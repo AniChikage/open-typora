@@ -37,6 +37,7 @@ run(process.execPath,["tests/linux-launcher.mjs"],{env:{...process.env,OPEN_TYPO
 const retained = await exercise(installed,"deb");
 run("sudo",["apt-get","remove","-y","open-typora"]);
 await assert.rejects(stat(installed),{code:"ENOENT"});
+await assert.rejects(stat("/usr/share/mime/packages/open-typora.xml"),{code:"ENOENT"});
 assert.equal(createHash("sha256").update(await readFile(retained.session)).digest("hex"),retained.hash);
 
 // Extract the AppImage to test its actual payload without requiring FUSE on a

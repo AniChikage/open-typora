@@ -16,6 +16,7 @@ await build({
     directories: { app: application, output: "release/linux" },
     files: ["**/*"], asar: true, npmRebuild: false,
     electronVersion: pkg.devDependencies.electron,
+    deb: { fpm: [`${path.resolve("scripts/linux-mime.xml")}=/usr/share/mime/packages/open-typora.xml`] },
     linux: {
       desktop: { entry: { Name: pkg.build.productName } },
       executableName: "open-typora", icon: "build/icon.png", category: "Office",
