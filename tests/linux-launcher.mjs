@@ -32,7 +32,7 @@ if(!process.env.OPEN_TYPORA_LAUNCHER_ROOT){
   await expect(page.getByRole('heading',{name:'Launcher 0',exact:true})).toBeVisible({timeout:20000});
   await exec('gio',['launch',desktop,...files.slice(1,3).map(file=>pathToFileURL(file).href)],{env,timeout:30000});
   for(const name of names.slice(1,3))await expect(page.getByRole('tab',{name,exact:true})).toBeVisible({timeout:20000});
-  await expect(page.getByRole('heading',{name:'Launcher 2',exact:true})).toBeVisible();
+  for(const i of [1,2]){await page.getByRole('tab',{name:names[i],exact:true}).click();await expect(page.getByRole('heading',{name:`Launcher ${i}`,exact:true})).toBeVisible();}
   const detected=(await exec('xdg-mime',['query','filetype',files[3]],{env,timeout:10000})).stdout.trim();
   assert.ok(['text/markdown','text/x-markdown'].includes(detected),`Unexpected Markdown MIME type: ${detected}`);
   await exec('kioclient5',['--noninteractive','exec',pathToFileURL(files[3]).href],{env,timeout:30000});
@@ -43,6 +43,9 @@ if(!process.env.OPEN_TYPORA_LAUNCHER_ROOT){
   assert.deepEqual(errors,[]);await page.screenshot({path:path.join(qa,'linux-desktop-launcher.png')});
   await writeFile(path.join(qa,'linux-launcher-results.json'),JSON.stringify({desktopValidated:true,gioDesktopLaunch:true,kdeMimeAssociationLaunch:true,detectedMime:detected,unicodeAndReservedPaths:true,singleInstance:true,errors,distro:await readFile('/etc/os-release','utf8')},null,2));
   console.log('PASS: installed desktop entry launches through GIO and KDE MIME association with Unicode, spaces, #, %, and &; one application window, unchanged file bytes.');
- }catch(error){await page?.screenshot({path:path.join(qa,'linux-launcher-failure.png')}).catch(()=>{});throw error;}
+ }catch(error){
+  const diagnostics={error:String(error),tabs:await page?.getByRole('tab').allTextContents().catch(()=>[]),headings:await page?.getByRole('heading').allTextContents().catch(()=>[]),errors};
+  await writeFile(path.join(qa,'linux-launcher-failure.json'),JSON.stringify(diagnostics,null,2));console.error(JSON.stringify(diagnostics));
+  await page?.screenshot({path:path.join(qa,'linux-launcher-failure.png')}).catch(()=>{});throw error;}
  finally{if(app){await app.evaluate(({app})=>app.exit(0)).catch(()=>{});await app.close().catch(()=>{});}}
 }

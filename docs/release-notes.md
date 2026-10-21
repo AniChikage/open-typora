@@ -1,4 +1,4 @@
-Open Typora 0.13.2 fixes Linux desktop launching and indentation commands reported in Issue #1.
+Open Typora 0.13.3 fixes Linux desktop launching and indentation commands reported in Issue #1.
 
 > **Independent, unofficial project. Open Typora is not developed, endorsed or supported by Typora. If you can afford it, please [buy Typora](https://store.typora.io/) and support its official developers.**
 
@@ -6,9 +6,9 @@ Open Typora 0.13.2 fixes Linux desktop launching and indentation commands report
 
 | Platform | Installer | Alternative |
 | --- | --- | --- |
-| macOS 14+, Apple Silicon | `Open-Typora-0.13.2-arm64.dmg` | macOS ZIP |
-| Windows 10/11, x64 | `Open-Typora-0.13.2-windows-x64-Setup.exe` | Windows ZIP |
-| Linux x64 | `Open-Typora-0.13.2-linux-x64.deb` | AppImage |
+| macOS 14+, Apple Silicon | `Open-Typora-0.13.3-arm64.dmg` | macOS ZIP |
+| Windows 10/11, x64 | `Open-Typora-0.13.3-windows-x64-Setup.exe` | Windows ZIP |
+| Linux x64 | `Open-Typora-0.13.3-linux-x64.deb` | AppImage |
 
 `SHA256SUMS.txt` covers all six downloads. Install the new DEB to update the system desktop entry. Custom launchers copied into your home directory may still reference an older installation path and need updating separately.
 
