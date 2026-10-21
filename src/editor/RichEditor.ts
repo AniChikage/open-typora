@@ -1283,6 +1283,20 @@ export class RichEditor {
     if (this.composing) return;
     if (selectionActions.has(action)) { this.selectionCommand(action); return; }
     if (this.readOnly) return;
+    if ((action === "indent" || action === "outdent") && !this.fence) {
+      // Opening a menu or undoing may have released the local code view.
+      const selection = this.model.selection, node = this.model.nodeAt(selection.head);
+      const element = node ? this.root.querySelector<HTMLElement>(`[data-cid="${node.id}"][data-fence]`) : null;
+      const leaf = element ? this.leaves.get(element.dataset.fence!) : undefined;
+      if (element && leaf && [selection.anchor, selection.head].every(position => position >= leaf.positions[0] && position <= leaf.positions.at(-1)!))
+        this.activateFence(element);
+    }
+    if ((action === "indent" || action === "outdent") && this.fence) {
+      this.model.closeGroup();
+      (action === "indent" ? indentMore : indentLess)(this.fence.view);
+      this.model.closeGroup(); this.fence.view.focus();
+      return;
+    }
     this.model.selection = this.bookmark();
     this.pendingFormat.clear();
     if (action.startsWith("table-")) { this.tableAction(action.slice(6)); return; }
@@ -1496,6 +1510,9 @@ export class RichEditor {
     this.fence = { id: leaf.nodeId, leaf, view };
     view.focus();
     view.dom.addEventListener("focusout", (event) => {
+      const next = (event as FocusEvent).relatedTarget as HTMLElement | null;
+      // Menus temporarily take focus; keep the code selection for their commands.
+      if (!next || next.closest(".quick-actions,.toolbar,.more-menu,.pane-heading")) return;
       if (
         !view.dom.contains((event as FocusEvent).relatedTarget as Node | null)
       )

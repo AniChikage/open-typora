@@ -14,6 +14,8 @@ node tests/electron-shell.mjs
 $shellExit = $LASTEXITCODE
 node tests/parity-desktop.mjs
 $parityExit = $LASTEXITCODE
+node tests/indentation-desktop.mjs
+$indentationExit = $LASTEXITCODE
 node tests/workspace-desktop.mjs
 $workspaceExit = $LASTEXITCODE
 node tests/compatibility-desktop.mjs
@@ -22,6 +24,7 @@ node tests/ime-desktop.mjs
 $imeExit = $LASTEXITCODE
 node tests/plugin-package-desktop.mjs
 $packageExit = $LASTEXITCODE
+if ($indentationExit -ne 0) { throw 'Installed indentation shortcut regression failed' }
 if ($workspaceExit -ne 0) { throw 'Installed tabs and split-pane regression failed' }
 if ($packageExit -ne 0) { throw 'Installed plugin package regression failed' }
 if ($imeExit -ne 0) { throw 'Installed composition and plugin regression failed' }

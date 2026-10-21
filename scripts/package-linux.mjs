@@ -11,11 +11,13 @@ await build({
   targets: Platform.LINUX.createTarget(["deb", "AppImage"], Arch.x64),
   publish: "never",
   config: {
-    appId: pkg.build.appId, productName: pkg.build.productName,
+    // Keep the installation directory free of whitespace; retain the display label below.
+    appId: pkg.build.appId, productName: pkg.build.productName.replace(/\s+/g, "-"),
     directories: { app: application, output: "release/linux" },
     files: ["**/*"], asar: true, npmRebuild: false,
     electronVersion: pkg.devDependencies.electron,
     linux: {
+      desktop: { entry: { Name: pkg.build.productName } },
       executableName: "open-typora", icon: "build/icon.png", category: "Office",
       artifactName: "Open-Typora-${version}-linux-x64.${ext}",
       maintainer: "AniChikage <15864698+AniChikage@users.noreply.github.com>",

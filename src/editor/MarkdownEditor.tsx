@@ -18,7 +18,7 @@ import {
   drawSelection,
   highlightActiveLine,
 } from "@codemirror/view";
-import { defaultKeymap, indentWithTab } from "@codemirror/commands";
+import { defaultKeymap, indentWithTab, indentMore, indentLess } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import {
   syntaxHighlighting,
@@ -464,7 +464,14 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
         command: (action, args) => {
           if (viewOptions.current.readOnly && (!selectionActions.has(action) || action === "delete-word")) return;
           if (activeMode.current) rich.current?.command(action, args);
-          else if (source.current) codeSelectionCommand(source.current, action);
+          else if (source.current) {
+            if (action === "indent" || action === "outdent") {
+              if (editingBlocked()) return;
+              model.current?.closeGroup();
+              (action === "indent" ? indentMore : indentLess)(source.current);
+              model.current?.closeGroup(); source.current.focus();
+            } else codeSelectionCommand(source.current, action);
+          }
         },
         insert: (text) => insert(text),
         selectionText: (markdown = false) => {

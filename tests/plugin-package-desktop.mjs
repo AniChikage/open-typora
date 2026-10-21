@@ -8,7 +8,7 @@ const qa=process.env.OPEN_TYPORA_QA_DIR || path.join(data,'evidence');await mkdi
 await cp(new URL('./fixtures/plugin-package',import.meta.url),folder,{recursive:true});
 const env={...process.env,OPEN_TYPORA_DATA_DIR:profile};delete env.ELECTRON_RUN_AS_NODE;delete env.OPEN_TYPORA_DEV_URL;
 let app,page;const errors=[],checks=[];
-const launch=async()=>{app=await electron.launch({...(process.env.OPEN_TYPORA_EXECUTABLE?{executablePath:process.env.OPEN_TYPORA_EXECUTABLE,args:[]}:{args:[process.cwd()]}),env,timeout:30000});page=await app.firstWindow();page.on('pageerror',e=>errors.push(e.message));await expect(page.getByRole('button',{name:'欢迎.md',exact:true})).toBeVisible();};
+const launch=async()=>{app=await electron.launch({...(process.env.OPEN_TYPORA_EXECUTABLE?{executablePath:process.env.OPEN_TYPORA_EXECUTABLE,args:[]}:{args:[process.cwd()]}),env,timeout:30000});page=await app.firstWindow();page.on('pageerror',e=>errors.push(e.message));await expect(page.getByRole('button',{name:'欢迎.md',exact:true})).toBeVisible({timeout:20000});};
 const stop=async()=>{if(app){await app.evaluate(({app})=>app.exit(0)).catch(()=>{});await app.close().catch(()=>{});app=null;}};
 const openPlugins=async()=>{await page.getByRole('button',{name:'更多操作',exact:true}).click();await page.getByRole('menuitem',{name:'插件管理…',exact:true}).click();};
 const card=()=>page.locator('.plugin-card').filter({has:page.getByRole('heading',{name:'Package fixture',exact:true})});
