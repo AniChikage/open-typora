@@ -199,3 +199,20 @@ test("ignored files beyond the inventory limit do not falsely report truncation"
   await writeFile(path.join(directory, "z-extra.md"), "extra");
   assert.equal((await store.scan()).truncated, true);
 });
+
+test("document order, active tab and split layout survive session recovery", async () => {
+  const {store,record,directory}=await setup();
+  const second=store.registerDraft({id:"second-tab",name:"Second.md",content:"unsaved second"});
+  const workspace={primaryId:record.id,secondaryId:second.id,direction:"rows",ratio:.63};
+  await store.persist({documents:[second,record],activeId:second.id,workspace});
+  const restored=await new DocumentStore(path.join(directory,"recovery")).restore();
+  assert.deepEqual(restored.documents.map(item=>item.id),[second.id,record.id]);assert.equal(restored.activeId,second.id);assert.deepEqual(restored.workspace,workspace);
+  await store.persist({documents:[record,second],activeId:record.id,workspace:null});
+  assert.equal((await new DocumentStore(path.join(directory,"recovery")).restore()).workspace,null);
+});
+
+test("reopening an untitled tab restores its clean content without reading a null path", async () => {
+  const {store}=await setup(); const draft=store.registerDraft({id:"closed-draft",name:"Untitled.md",content:"discarded content"});
+  const reopened=await store.reopen(draft.id);assert.equal(reopened.path,null);assert.equal(reopened.content,"");assert.equal(store.require(draft.id).content,"");
+  await assert.rejects(store.reopen("unknown"));
+});

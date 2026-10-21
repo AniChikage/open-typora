@@ -190,8 +190,10 @@ test("composition at an empty paragraph element commits and restores through und
   assert.equal(f.model.text, before + "你好");
   f.editor.undo();
   assert.equal(f.model.text, before);
+  assert.ok(!f.root.textContent.includes("你好"), "undo updates the browser-owned composition DOM");
   f.editor.redo();
   assert.equal(f.model.text, before + "你好");
+  assert.ok(f.root.textContent.includes("你好"));
   f.close();
 });
 test("IME key 229 cannot split a paragraph before compositionstart", () => {
@@ -877,4 +879,55 @@ test("multiline text pasted into a table stays in one cell and undoes once",()=>
   const header=fixture('| A | B |');try {
     header.editor.model.selection={anchor:0,head:header.model.text.length};header.editor.restore();input(header.root,'insertParagraph');assert.equal(header.root.querySelector('table'),null);
   } finally {header.close();}
+});
+
+test("unchanged blocks retain their DOM and shifted source maps remain editable", () => {
+  const f = fixture("First paragraph\n\nSecond **bold** paragraph\n\n- [ ] Task\n");
+  const second = f.root.children[1], task = f.root.querySelector("input[data-task]");
+  point(f.editor, 5); input(f.root,"insertText","中文");
+  assert.equal(f.root.children[1],second);
+  assert.equal(f.root.querySelector("input[data-task]"),task);
+  assert.equal(Number(task.dataset.task),f.model.text.indexOf("[ ]")+1);
+  point(f.editor,f.model.text.indexOf("Second")+6); input(f.root,"insertText","!");
+  assert.ok(f.model.text.includes("Second! **bold** paragraph"));
+  task.click(); assert.ok(f.model.text.includes("- [x] Task"));
+  f.close();
+});
+test("render cache refreshes reference links, footnotes, headings and Markdown preferences", async () => {
+  const f = fixture("# Title\n\n[TOC]\n\n[link][target] and footnote[^n]\n\n[target]: https://first.example\n\n[^n]: first note\n");
+  f.model.replace(f.model.text.indexOf("first.example"),f.model.text.indexOf("first.example")+13,"second.example");
+  f.editor.render(false); assert.equal(f.root.querySelector('a[href="https://second.example"]').textContent,"link");
+  const at=f.model.text.indexOf("first note"); f.model.replace(at,at+10,"changed note");f.editor.render(false);
+  assert.ok(f.root.querySelector('[data-footnote]').title.includes("changed note"));
+  f.model.replace(2,7,"Renamed");f.editor.render(false);
+  assert.ok(f.root.querySelector('.md-toc').textContent.includes("Renamed"));
+  f.close();
+  const {setMarkdownOptions}=await import('../src/editor/markdown.ts');
+  const g=fixture("==marked==");
+  setMarkdownOptions({highlight:false,subscript:true,superscript:true,emoji:true,inlineMath:true});
+  g.editor.render(false);assert.equal(g.root.querySelector('mark'),null);
+  setMarkdownOptions({highlight:true,subscript:true,superscript:true,emoji:true,inlineMath:true});
+  g.editor.render(false);assert.ok(g.root.querySelector('mark'));g.close();
+});
+test("duplicate blocks keep unique identities through structural edits and undo", () => {
+  const f=fixture("same\n\nsame\n\nunique\n\nsame\n");
+  for(const text of ["new\n\n","same\n\n","# Heading\n\n"]){f.model.replace(0,0,text);f.editor.render(false);assert.equal(new Set(f.model.nodes.map(node=>node.id)).size,f.model.nodes.length);assert.equal(f.model.serialize(),f.model.text);}
+  while(f.model.canUndo){f.editor.undo();assert.equal(new Set(f.model.nodes.map(node=>node.id)).size,f.model.nodes.length);}
+  assert.equal(f.model.text,"same\n\nsame\n\nunique\n\nsame\n");f.close();
+});
+test("serialization cache clears after an external reload, encoding changes and deletion", () => {
+  const f=fixture("original\r\n");f.model.replace(0,8,"changed");assert.equal(f.model.toMarkdown(),"changed\r\n");
+  f.model.replaceExternal("fresh\n","\n");f.model.replace(0,f.model.text.length,"");assert.equal(f.model.toMarkdown(),"");
+  f.model.undo();assert.equal(f.model.toMarkdown(),"fresh\n");f.close();
+});
+
+test("middle empty-paragraph composition undo refreshes the rich DOM after source round trip", async () => {
+  const original="第一段。\n\n- [ ] 任务\n", f=fixture(original);point(f.editor,4);input(f.root,"insertParagraph");
+  const empty=[...f.root.querySelectorAll('[data-leaf]')].find(element=>!element.textContent);
+  empty.dispatchEvent(new window.CompositionEvent('compositionstart',{bubbles:true}));empty.textContent='你好';window.getSelection().collapse(empty.firstChild,2);
+  empty.dispatchEvent(new window.InputEvent('input',{bubbles:true,isComposing:true,inputType:'insertCompositionText',data:'你好'}));empty.dispatchEvent(new window.CompositionEvent('compositionend',{bubbles:true,data:'你好'}));
+  await new Promise(resolve=>setTimeout(resolve,5));
+  f.model.beginSourceSession();f.model.endSourceSession();f.model.refreshCaret();f.editor.render(false);f.editor.undo();
+  assert.equal(new Set(f.model.nodes.map(node=>node.id)).size,f.model.nodes.length);
+  assert.ok(!f.root.textContent.includes('你好'));f.editor.redo();assert.ok(f.root.textContent.includes('你好'));f.editor.undo();f.editor.undo();assert.equal(f.model.text,original);f.close();
 });

@@ -32,6 +32,9 @@ export class MarkdownDocument {
   environment: Record<string, unknown> = {};
   selection: SelectionBookmark;
   private original: string;
+  private normalizedOriginal: string;
+  private serializedText: string | null = null;
+  private serializedMarkdown = "";
   private undoStack: Command[] = [];
   private redoStack: Command[] = [];
   private group = false;
@@ -97,6 +100,7 @@ export class MarkdownDocument {
     this.lineEnding = lineEnding;
     this.original = source;
     this.text = source.replace(/\r\n/g, "\n");
+    this.normalizedOriginal = this.text;
     this.selection = { anchor: this.text.length, head: this.text.length };
     this.parse();
   }
@@ -104,10 +108,13 @@ export class MarkdownDocument {
     return this.root.children.map((node) => node.source).join("");
   }
   toMarkdown() {
-    const source = this.serialize();
-    return source === this.original.replace(/\r\n/g, "\n")
-      ? this.original
-      : source.replace(/\n/g, this.lineEnding);
+    const source = this.text;
+    if (source === this.normalizedOriginal) return this.original;
+    if (source !== this.serializedText) {
+      this.serializedText = source;
+      this.serializedMarkdown = this.lineEnding === "\n" ? source : source.replace(/\n/g, this.lineEnding);
+    }
+    return this.serializedMarkdown;
   }
   private parse() {
     const old = this.nodes;
@@ -129,21 +136,22 @@ export class MarkdownDocument {
     for (let i = 0; i < this.text.length; i++)
       if (this.text[i] === "\n") offsets.push(i + 1);
     const used = new Set<string>();
+    // Exact matches are consumed in document order, including duplicate paragraphs.
+    const candidates = new Map<string, Map<string, DocumentNode[]>>();
+    for (let i = old.length - 1; i >= 0; i--) {
+      const node = old[i], sources = candidates.get(node.kind) || new Map<string, DocumentNode[]>();
+      const matches = sources.get(node.source) || [];
+      matches.push(node); sources.set(node.source, matches); candidates.set(node.kind, sources);
+    }
     this.environment = {};
     this.nodes = parseBlocks(this.text, this.environment).map(
       (block, index) => {
         const from = offsets[block.fromLine - 1],
           to = (offsets[block.toLine] ?? this.text.length + 1) - 1;
-        const same =
-          old.find(
-            (node) =>
-              !used.has(node.id) &&
-              node.source === block.source &&
-              node.kind === block.kind,
-          ) ||
-          (old[index]?.kind === block.kind && !used.has(old[index].id)
-            ? old[index]
-            : undefined);
+        const matches = candidates.get(block.kind)?.get(block.source);
+        while (matches?.length && used.has(matches.at(-1)!.id)) matches.pop();
+        const same = matches?.pop() ||
+          (old[index]?.kind === block.kind && !used.has(old[index].id) ? old[index] : undefined);
         const id = same?.id || `node-${++sequence}`;
         used.add(id);
         return {
@@ -161,8 +169,10 @@ export class MarkdownDocument {
       caret < this.text.length &&
       !this.nodes.some((node) => caret >= node.from && caret <= node.to)
     ) {
+      const gapId = used.has(`gap-${caret}`) ? `node-${++sequence}` : `gap-${caret}`;
+      used.add(gapId);
       this.nodes.push({
-        id: `gap-${caret}`,
+        id: gapId,
         from: caret,
         to: caret,
         source: "",
@@ -173,7 +183,7 @@ export class MarkdownDocument {
     }
     if (!this.nodes.length || /\n$/.test(this.text))
       this.nodes.push({
-        id: old.find((n) => n.kind === "empty")?.id || `node-${++sequence}`,
+        id: old.findLast(n => n.kind === "empty" && !used.has(n.id))?.id || `node-${++sequence}`,
         from: this.text.length,
         to: this.text.length,
         source: "",
@@ -270,6 +280,8 @@ export class MarkdownDocument {
     this.lineEnding = lineEnding;
     this.original = source;
     this.text = source.replace(/\r\n/g, "\n");
+    this.normalizedOriginal = this.text;
+    this.serializedText = null;
     this.selection = {
       anchor: Math.min(this.selection.anchor, this.text.length),
       head: Math.min(this.selection.head, this.text.length),

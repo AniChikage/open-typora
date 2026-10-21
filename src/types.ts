@@ -1,3 +1,4 @@
+import type { WorkspaceLayout } from "./workspace";
 export interface DocumentRecord {
   id: string;
   path: string | null;
@@ -31,6 +32,7 @@ export interface FolderResult {
   skipped?: number;
 }
 export interface Recovery {
+  workspace?: WorkspaceLayout | null;
   documents: DocumentRecord[];
   activeId?: string;
   folder?: string | null;
@@ -43,6 +45,7 @@ export interface DiskChange {
   missing?: boolean;
 }
 export interface SessionSnapshot {
+  workspace?: WorkspaceLayout | null;
   documents: DocumentRecord[];
   activeId: string;
 }

@@ -10,6 +10,7 @@ import { full as emoji } from "markdown-it-emoji";
 import { configureDocumentSyntax } from "./markdownExtensions.ts";
 import type { Token } from "markdown-it";
 let allowRemoteImages = true;
+export let markdownOptionsVersion = 0;
 export interface Block {
   fromLine: number;
   toLine: number;
@@ -37,6 +38,7 @@ const md = new MarkdownIt({
   .use(mark).use(sub).use(sup).use(emoji, { shortcuts: {} })
   .use(configureDocumentSyntax).disable("html_inline");
 export function setMarkdownOptions(options: { highlight: boolean; subscript: boolean; superscript: boolean; emoji: boolean; inlineMath: boolean }) {
+  markdownOptionsVersion++;
   allowRemoteImages = (options as { remoteImages?: boolean }).remoteImages !== false;
   for (const [rule, enabled] of [["mark", options.highlight], ["sub", options.subscript], ["sup", options.superscript], ["emoji", options.emoji], ["math_inline", options.inlineMath]] as const)
     enabled ? md.enable(rule, true) : md.disable(rule, true);

@@ -913,17 +913,13 @@ final class NativeApplication: NSObject, NSApplicationDelegate, NSMenuItemValida
   }
   @objc func command(_ sender: NSMenuItem) {
     guard let action = sender.representedObject as? String else { return }
-    if ["new", "newWindow", "newTab"].contains(action) {
-      newWindow(tab: action == "newTab")
-    } else if action == "open" {
-      if let file = current?.chooseFile(false) { openWindow(file) }
+    if action == "newWindow" || current == nil && ["new", "newTab", "open"].contains(action) {
+      newWindow()
+      if action == "open" { current?.send("open") }
     } else if action == "quit" {
       NSApp.terminate(nil)
     } else if action == "close-window" {
       current?.send("close-window")
-    } else if action == "reopen", let recent = recentClosedFiles.popLast() {
-      persistClosedHistory()
-      openWindow(recent.url, tabGroupID: recent.group)
     } else {
       current?.send(action)
     }

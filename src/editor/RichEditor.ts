@@ -24,7 +24,7 @@ import { fenceLanguage } from "./fenceLanguage.ts";
 import { applyBlockCommand } from "./blockCommands.ts";
 import type { BlockArguments } from "./blockCommands.ts";
 import { htmlToMarkdown } from "./clipboard.ts";
-import { inlineTokens } from "./markdown.ts";
+import { inlineTokens, markdownOptionsVersion } from "./markdown.ts";
 import { imeKey } from "./composition.ts";
 export interface RichCallbacks {
   change(): void;
@@ -42,7 +42,7 @@ export class RichEditor {
   private compositionText: string | null = null;
   private mutating = false;
   private pointing = false;
-  private html = new Map<string, string>();
+  private blocks = new Map<string, { node: DocumentNode; element: HTMLElement; leaves: Leaf[]; environment: string }>();
   private fence: { id: string; leaf: Leaf; view: EditorView } | null = null;
   private emojiPopup: HTMLDivElement;
   private emojiOptions: string[] = [];
@@ -282,6 +282,7 @@ export class RichEditor {
     return { node: element, offset: 0 };
   }
   restore(selection = this.model.selection, focus = true) {
+    if (this.root.closest<HTMLElement>(".document-editor")?.dataset.active === "false") return;
     const anchor = this.domPoint(selection.anchor),
       head = this.domPoint(selection.head);
     if (!anchor || !head) return;
@@ -294,36 +295,33 @@ export class RichEditor {
   render(restore = true) {
     if (this.composing) return;
     this.mutating = true;
-    const fresh = new Map<string, Leaf>();
-    const desired: HTMLElement[] = [];
+    const fresh = new Map<string, Leaf>(), desired: HTMLElement[] = [], next = new Map<string, { node: DocumentNode; element: HTMLElement; leaves: Leaf[]; environment: string }>();
+    const existing = new Map([...this.root.children].map(element => [(element as HTMLElement).dataset.cid, element as HTMLElement]));
+    const environment = markdownOptionsVersion + ":" + JSON.stringify(this.model.environment);
     for (const node of this.model.nodes) {
-      const element = renderNode(
-        node,
-        this.documentId,
-        fresh,
-        this.model.environment,
-      );
-      const previous = this.root.querySelector<HTMLElement>(
-        `:scope > [data-cid="${node.id}"]`,
-      );
-      if (this.fence?.id === node.id && previous) {
-        desired.push(previous);
+      const previous = existing.get(node.id), cached = this.blocks.get(node.id);
+      if (cached && previous === cached.element && this.fence?.id !== node.id && cached.node.source === node.source && cached.node.kind === node.kind && cached.environment === environment) {
+        const delta = node.from - cached.node.from;
+        const leaves = delta ? cached.leaves.map(leaf => ({ ...leaf, positions: leaf.positions.map(position => position + delta) })) : cached.leaves;
+        for (const leaf of leaves) fresh.set(leaf.id, leaf);
+        if (delta) for (const checkbox of previous.querySelectorAll<HTMLElement>("[data-task]")) checkbox.dataset.task = String(Number(checkbox.dataset.task) + delta);
+        if (previous.dataset.line !== String(node.line)) previous.dataset.line = String(node.line);
+        desired.push(previous); next.set(node.id, { node, element: previous, leaves, environment });
         continue;
       }
-      const html = element.outerHTML;
-      if (previous && this.html.get(node.id) === html) desired.push(previous);
-      else {
-        if (previous) previous.replaceWith(element);
-        desired.push(element);
-      }
-      this.html.set(node.id, html);
+      const leaves = new Map<string, Leaf>();
+      const element = renderNode(node, this.documentId, leaves, this.model.environment);
+      for (const [id, leaf] of leaves) fresh.set(id, leaf);
+      if (this.fence?.id === node.id && previous) { desired.push(previous); continue; }
+      if (previous) previous.replaceWith(element);
+      desired.push(element); next.set(node.id, { node, element, leaves: [...leaves.values()], environment });
     }
+    this.blocks = next;
     this.leaves = fresh;
     for (let i = 0; i < desired.length; i++)
-      if (this.root.children[i] !== desired[i])
-        this.root.insertBefore(desired[i], this.root.children[i] || null);
-    for (const element of [...this.root.children])
-      if (!desired.includes(element as HTMLElement)) element.remove();
+      if (this.root.children[i] !== desired[i]) this.root.insertBefore(desired[i], this.root.children[i] || null);
+    const retained = new Set(desired);
+    for (const element of [...this.root.children]) if (!retained.has(element as HTMLElement)) element.remove();
     if (restore && !this.fence) this.restore();
     this.mutating = false;
     void renderDiagrams(this.root).catch(() => {});
@@ -1392,7 +1390,7 @@ export class RichEditor {
     const id = this.fence.id;
     this.fence.view.destroy();
     this.fence = null;
-    this.html.delete(id);
+    this.blocks.delete(id);
     this.render(false);
   }
   private activateFence(element: HTMLElement) {

@@ -177,7 +177,7 @@ const handlers = {
   },
   scan: () => store.scan(),
   token: async (_, token) => { const record = await store.openToken(token); await workspace.remember(record.path); return record; },
-  reopen: (_, id) => store.reload(id),
+  reopen: (_, id) => store.reopen(id),
   writeClipboard: (_, text) => clipboard.writeText(String(text)),
   readClipboard: () => clipboard.readText(),
   chooseImage: async (_, id, options) => {

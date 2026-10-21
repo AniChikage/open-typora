@@ -14,12 +14,15 @@ node tests/electron-shell.mjs
 $shellExit = $LASTEXITCODE
 node tests/parity-desktop.mjs
 $parityExit = $LASTEXITCODE
+node tests/workspace-desktop.mjs
+$workspaceExit = $LASTEXITCODE
 node tests/compatibility-desktop.mjs
 $compatibilityExit = $LASTEXITCODE
 node tests/ime-desktop.mjs
 $imeExit = $LASTEXITCODE
 node tests/plugin-package-desktop.mjs
 $packageExit = $LASTEXITCODE
+if ($workspaceExit -ne 0) { throw 'Installed tabs and split-pane regression failed' }
 if ($packageExit -ne 0) { throw 'Installed plugin package regression failed' }
 if ($imeExit -ne 0) { throw 'Installed composition and plugin regression failed' }
 if ($desktopExit -ne 0) { throw 'Installed desktop regression failed' }

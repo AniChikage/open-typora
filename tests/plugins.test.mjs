@@ -277,3 +277,11 @@ test("host shutdown invalidates plugin APIs even while initialization is awaitin
   await ready;const stopped=run.destroy();assert.equal(locks.at(-1),false);release();await Promise.all([enabling,stopped]);
   assert.deepEqual(edits,[]);assert.equal(locks.at(-1),false);
 });
+
+test("plugin DOM bindings follow the focused pane when both documents are visible", async () => {
+  const first=document.querySelector('.document-editor'), second=document.createElement('div');
+  first.dataset.active='false';second.className='document-editor';second.dataset.active='true';second.innerHTML='<div class="rich-document"><p data-cid="second-pane">Second pane</p></div>';first.parentElement.append(second);
+  const run=runtime();
+  try { assert.equal(document.getElementById('write'),second.firstElementChild); first.dataset.active='true';second.dataset.active='false';run.value.documentChanged();assert.equal(document.getElementById('write'),first.querySelector('.rich-document')); }
+  finally { await run.value.destroy();second.remove();delete first.dataset.active; }
+});

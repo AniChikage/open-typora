@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { host } from "./host";
+import { normalizeWorkspace, activateWorkspace, reorderDocuments } from "./workspace";
+import type { WorkspaceLayout } from "./workspace";
 import type { DocumentRecord, FileEntry, FolderResult, PathChange, RecentEntry, FileOperation } from "./types";
 export function useDocuments(canPrepare: () => boolean = () => true) {
   const prepareEditor = useRef(canPrepare); prepareEditor.current = canPrepare;
   const [documents, setDocuments] = useState<DocumentRecord[]>([]),
-    [activeId, setActiveId] = useState("");
+    [activeId, setActiveIdState] = useState("");
+  const [workspace, setWorkspaceState] = useState<WorkspaceLayout | null>(null);
   const [files, setFiles] = useState<FileEntry[]>([]),
     [folder, setFolder] = useState<string | null>(null);
   const [ready, setReady] = useState(false),
@@ -15,11 +18,12 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
   );
   const [fileOperationBusy, setFileOperationBusy] = useState(false);
   const [recent, setRecent] = useState<RecentEntry[]>([]);
-  const current = useRef({ documents, activeId });
-  current.current = { documents, activeId };
+  const current = useRef({ documents, activeId, workspace });
+  current.current = { documents, activeId, workspace };
   const inFlight = useRef(new Map<string, Promise<unknown>>());
   const closing = useRef(false);
   const closed = useRef<{ id: string; name: string }[]>([]);
+  const activated = useRef<string[]>([]);
   const update = (id: string, patch: Partial<DocumentRecord>) =>
     setDocuments((records) => {
       const next = records.map(record => record.id === id ? { ...record, ...patch } : record);
@@ -40,12 +44,11 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
       .then(async (session) => {
         if (disposed) return;
         const records = session?.documents || [];
-        setDocuments(records);
-        setActiveId(
-          records.some((record) => record.id === session?.activeId)
-            ? session!.activeId!
-            : records[0]?.id || "",
-        );
+        const id = records.some(record => record.id === session?.activeId) ? session!.activeId! : records[0]?.id || "";
+        const layout = normalizeWorkspace(session?.workspace, records.map(record => record.id), id);
+        current.current = { documents: records, activeId: id, workspace: layout };
+        activated.current = id ? [id] : [];
+        setDocuments(records); setActiveIdState(id); setWorkspaceState(layout);
         setFolder(session?.folder || null);
         if (session?.folder) {
           const scanned = await host.scan();
@@ -69,13 +72,13 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
     if (!ready) return;
     const timer = setTimeout(() => {
       if (closing.current) return;
-      void host.persist({ documents, activeId }).catch(notify);
+      void host.persist({ documents, activeId, workspace }).catch(notify);
     }, 500);
     void host.setDirty(
       documents.some((record) => record.content !== record.savedContent),
     );
     return () => clearTimeout(timer);
-  }, [documents, activeId, ready]);
+  }, [documents, activeId, workspace, ready]);
   useEffect(() => {
     localStorage.setItem("open-typora-autosave", String(autosave));
   }, [autosave]);
@@ -191,8 +194,62 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
     }, 1800);
     return () => clearInterval(timer);
   }, [ready]);
+  function canSwitch() {
+    if (closing.current) return false;
+    if (prepareEditor.current()) return true;
+    setMessage("请先完成当前输入法组合输入，再切换文档或窗格。");
+    return false;
+  }
+  function setActiveId(id: string) {
+    if (!current.current.documents.some(record => record.id === id)) return false;
+    if (id !== current.current.activeId && !canSwitch()) return false;
+    activated.current = [...activated.current.filter(item => item !== id), id].slice(-100);
+    const layout = activateWorkspace(current.current.workspace, current.current.activeId, id);
+    current.current = { ...current.current, activeId: id, workspace: layout };
+    setActiveIdState(id); setWorkspaceState(layout);
+    return true;
+  }
+  function setWorkspace(layout: WorkspaceLayout | null) {
+    const value = normalizeWorkspace(layout, current.current.documents.map(record => record.id), current.current.activeId);
+    current.current = { ...current.current, workspace: value }; setWorkspaceState(value);
+  }
+  async function split(direction: "columns" | "rows") {
+    if (!canSwitch() || !current.current.activeId) return;
+    if (current.current.workspace) { setWorkspace({ ...current.current.workspace, direction }); return; }
+    const primaryId = current.current.activeId;
+    let other = current.current.documents.find(record => record.id !== primaryId);
+    if (!other) other = await create();
+    if (other) setWorkspace({primaryId, secondaryId: other.id, direction, ratio:.5});
+  }
+  function closePane(id: string) {
+    if (!canSwitch() || !current.current.workspace) return;
+    const layout = current.current.workspace;
+    setActiveId(id === layout.primaryId ? layout.secondaryId : layout.primaryId);
+    setWorkspace(null);
+  }
+  function resizeWorkspace(ratio: number) {
+    if (current.current.workspace && Number.isFinite(ratio)) setWorkspace({ ...current.current.workspace, ratio });
+  }
+  function swapPanes() {
+    if (!canSwitch() || !current.current.workspace) return;
+    const layout = current.current.workspace;
+    setWorkspace({ ...layout, primaryId: layout.secondaryId, secondaryId: layout.primaryId, ratio: 1-layout.ratio });
+  }
+  function nextTab(back = false) {
+    const records = current.current.documents, index = records.findIndex(record => record.id === current.current.activeId);
+    if (records.length) setActiveId(records[(index + (back ? records.length-1 : 1)) % records.length].id);
+  }
+  function otherPane() {
+    const layout = current.current.workspace;
+    if (layout) setActiveId(current.current.activeId === layout.primaryId ? layout.secondaryId : layout.primaryId);
+  }
+  function reorder(source: string, target: string) {
+    if (!canSwitch()) return;
+    const records = reorderDocuments(current.current.documents,source,target);
+    current.current = { ...current.current, documents: records }; setDocuments(records);
+  }
   async function add(record: DocumentRecord | null) {
-    if (!record) return;
+    if (!record || !canSwitch()) return;
     const existing = current.current.documents.find(
       (item) =>
         item.id === record.id || (record.path && item.path === record.path),
@@ -201,11 +258,13 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
       setActiveId(existing.id);
       return existing;
     }
-    setDocuments((records) => [...records, record]);
-    setActiveId(record.id);
+    const records = [...current.current.documents, record];
+    current.current = { ...current.current, documents: records };
+    setDocuments(records); setActiveId(record.id);
     return record;
   }
   async function create() {
+    if (!canSwitch()) return;
     const id = crypto.randomUUID();
     const name = `未命名${current.current.documents.filter((record) => !record.path).length ? ` ${current.current.documents.filter((record) => !record.path).length + 1}` : ""}.md`;
     const record: DocumentRecord = {
@@ -219,12 +278,13 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
     };
     try {
       await host.registerDraft(record);
-      await add(record);
+      return await add(record);
     } catch (error) {
       notify(error);
     }
   }
   async function open() {
+    if (!canSwitch()) return;
     try {
       await add(await host.open());
       await refresh();
@@ -291,7 +351,8 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
         return record;
       });
       const id = records.some(record => record.id === current.current.activeId) ? current.current.activeId : records[0]?.id || "";
-      current.current = { documents: records, activeId: id }; setDocuments(records); setActiveId(id);
+      const layout = normalizeWorkspace(current.current.workspace, records.map(record => record.id), id);
+      current.current = { documents: records, activeId: id, workspace: layout }; setDocuments(records); setActiveIdState(id); setWorkspaceState(layout);
       await host.persist(current.current); await refresh(); setRecent(await host.recent()); return true;
     }
     return false;
@@ -336,12 +397,16 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
     const remaining = current.current.documents.filter(
       (item) => item.id !== id,
     );
-    const nextId = current.current.activeId === id ? remaining[0]?.id || "" : current.current.activeId;
+    const recent = activated.current.findLast(previous => previous !== id && remaining.some(record => record.id === previous));
+    const nextId = current.current.activeId === id ? recent || remaining[Math.min(current.current.documents.findIndex(record => record.id === id), remaining.length-1)]?.id || "" : current.current.activeId;
+    const layout = normalizeWorkspace(current.current.workspace, remaining.map(record => record.id), nextId);
     await host.persist({
       documents: remaining,
-      activeId: nextId,
+      activeId: nextId, workspace: layout,
     });
-    setDocuments(remaining); setActiveId(nextId);
+    activated.current = [...activated.current.filter(item => item !== id && item !== nextId), ...(nextId ? [nextId] : [])];
+    current.current = { documents: remaining, activeId: nextId, workspace: layout };
+    setDocuments(remaining); setActiveIdState(nextId); setWorkspaceState(layout);
     closed.current = [...closed.current.filter(item => item.id !== id), { id, name: record.name }].slice(-20);
     } catch (error) { notify(error); }
     finally { closing.current = false; setDocuments(records => [...records]); }
@@ -435,6 +500,7 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
         activeId: remaining.some((item) => item.id === current.current.activeId)
           ? current.current.activeId
           : remaining[0]?.id || "",
+        workspace: current.current.workspace,
       });
       await host.setDirty(false);
       await host.closeWindow();
@@ -446,7 +512,8 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
   }
   return {
     documents,
-    activeId,
+    activeId, workspace, split, closePane, resizeWorkspace, swapPanes, nextTab, otherPane, reorder,
+    canReopen: closed.current.length > 0,
     fileOperationBusy, fileOperation, recent, recentAction,
     setActiveId,
     active: documents.find((record) => record.id === activeId),

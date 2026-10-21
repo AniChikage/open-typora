@@ -2,7 +2,7 @@
   {"title":"文件","items":[
     {"label":"新建","action":"new","key":"Mod-N"},
     {"label":"新建窗口","action":"newWindow","key":"Mod-Shift-N"},
-    {"label":"新建标签页","action":"newTab","pcKey":"","key":"Mod-T"},
+    {"label":"新建标签页","action":"newTab","pcKey":"Mod-Alt-N","key":"Mod-T"},
     {"label":"打开文件…","action":"open","key":"Mod-O"},
     {"label":"快速打开…","action":"quick-open","pcKey":"Mod-P","key":"Mod-Shift-O"},
     {"label":"重新打开关闭的文档","action":"reopen","key":"Mod-Shift-T"},
@@ -27,7 +27,8 @@
     {"label":"导出 Textile…","action":"textile","context":"document"},
     {"label":"导出 OPML…","action":"opml","context":"document"},
     {"label":"导出 Reveal.js…","action":"revealjs","context":"document"},
-    {"label":"关闭窗口","action":"close-window","key":"Mod-W"}
+    {"label":"关闭标签页","action":"close","key":"Mod-W","context":"document"},
+    {"label":"关闭窗口","action":"close-window","key":"Mod-Shift-W"}
   ]},
   {"title":"编辑","items":[
     {"label":"撤销","action":"undo","key":"Mod-Z","context":"document"},
@@ -113,6 +114,13 @@
     {"label":"清除格式","action":"clear-format","key":"Mod-\\","context":"rich"}
   ]},
   {"title":"显示","items":[
+    {"label":"下一个标签页","action":"next-tab","key":"Ctrl-Tab"},
+    {"label":"上一个标签页","action":"previous-tab","key":"Ctrl-Shift-Tab"},
+    {"label":"左右分屏","action":"split-right","key":"Mod-Alt-2","context":"document"},
+    {"label":"上下分屏","action":"split-down","context":"document"},
+    {"label":"切换编辑窗格","action":"other-pane","key":"F6","context":"document"},
+    {"label":"交换窗格","action":"swap-panes","context":"document"},
+    {"label":"关闭当前窗格","action":"close-pane","context":"document"},
     {"label":"源码模式","action":"source","key":"Mod-/","context":"document"},
     {"label":"专注模式","action":"focus","key":"F8","context":"document"},
     {"label":"打字机模式","action":"typewriter","key":"F9","context":"document"},

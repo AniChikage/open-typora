@@ -1,0 +1,70 @@
+import { _electron as electron, expect } from "playwright/test";
+import assert from "node:assert/strict";
+import { mkdtemp, mkdir, writeFile, readFile, realpath } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import os from "node:os";
+import path from "node:path";
+const data=await realpath(await mkdtemp(path.join(os.tmpdir(),'open-typora-workspace-'))), profile=path.join(data,'profile');
+const qa=process.env.OPEN_TYPORA_QA_DIR || path.join(data,'evidence');await mkdir(profile);await mkdir(qa,{recursive:true});
+const texts=['# Long document\n\n'+Array.from({length:700},(_,i)=>`Paragraph ${i}. 中文 **Markdown** editing.`).join('\n\n')+'\n','# Second document\n\nSecond input: end\n','# Third document\n\nThird input: end\n'];
+const names=['Long.md','Second.md','Third.md'];
+const records=[];for(let i=0;i<3;i++){const file=path.join(data,names[i]);await writeFile(file,texts[i]);records.push({id:'workspace-'+i,path:file,name:names[i],content:texts[i],savedContent:texts[i],diskHash:createHash('sha256').update(texts[i]).digest('hex'),lineEnding:'\n',encoding:'utf-8',bom:false});}
+await writeFile(path.join(profile,'session.json'),JSON.stringify({version:1,documents:records,activeId:records[0].id}));
+const env={...process.env,OPEN_TYPORA_DATA_DIR:profile};delete env.ELECTRON_RUN_AS_NODE;delete env.OPEN_TYPORA_DEV_URL;
+let app,page;const errors=[],checks=[];const mod=process.platform==='darwin'?'Meta':'Control';
+async function launch(){app=await electron.launch({...(process.env.OPEN_TYPORA_EXECUTABLE?{executablePath:process.env.OPEN_TYPORA_EXECUTABLE,args:[]}:{args:[process.cwd()]}),env,timeout:30000});page=await app.firstWindow();page.on('pageerror',error=>errors.push(error.message));await page.setViewportSize({width:1380,height:900});}
+const pane=id=>page.locator(`.document-editor[data-document-id="${id}"]`);
+const tab=name=>page.getByRole('tab',{name,exact:true});
+async function command(action){await app.evaluate(({BrowserWindow},action)=>BrowserWindow.getAllWindows()[0].webContents.send('app:command',{action}),action);}
+async function point(id,text,offset=0){await pane(id).locator('.rich-document').evaluate((root,{text,offset})=>{const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let node;while((node=walker.nextNode())){if(!node.parentElement.closest('.md-meta,.md-view')&&node.data.includes(text)){root.focus();getSelection().setBaseAndExtent(node,node.data.indexOf(text)+offset,node,node.data.indexOf(text)+offset);document.dispatchEvent(new Event('selectionchange'));return;}}throw new Error('Missing selection target '+text);},{text,offset});}
+const session=async()=>JSON.parse(await readFile(path.join(profile,'session.json'),'utf8'));
+try{
+ await launch();await expect(tab('Long.md')).toHaveAttribute('aria-selected','true');await expect(page.getByRole('tab')).toHaveCount(3);await expect(page.locator('.document-editor')).toHaveCount(1);
+ await pane(records[0].id).locator('.rich-document > p').last().evaluate(element=>element.dataset.qaStable='true');
+ await point(records[0].id,'Paragraph 2.',10);await page.keyboard.insertText('你好');await expect.poll(()=>readFile(records[0].path,'utf8')).toContain('Paragraph 你好2.');
+ assert.equal(await pane(records[0].id).locator('[data-qa-stable]').count(),1);
+ await tab('Second.md').click();await tab('Long.md').click();await page.keyboard.press(`${mod}+z`);await expect.poll(()=>readFile(records[0].path,'utf8')).toBe(texts[0]);
+ await pane(records[0].id).locator('.rich-scroller').evaluate(element=>element.scrollTop=700);const scroll=await pane(records[0].id).locator('.rich-scroller').evaluate(element=>element.scrollTop);
+ await tab('Third.md').click();await tab('Long.md').click();assert.equal(await pane(records[0].id).locator('.rich-scroller').evaluate(element=>element.scrollTop),scroll);
+ checks.push('Tabs mount editors on first use and retain undo history and scroll position.');
+ await page.getByRole('button',{name:'左右分屏',exact:true}).click();await expect(page.locator('.document-editor:not([hidden])')).toHaveCount(2);
+ await tab('Second.md').click();await expect(pane(records[1].id)).toHaveAttribute('data-active','true');
+ await point(records[1].id,'Second input:',13);await page.keyboard.insertText('乙');await expect.poll(()=>readFile(records[1].path,'utf8')).toContain('Second input:乙 end');
+ assert.equal(await readFile(records[0].path,'utf8'),texts[0]);
+ await command('other-pane');await expect(pane(records[0].id)).toHaveAttribute('data-active','true');
+ await pane(records[0].id).locator('.rich-scroller').evaluate(element=>element.scrollTop=0);
+ await point(records[0].id,'Paragraph 0.',10);await page.keyboard.insertText('甲');await expect.poll(()=>readFile(records[0].path,'utf8')).toContain('Paragraph 甲0.');
+ await command('source');await expect(pane(records[0].id).locator('.source-surface')).toBeVisible();await expect(pane(records[1].id).locator('.rich-scroller')).toBeVisible();
+ await command('source');await expect(pane(records[0].id).locator('.rich-scroller')).toBeVisible();
+ checks.push('Both split panes edit separate files; source/live mode is independent per document.');
+ const secondRoot=pane(records[1].id).locator('.rich-document');
+ await secondRoot.locator('.md-line').filter({hasText:'Second input:'}).click({position:{x:2,y:8}});await page.keyboard.insertText('开');
+ await expect.poll(()=>readFile(records[1].path,'utf8')).toContain('\n\n开Second input:');
+ await page.keyboard.press(`${mod}+z`);await expect.poll(()=>readFile(records[1].path,'utf8')).not.toContain('开Second');
+ await secondRoot.getByText('Second input:',{exact:false}).click();await page.keyboard.press('End');await page.keyboard.insertText('尾');
+ await expect.poll(()=>readFile(records[1].path,'utf8')).toContain('end尾');
+ const cdp=await page.context().newCDPSession(page);await point(records[1].id,'Second input:',13);await cdp.send('Input.imeSetComposition',{text:'zhong',selectionStart:5,selectionEnd:5});
+ await command('next-tab');await expect(tab('Second.md')).toHaveAttribute('aria-selected','true');await cdp.send('Input.insertText',{text:'中国'});await expect.poll(()=>readFile(records[1].path,'utf8')).toContain('Second input:中国乙');
+ await page.keyboard.press(`${mod}+z`);await expect.poll(()=>readFile(records[1].path,'utf8')).not.toContain('中国');
+ assert.equal(await page.locator('#write').evaluate(element=>element.closest('.document-editor').dataset.documentId),records[1].id);
+ checks.push('Clicking the other pane activates it; Chromium composition blocks tab switches and undoes once; plugin DOM follows focus.');
+ let divider=page.getByRole('separator',{name:'调整分屏比例'});await divider.focus();await page.keyboard.press('Home');await expect(divider).toHaveAttribute('aria-valuenow','20');await page.keyboard.press('ArrowRight');await expect(divider).toHaveAttribute('aria-valuenow','25');
+ await page.getByRole('button',{name:'上下分屏',exact:true}).click();await expect(divider).toHaveAttribute('aria-orientation','horizontal');
+ await divider.dblclick();await expect(divider).toHaveAttribute('aria-valuenow','50');await page.getByRole('button',{name:'交换窗格',exact:true}).click();
+ await tab('Third.md').focus();await page.keyboard.press('Alt+ArrowLeft');await expect.poll(async()=>(await session()).documents.map(record=>record.name)).toEqual(['Long.md','Third.md','Second.md']);
+ await expect.poll(async()=>(await session()).workspace?.direction).toBe('rows');
+ await page.screenshot({path:path.join(qa,'workspace-rows.png')});
+ checks.push('Split orientation, swapping, accessible resizing and keyboard tab reorder persist.');
+ await app.close();await launch();await expect(page.locator('.document-editor:not([hidden])')).toHaveCount(2);await expect(page.getByRole('separator',{name:'调整分屏比例'})).toHaveAttribute('aria-orientation','horizontal');
+ assert.deepEqual(await page.getByRole('tab').allTextContents(),['Long.md','Third.md','Second.md']);
+ await page.getByRole('button',{name:'左右分屏',exact:true}).click();await page.screenshot({path:path.join(qa,'workspace-columns.png')});
+ await page.getByRole('button',{name:'关闭第二个窗格',exact:true}).click();await expect(page.locator('.document-editor:not([hidden])')).toHaveCount(1);await expect(page.getByRole('tab')).toHaveCount(3);
+ const priorActive=await page.getByRole('tab',{selected:true}).getAttribute('aria-label');
+ await page.keyboard.press(process.platform==='darwin'?'Meta+t':'Control+Alt+n');await expect(page.getByRole('tab')).toHaveCount(4);await page.keyboard.insertText('未保存草稿');
+ await app.evaluate(({dialog})=>{dialog.showMessageBox=async()=>({response:1});});await command('close');await expect(page.getByRole('tab')).toHaveCount(4);
+ await app.evaluate(({dialog})=>{dialog.showMessageBox=async()=>({response:2});});await command('close');await expect(page.getByRole('tab')).toHaveCount(3);await expect(tab(priorActive)).toHaveAttribute('aria-selected','true');
+ await command('reopen');await expect(page.getByRole('tab')).toHaveCount(4);
+ checks.push('Restart restores pane layout and tab order; closing a pane retains documents; dirty-tab cancellation and reopen work.');
+ assert.deepEqual(errors,[]);assert.equal(await page.locator('vite-error-overlay').count(),0);
+ await writeFile(path.join(qa,'workspace-results.json'),JSON.stringify({platform:process.platform,browser:'Browser plugin not available; existing Electron/Playwright workflow',checks,errors,profile},null,2));console.log(checks.map(check=>'PASS: '+check).join('\n'));
+}catch(error){await page?.screenshot({path:path.join(qa,'workspace-failure.png')}).catch(()=>{});throw error;}finally{await app?.close();}

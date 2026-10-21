@@ -57,6 +57,7 @@ export interface EditorHandle {
 interface Props {
   document: DocumentRecord;
   rendered: boolean;
+  active?: boolean;
   readOnly?: boolean;
   preferences?: Preferences;
   typewriter?: boolean;
@@ -68,7 +69,7 @@ interface Props {
 }
 export const MarkdownEditor = forwardRef<EditorHandle, Props>(
   function MarkdownEditor(
-    { document: record, rendered, readOnly = false, preferences, typewriter = false, onChange, onError, onCursor, onSelection, onCompositionEnd },
+    { document: record, rendered, active = true, readOnly = false, preferences, typewriter = false, onChange, onError, onCursor, onSelection, onCompositionEnd },
     ref,
   ) {
     const root = useRef<HTMLDivElement>(null),
@@ -123,11 +124,10 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
     }
     const sourceBehavior = useRef(new Compartment());
     const sourceOptions = () => [EditorState.readOnly.of(viewOptions.current.readOnly), EditorView.editable.of(!viewOptions.current.readOnly), indentUnit.of(" ".repeat(viewOptions.current.preferences?.tabSize || 2)), ...(viewOptions.current.preferences?.autoPair ? [closeBrackets(), keymap.of(closeBracketsKeymap)] : [])];
-    const viewOptions = useRef({ preferences, typewriter, readOnly });
-    viewOptions.current = { preferences, typewriter, readOnly };
+    const viewOptions = useRef({ preferences, typewriter, readOnly, active });
+    viewOptions.current = { preferences, typewriter, readOnly, active };
     function historyState() {
-      if (root.current?.closest(".document-editor")?.hasAttribute("hidden"))
-        return;
+      if (!viewOptions.current.active || root.current?.closest(".document-editor")?.hasAttribute("hidden")) return;
       if (model.current && window.desktop?.historyState)
         void window.desktop
           .historyState(
@@ -139,8 +139,17 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
           .catch(() => {});
     }
     function focusEditor() {
+      if (!viewOptions.current.active) return;
       if (activeMode.current) rich.current?.restore();
-      else source.current?.focus();
+      else { source.current?.requestMeasure(); source.current?.focus(); }
+      const doc = model.current;
+      if (doc) {
+        const before = doc.text.slice(0,doc.selection.head), at = before.lastIndexOf("\n");
+        callbacks.current.onCursor(before.split("\n").length, before.length-at);
+        const from = Math.min(doc.selection.anchor,doc.selection.head), to = Math.max(doc.selection.anchor,doc.selection.head);
+        callbacks.current.onSelection?.(doc.text.slice(from,to));
+      }
+      historyState();
     }
     const publish = () => {
       callbacks.current.onChange(model.current!.toMarkdown());
@@ -528,7 +537,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
       // A delayed frame can restore an older caret after a navigation key.
       if (!root.current?.closest(".document-editor")?.hasAttribute("hidden"))
         focusEditor();
-    }, [visibleMode]);
+    }, [visibleMode, active]);
     return (
       <div
         className={`editor-surface ${visibleMode ? "rich-mode" : "source-mode"}`}

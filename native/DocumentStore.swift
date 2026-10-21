@@ -24,12 +24,19 @@ struct DocumentRecord: Codable {
   var bom: Bool?
   var encoding: String?
 }
+struct WorkspaceLayoutState: Codable {
+  var primaryId: String
+  var secondaryId: String
+  var direction: String
+  var ratio: Double
+}
 struct SessionRecord: Codable {
   var version: Int = 1
   var documents: [DocumentRecord]
   var activeId: String?
   var folder: String?
   var restoreError: String?
+  var workspace: WorkspaceLayoutState?
 }
 func hashData(_ data: Data) -> String {
   SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
@@ -286,7 +293,7 @@ final class DocumentStore {
     }
     activeId = incoming.activeId
     let session = SessionRecord(
-      documents: documents, activeId: incoming.activeId, folder: folder?.path)
+      documents: documents, activeId: incoming.activeId, folder: folder?.path, workspace: incoming.workspace)
     try atomicWrite(
       dataDirectory.appendingPathComponent("session.json"), JSONEncoder().encode(session))
     let openIDs = Set(documents.map { $0.id })

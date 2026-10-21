@@ -289,6 +289,13 @@ export class DocumentStore {
     this.records.set(id, updated);
     return updated;
   }
+  async reopen(id) {
+    const record = this.require(id);
+    if (record.path) return this.reload(id);
+    const restored = { ...record, content: record.savedContent };
+    this.records.set(id, restored);
+    return { ...restored };
+  }
   async reload(id, encoding) {
     const record = this.require(id);
     return this.open(record.path, true, encoding || record.encoding);
@@ -314,6 +321,7 @@ export class DocumentStore {
       documents,
       activeId: session.activeId,
       folder: this.folder,
+      workspace: session.workspace,
     });
     const operation = this.persistQueue
       .catch(() => {})
@@ -352,7 +360,7 @@ export class DocumentStore {
           await this.scan(session.folder);
         } catch {}
       }
-      return { documents, activeId: session.activeId, folder: this.folder };
+      return { documents, activeId: session.activeId, folder: this.folder, workspace: session.workspace };
     } catch (e) {
       if (e.code === "ENOENT") return null;
       const original = await readFile(path.join(this.dataDir, "session.json"));

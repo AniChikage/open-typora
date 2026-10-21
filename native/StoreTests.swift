@@ -42,11 +42,12 @@ func runStoreTests() throws {
   _ = try store.draft(draft)
   var dirty = try store.require(record.id)
   dirty.content += "未保存"
-  try store.persist(SessionRecord(documents: [dirty, draft], activeId: draft.id))
+  try store.persist(SessionRecord(documents: [dirty, draft], activeId: draft.id, workspace: WorkspaceLayoutState(primaryId: dirty.id, secondaryId: draft.id, direction: "rows", ratio: 0.6)))
   let recovered = try DocumentStore(store.dataDirectory).restore()!
   try expect(
     recovered.documents.first?.conflict == true && recovered.documents.last?.content == "# 草稿",
     "recovery retains dirty file conflict and untitled draft")
+  try expect(recovered.workspace?.primaryId == dirty.id && recovered.workspace?.secondaryId == draft.id && recovered.workspace?.ratio == 0.6, "native session restores split documents and pane dimensions")
   let change = try store.check(record.id)!
   _ = try store.accept(
     record.id, content: change["content"] as! String, digest: change["diskHash"] as! String)

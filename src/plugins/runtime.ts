@@ -55,7 +55,7 @@ export class PluginRuntime {
     this.observer.observe(document.getElementById("root") || document.body, { childList: true, subtree: true });
     this.syncDOM();
   }
-  private write = () => document.querySelector<HTMLElement>('.document-editor:not([hidden]) .rich-document') || document.querySelector<HTMLElement>(".rich-document");
+  private write = () => document.querySelector<HTMLElement>('.document-editor[data-active="true"] .rich-document') || document.querySelector<HTMLElement>('.document-editor:not([hidden]) .rich-document') || document.querySelector<HTMLElement>(".rich-document");
   private focus = () => {
     const root = this.write(), anchor = window.getSelection()?.anchorNode;
     if (!root || !anchor || !root.contains(anchor)) return;

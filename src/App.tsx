@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FilePlus2, FolderOpen, X, AlertCircle } from "lucide-react";
 import { useDocuments } from "./useDocuments";
 import { EncodingDialog, encodingNames } from "./components/EncodingDialog";
 import { Toolbar } from "./components/Toolbar";
 import { Sidebar } from "./components/Sidebar";
-import { MarkdownEditor } from "./editor/MarkdownEditor";
+import { EditorWorkspace } from "./components/EditorWorkspace";
+import "./workspace.css";
 import type { EditorHandle } from "./editor/MarkdownEditor";
 import { extractHeadings, renderMarkdown, setMarkdownOptions } from "./editor/markdown";
 import { host } from "./host";
@@ -54,8 +55,10 @@ export default function App() {
   const [countUnit, setCountUnit] = useState<"characters" | "words">(() => localStorage.getItem("open-typora-count-unit") === "words" ? "words" : "characters");
   const [exporting, setExporting] = useState(false);
   const exportingRef = useRef(false);
-  const [rendered, setRendered] = useState(true),
-    [sidebar, setSidebar] = useState(() => window.innerWidth > 760),
+  const [modes, setModes] = useState<Record<string,boolean>>({});
+  const rendered = modes[session.activeId] !== false;
+  function setRendered(value: boolean | ((previous: boolean) => boolean)) { setModes(previous => ({...previous,[session.activeId]: typeof value === "function" ? value(previous[session.activeId] !== false) : value})); }
+  const [sidebar, setSidebar] = useState(() => window.innerWidth > 760),
     [focus, setFocus] = useState(false);
   const [tab, setTab] = useState<"files" | "outline" | "tree">("files"),
     [theme, setTheme] = useState(
@@ -67,6 +70,15 @@ export default function App() {
   const printDocument = useRef<HTMLElement>(null);
   const commands = useRef<(command: Command) => void>(() => {});
   const active = session.active;
+  const sessionRef = useRef(session); sessionRef.current = session;
+  const registerEditor = useCallback((id: string, handle: EditorHandle | null) => { if (handle) editors.current.set(id,handle); else editors.current.delete(id); }, []);
+  const selectDocument = useCallback((id: string) => sessionRef.current.setActiveId(id), []);
+  const changeDocument = useCallback((id: string, content: string) => sessionRef.current.update(id,{content}), []);
+  const cursorDocument = useCallback((id: string, line: number, column: number) => { if (id === sessionRef.current.activeId) setCursor(previous => previous.line === line && previous.column === column ? previous : {line,column}); }, []);
+  const selectionDocument = useCallback((id: string, text: string) => { if (id === sessionRef.current.activeId) setSelection(text); }, []);
+  const compositionDocument = useCallback((id: string) => { if (id === sessionRef.current.activeId) pluginRuntime.current?.documentChanged(); }, []);
+  const modeDocument = useCallback((id: string, value: boolean) => { setModes(previous => ({...previous,[id]:value})); }, []);
+  const closePane = useCallback((id: string) => sessionRef.current.closePane(id), []);
   const pluginContext = useRef({ active, editor, notify: session.setMessage });
   pluginContext.current = { active, editor, notify: session.setMessage };
   const pluginDefinitions = useMemo(() => [...bundledPlugins, ...installedPlugins].map(definition => ({ ...definition, config: { ...definition.config, ...pluginPreferences[definition.id]?.config } })), [installedPlugins, pluginPreferences]);
@@ -147,7 +159,7 @@ export default function App() {
     if (editor()?.composing()) { session.setMessage("请先完成当前输入法组合输入，再导出。"); return; }
     exportingRef.current = true; setExporting(true); document.body.classList.add("printing");
     try {
-      await host.persist({ documents: session.documents, activeId: session.activeId });
+      await host.persist({ documents: session.documents, activeId: session.activeId, workspace: session.workspace });
       printDocument.current.innerHTML = renderMarkdown(active.content, active.id);
       await Promise.all([renderDiagrams(printDocument.current), renderMath(printDocument.current), document.fonts.ready]);
       const result = kind === "pdf" ? await host.exportPdf(exportHtml(printDocument.current), { paper: preferences.pdfPaper, margin: preferences.pdfMargin, header: preferences.pdfHeader, footer: preferences.pdfFooter, title: active.name }) : kind === "html" ? await host.exportHtml(active.name, await portableHtml(printDocument.current, active.name)) : await host.exportConverted(active.id, kind, await conversionMarkdown(active.content, printDocument.current), await portableHtml(printDocument.current, active.name));
@@ -171,11 +183,8 @@ export default function App() {
   useEffect(() => {
     document.title = active ? `${active.name} — Open Typora` : "Open Typora";
   }, [active?.name]);
-  useEffect(() => {
-    editor()?.focus();
-  }, [session.activeId]);
   commands.current = ({ action, document: opened, anchor, line, message }) => {
-    if (["new", "newWindow", "newTab", "open"].includes(action) && window.desktop?.windowAction) { void host.windowAction(action).catch((error: Error) => session.setMessage(error.message)); return; }
+    if (action === "newWindow" && window.desktop?.windowAction) { void host.windowAction(action).catch((error: Error) => session.setMessage(error.message)); return; }
     const context = commandsByAction.get(action)?.context;
     if (readOnly && ((context && context !== "document") || ["delete-word", "undo", "redo", "paste-plain", "image", "table", "link", "reference-link", "footnote", "copy-all-images", "move-all-images", "upload-all-images"].includes(action))) { session.setMessage("只读模式已开启，请先在插件管理中关闭或切换只读效果。"); return; }
     if (context && !active) return;
@@ -191,7 +200,8 @@ export default function App() {
     else if (action === "saveAs") void session.save(true);
     else if (action === "close") void session.close();
     else if (action === "reopen") {
-      if (window.desktop?.windowAction) void host.windowAction("reopen")
+      if (session.canReopen) void session.reopen();
+      else if (window.desktop?.windowAction) void host.windowAction("reopen")
         .then((handled: unknown) => { if (!handled) return session.reopen(); })
         .catch((error: Error) => session.setMessage(error.message));
       else void session.reopen();
@@ -199,6 +209,11 @@ export default function App() {
     else if (action === "quit") void session.quit();
     else if (action === "close-window") void session.closeWindow();
     else if (action === "source") setRendered((value) => !value);
+    else if (action === "next-tab" || action === "previous-tab") session.nextTab(action === "previous-tab");
+    else if (action === "split-right" || action === "split-down") void session.split(action === "split-right" ? "columns" : "rows");
+    else if (action === "other-pane") session.otherPane();
+    else if (action === "swap-panes") session.swapPanes();
+    else if (action === "close-pane") session.closePane(session.activeId);
     else if (action === "sidebar") setSidebar((value) => !value);
     else if (action === "outline" || action === "files" || action === "file-tree") {
       setTab(action === "file-tree" ? "tree" : action);
@@ -235,12 +250,12 @@ export default function App() {
     else if (["copy-all-images", "move-all-images", "upload-all-images"].includes(action) && active) {
       const source = active.content, sources = [...new Set(imageReferences(source).map(image => image.url))];
       if (!sources.length) { session.setMessage("当前文档没有图片。"); return; }
-      void host.persist({ documents: session.documents, activeId: session.activeId }).then(() => host.imageAction(active.id, sources, action.split("-")[0], { ...preferences })).then(mapping => { if (mapping) editors.current.get(active.id)?.transform(text => updateImageReferences(text, mapping)); }).catch(e => session.setMessage(e.message));
+      void host.persist({ documents: session.documents, activeId: session.activeId, workspace: session.workspace }).then(() => host.imageAction(active.id, sources, action.split("-")[0], { ...preferences })).then(mapping => { if (mapping) editors.current.get(active.id)?.transform(text => updateImageReferences(text, mapping)); }).catch(e => session.setMessage(e.message));
     }
     else if (action === "copy-markdown") void host.writeClipboard(editor()?.selectionText(true) || "").catch(error => session.setMessage(error.message));
     else if (action === "paste-plain") void host.readClipboard().then(text => editor()?.insert(text)).catch(error => session.setMessage(error.message));
     else if (action === "image" && active) void (async () => {
-      await host.persist({ documents: session.documents, activeId: session.activeId });
+      await host.persist({ documents: session.documents, activeId: session.activeId, workspace: session.workspace });
       const image = await host.chooseImage(active.id, { ...preferences, source: active.content }); if (!image) return;
       if (preferences.imageAutoUpload) { try { const mapping = await host.imageAction(active.id, [image.path], "upload", { ...preferences }); if (mapping?.[image.path]) image.path = mapping[image.path]; } catch (e) { session.setMessage(`上传失败，已保留本地图片：${(e as Error).message}`); } }
       editors.current.get(active.id)?.insert(`![${image.alt.replace(/[\[\]]/g, "")}](${image.path})`);
@@ -257,7 +272,7 @@ export default function App() {
         setAbout(false);
       }
       const action = commandForKey(event);
-      if (host.native && ["new", "newWindow", "newTab", "open", "save", "saveAs", "close-window"].includes(action || "")) return;
+      if (window.desktop?.windowAction && ["new", "newWindow", "newTab", "open", "save", "saveAs", "close", "close-window", "next-tab", "previous-tab"].includes(action || "")) return;
       if (action) {
         event.preventDefault();
         event.stopPropagation();
@@ -352,34 +367,9 @@ export default function App() {
           </div>
         ) : (
           <>
-            {session.documents.map((record) => (
-              <div
-                className="document-editor"
-                hidden={record.id !== session.activeId}
-                key={record.id}
-              >
-                <MarkdownEditor
-                  key={`${record.id}-${record.lineEnding}`}
-                  ref={(handle) => {
-                    if (handle) editors.current.set(record.id, handle);
-                    else editors.current.delete(record.id);
-                  }}
-                  document={record}
-                  rendered={rendered}
-                  readOnly={readOnly}
-                  preferences={preferences}
-                  typewriter={typewriter}
-                  onChange={(content) => session.update(record.id, { content })}
-                  onError={session.setMessage}
-                  onCursor={(line, column) => {
-                    if (record.id === session.activeId)
-                      setCursor({ line, column });
-                  }}
-                  onSelection={text => { if (record.id === session.activeId) setSelection(text); }}
-                  onCompositionEnd={() => { if (record.id === session.activeId) pluginRuntime.current?.documentChanged(); }}
-                />
-              </div>
-            ))}
+            <EditorWorkspace documents={session.documents} activeId={session.activeId} layout={session.workspace} modes={modes}
+              preferences={preferences} readOnly={readOnly} typewriter={typewriter} select={selectDocument} register={registerEditor} change={changeDocument} error={session.setMessage} cursor={cursorDocument} selection={selectionDocument} compositionEnd={compositionDocument} mode={modeDocument} closePane={closePane}
+              create={() => void session.create()} close={id => void session.close(id)} reorder={session.reorder} split={direction => void session.split(direction)} swap={session.swapPanes} resize={session.resizeWorkspace} />
             <article
               className="print-document"
               ref={printDocument}
