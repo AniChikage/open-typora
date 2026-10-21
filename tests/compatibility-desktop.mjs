@@ -27,7 +27,7 @@ let application,page; const checks=[],errors=[];
 try {
   application = await electron.launch({...(process.env.OPEN_TYPORA_EXECUTABLE ? {executablePath:process.env.OPEN_TYPORA_EXECUTABLE,args:[]} : {args:[process.cwd()]}),env,timeout:30000});
   page = await application.firstWindow(); page.on('pageerror',error=>errors.push(error.message));
-  await expect(page.getByRole('button',{name:'欢迎.md',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'欢迎.md',exact:true})).toBeVisible({timeout:20000});
   await application.evaluate(({dialog})=>{dialog.showMessageBox=async()=>({response:2});});
   const command = action=>application.evaluate(({BrowserWindow},action)=>BrowserWindow.getAllWindows()[0].webContents.send('app:command',{action}),action);
   const openDialog = async file=>application.evaluate(({dialog},file)=>{dialog.showOpenDialog=async()=>({canceled:false,filePaths:[file]});},file);

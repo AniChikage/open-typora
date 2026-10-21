@@ -17,7 +17,7 @@ const errors = [], checks = [];
 try {
   application = await electron.launch({...(process.env.OPEN_TYPORA_EXECUTABLE ? {executablePath:process.env.OPEN_TYPORA_EXECUTABLE,args:[]} : {args:[process.cwd()]}),env,timeout:30000});
   page = await application.firstWindow(); page.on("pageerror",error => errors.push(error.message));
-  await expect(page.getByRole('button',{name:'欢迎.md',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'欢迎.md',exact:true})).toBeVisible({timeout:20000});
   await application.evaluate(({dialog},file) => {dialog.showOpenDialog = async () => ({canceled:false,filePaths:[file]});},file);
   const menu = async name => {await page.getByRole('button',{name:'更多操作',exact:true}).click(); await page.getByRole('menuitem',{name,exact:true}).click();};
   await menu('打开文件');

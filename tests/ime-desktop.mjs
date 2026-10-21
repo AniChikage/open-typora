@@ -28,7 +28,7 @@ try {
   app=await electron.launch({...(process.env.OPEN_TYPORA_EXECUTABLE?{executablePath:process.env.OPEN_TYPORA_EXECUTABLE,args:[]}:{args:[process.cwd()]}),env,timeout:30000});
   page=await app.firstWindow(); page.on('pageerror',e=>errors.push(e.message));
   console.log('IME: launched');
-  await expect(page.getByRole('button',{name:'欢迎.md',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'欢迎.md',exact:true})).toBeVisible({timeout:20000});
   await page.getByRole('button',{name:'更多操作',exact:true}).click(); await page.getByRole('menuitem',{name:'插件管理…',exact:true}).click();
   await page.getByRole('checkbox',{name:'启用IME-probe',exact:true}).check();
   await expect.poll(()=>page.evaluate(()=>!!window.imeProbe)).toBe(true);

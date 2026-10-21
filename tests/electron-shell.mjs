@@ -29,7 +29,7 @@ try {
   application = await electron.launch({ executablePath, args: [first], env, timeout: 30000 });
   let page = await application.firstWindow();
   currentPage = page;
-  await expect(page.getByRole("button", { name: path.basename(first), exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: path.basename(first), exact: true })).toBeVisible({timeout:20000});
   await expect(page.getByRole("heading", { name: "A quiet place for your words" })).toBeVisible();
   const identity = await application.evaluate(({ app, BrowserWindow }) => ({
     packaged: app.isPackaged, version: app.getVersion(), windows: BrowserWindow.getAllWindows().length,

@@ -12,7 +12,7 @@ const records=[];for(let i=0;i<3;i++){const file=path.join(data,names[i]);await 
 await writeFile(path.join(profile,'session.json'),JSON.stringify({version:1,documents:records,activeId:records[0].id}));
 const env={...process.env,OPEN_TYPORA_DATA_DIR:profile};delete env.ELECTRON_RUN_AS_NODE;delete env.OPEN_TYPORA_DEV_URL;
 let app,page;const errors=[],checks=[];const mod=process.platform==='darwin'?'Meta':'Control';
-async function launch(){app=await electron.launch({...(process.env.OPEN_TYPORA_EXECUTABLE?{executablePath:process.env.OPEN_TYPORA_EXECUTABLE,args:[]}:{args:[process.cwd()]}),env,timeout:30000});page=await app.firstWindow();page.on('pageerror',error=>errors.push(error.message));await page.setViewportSize({width:1380,height:900});}
+async function launch(){app=await electron.launch({...(process.env.OPEN_TYPORA_EXECUTABLE?{executablePath:process.env.OPEN_TYPORA_EXECUTABLE,args:[]}:{args:[process.cwd()]}),env,timeout:30000});page=await app.firstWindow();page.on('pageerror',error=>errors.push(error.message));await page.setViewportSize({width:1380,height:900});await expect(page.getByRole('tab',{name:'Long.md',exact:true})).toBeVisible({timeout:20000});}
 const pane=id=>page.locator(`.document-editor[data-document-id="${id}"]`);
 const tab=name=>page.getByRole('tab',{name,exact:true});
 async function command(action){await app.evaluate(({BrowserWindow},action)=>BrowserWindow.getAllWindows()[0].webContents.send('app:command',{action}),action);}
