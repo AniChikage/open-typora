@@ -39,7 +39,7 @@ if ($compatibilityExit -ne 0) { throw 'Installed image and office-format regress
 if ($parityExit -ne 0) { throw 'Installed editing parity regression failed' }
 node tests/next-desktop.mjs
 if ($LASTEXITCODE -ne 0) { throw 'Large document, theme and print acceptance failed' }
-& powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/windows-preview.ps1
+& pwsh.exe -NoProfile -ExecutionPolicy Bypass -File tests/windows-preview.ps1
 if ($LASTEXITCODE -ne 0) { throw 'Native and actual Everything preview acceptance failed' }
 $extension = Get-ItemPropertyValue 'HKCU:\Software\Classes\.md' '(default)'
 $command = Get-ItemPropertyValue "HKCU:\Software\Classes\$extension\shell\open\command" '(default)'

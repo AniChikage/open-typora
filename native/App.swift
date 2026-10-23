@@ -310,7 +310,8 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
         guard html.utf8.count <= 50 * 1024 * 1024 else { throw NativeFailure("导出内容过大。") }
         #if WEBTEST
           let settings = args.count > 1 ? args[1] as? [String: Any] ?? [:] : [:]
-          let destination = store.dataDirectory.appendingPathComponent(settings["testName"] as? String == "long" ? "native-test-long.pdf" : settings["title"] as? String == "复杂中文文档.md" ? "native-complex.pdf" : "native-test.pdf")
+          let named = ["long":"native-test-long.pdf", "controlled":"native-controlled.pdf", "tableheaders":"native-tableheaders.pdf"]
+          let destination = store.dataDirectory.appendingPathComponent(named[settings["testName"] as? String ?? ""] ?? (settings["title"] as? String == "复杂中文文档.md" ? "native-complex.pdf" : "native-test.pdf"))
         #else
           let panel = NSSavePanel()
           panel.allowedContentTypes = [.pdf]

@@ -35,6 +35,11 @@ jobs:
       - run: npm ci
       - name: Install desktop runtime libraries
         run: sudo apt-get update && sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2 libgbm1 libxss1 libxtst6 xdg-utils desktop-file-utils libglib2.0-bin dbus-x11 kde-cli-tools fonts-noto-cjk pandoc libreoffice-writer
+      - name: Prepare actual PDF content validation
+        run: |
+          python3 -m venv "$RUNNER_TEMP/open-typora-pdf"
+          "$RUNNER_TEMP/open-typora-pdf/bin/python" -m pip install --disable-pip-version-check pypdf==6.1.1
+          echo "OPEN_TYPORA_PDF_PYTHON=$RUNNER_TEMP/open-typora-pdf/bin/python" >> "$GITHUB_ENV"
       - run: npm test
         env:
           OPEN_TYPORA_REQUIRE_CONVERTERS: "1"
@@ -95,6 +100,14 @@ jobs:
           node --input-type=module -e "import {pandocPath,libreOfficePath} from './electron/interchange.mjs'; if (!(await pandocPath()) || !(await libreOfficePath())) process.exit(1)"
           if ($LASTEXITCODE -ne 0) { throw 'Installed conversion tools were not found' }
           exit 0
+      - name: Prepare actual PDF content validation
+        shell: pwsh
+        run: |
+          $pdfEnvironment = Join-Path $env:RUNNER_TEMP 'open-typora-pdf'
+          python -m venv $pdfEnvironment
+          $pdfPython = Join-Path $pdfEnvironment 'Scripts/python.exe'
+          & $pdfPython -m pip install --disable-pip-version-check pypdf==6.1.1
+          "OPEN_TYPORA_PDF_PYTHON=$pdfPython" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - run: npm test
         env:
           OPEN_TYPORA_REQUIRE_CONVERTERS: "1"

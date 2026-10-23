@@ -68,6 +68,13 @@ final class WebKitTests: NSObject, NSApplicationDelegate, WKNavigationDelegate {
           guard let complexPDF = PDFDocument(url: complexURL), complexPDF.pageCount >= 1,
             let complexText = complexPDF.string?.precomposedStringWithCompatibilityMapping, complexText.contains("复杂中文文档"), complexText.contains("中文甲"), complexText.contains("中文脚注内容") else { throw NativeFailure("Complex native PDF lost Chinese content or table/footnote text.") }
           print("PASS: complex PDF contains Chinese headings, table cells and footnotes across \(complexPDF.pageCount) pages")
+          guard let controlled = PDFDocument(url: self.owner.directory.appendingPathComponent("native-controlled.pdf")), controlled.pageCount == 2,
+            controlled.page(at: 0)?.string?.contains("Keep-before") == true, controlled.page(at: 1)?.string?.contains("Keep-after") == true else { throw NativeFailure("Native explicit CSS page boundary failed.") }
+          guard let tablePDF = PDFDocument(url: self.owner.directory.appendingPathComponent("native-tableheaders.pdf")), tablePDF.pageCount >= 3 else { throw NativeFailure("Native long table did not paginate.") }
+          let tableText = tablePDF.string ?? ""
+          for row in 0..<180 { let marker = String(format:"TableRow-%03d",row); guard tableText.components(separatedBy:marker).count == 2 else { throw NativeFailure("Native table row missing or repeated: " + marker) } }
+          for index in 0..<tablePDF.pageCount { let text = tablePDF.page(at:index)?.string ?? ""; if text.contains("TableRow-") && (!text.contains("Header-Key") || !text.contains("Header-Value")) { throw NativeFailure("Native continuation page is missing its table header.") } }
+          print("PASS: native CSS break-after and repeated table headers preserve 180 rows exactly once")
           let html = try String(contentsOf: self.owner.directory.appendingPathComponent("native-test.html"), encoding: .utf8)
           guard html.contains("data:image/"), html.contains("data:font/"), !html.contains("<link rel=\"stylesheet\"") else { throw NativeFailure("HTML export retained live app assets.") }
           print("PASS: HTML export contains embedded fonts and the owned local image")

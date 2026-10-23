@@ -7,7 +7,7 @@ import pkg from "../package.json" with { type: "json" };
 import { prepareElectronApplication } from "./prepare-electron.mjs";
 
 if (process.platform !== "win32" || process.arch !== "x64") throw new Error("Build Windows x64 releases on a Windows x64 machine.");
-execFileSync("powershell.exe",["-NoProfile","-ExecutionPolicy","Bypass","-File","scripts/build-windows-preview.ps1"],{stdio:"inherit"});
+execFileSync("pwsh.exe",["-NoProfile","-ExecutionPolicy","Bypass","-File","scripts/build-windows-preview.ps1"],{stdio:"inherit"});
 const application = await prepareElectronApplication("windows");
 await build({
   targets: Platform.WINDOWS.createTarget(["nsis", "zip"], Arch.x64),
