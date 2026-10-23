@@ -21,7 +21,7 @@ export function configureDocumentSyntax(md: MarkdownIt) {
     state.pos += match[0].length; return true;
   });
   md.renderer.rules.html_break = () => "<br>";
-  md.renderer.rules.html_block = (tokens, index, _options, env) => safeDocumentHtml(tokens[index].content, typeof env?.documentId === "string" ? env.documentId : undefined);
+  md.renderer.rules.html_block = (tokens, index, _options, env) => /^\s*<!--\s*pagebreak\s*-->\s*$/i.test(tokens[index].content) ? '<div class="print-page-break" role="separator" aria-label="分页符" style="break-before:page;page-break-before:always"></div>' : safeDocumentHtml(tokens[index].content, typeof env?.documentId === "string" ? env.documentId : undefined);
   md.renderer.rules.alert_marker = (tokens, index) => alertTitle(tokens[index].content);
   md.core.ruler.after("inline", "alert_blocks", state => {
     for (let i = 0; i < state.tokens.length - 2; i++) {

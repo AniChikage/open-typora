@@ -144,8 +144,13 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
       else { source.current?.requestMeasure(); source.current?.focus(); }
       const doc = model.current;
       if (doc) {
-        const before = doc.text.slice(0,doc.selection.head), at = before.lastIndexOf("\n");
-        callbacks.current.onCursor(before.split("\n").length, before.length-at);
+        if (!activeMode.current && source.current) {
+          const line = source.current.state.doc.lineAt(doc.selection.head);
+          callbacks.current.onCursor(line.number, doc.selection.head - line.from + 1);
+        } else {
+          const before = doc.text.slice(0,doc.selection.head), at = before.lastIndexOf("\n");
+          callbacks.current.onCursor(before.split("\n").length, before.length-at);
+        }
         const from = Math.min(doc.selection.anchor,doc.selection.head), to = Math.max(doc.selection.anchor,doc.selection.head);
         callbacks.current.onSelection?.(doc.text.slice(from,to));
       }
@@ -265,9 +270,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
             drawSelection(),
             EditorView.lineWrapping,
             highlightActiveLine(),
-            markdown({ base: markdownLanguage }),
-            syntaxHighlighting(defaultHighlightStyle),
-            bracketMatching(),
+            ...(doc.text.length <= 300_000 ? [markdown({ base: markdownLanguage }), syntaxHighlighting(defaultHighlightStyle), bracketMatching()] : []),
             sourceBehavior.current.of(sourceOptions()),
             search({ top: true }),
             keymap.of([
@@ -306,13 +309,13 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
                   : update.transactions.some((t) => t.isUserEvent("input.type"))
                     ? "typing"
                     : "source-command";
-                doc.replace(
-                  0,
-                  doc.text.length,
-                  update.state.doc.toString(),
-                  kind,
-                  { anchor: selected.anchor, head: selected.head },
-                );
+                let from = -1, to = 0, newFrom = 0, newTo = 0;
+                update.changes.iterChangedRanges((fromA, toA, fromB, toB) => {
+                  if (from < 0) { from = fromA; newFrom = fromB; }
+                  to = toA; newTo = toB;
+                });
+                doc.replace(from, to, update.state.sliceDoc(newFrom, newTo), kind,
+                  { anchor: selected.anchor, head: selected.head });
                 publish();
               } else if (update.selectionSet) {
                 doc.selection = {

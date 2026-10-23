@@ -104,6 +104,8 @@ export interface Host {
   importImage(id: string, bytes: Uint8Array, name: string, options?: Record<string, unknown>): Promise<string>;
   exportPdf(html?: string, options?: Record<string, unknown>): Promise<string | null>;
   exportHtml(name: string, html: string): Promise<string | null>;
+  exportTheme(name: string, css: string): Promise<string | null>;
+  previewSettings(enable?: boolean): Promise<{ supported: boolean; available: boolean; enabled: boolean }>;
   writeClipboard(text: string): Promise<unknown>;
   readClipboard(): Promise<string>;
   openLink(url: string): Promise<unknown>;

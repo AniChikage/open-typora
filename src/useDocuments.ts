@@ -73,7 +73,7 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
     const timer = setTimeout(() => {
       if (closing.current) return;
       void host.persist({ documents, activeId, workspace }).catch(notify);
-    }, 500);
+    }, documents.some(record => record.content.length > 300_000) ? 1200 : 500);
     void host.setDirty(
       documents.some((record) => record.content !== record.savedContent),
     );

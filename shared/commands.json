@@ -62,6 +62,7 @@
     {"label":"插入表格…","action":"table","pcKey":"Mod-T","key":"Mod-Alt-T","context":"rich"},
     {"label":"代码块","action":"code","pcKey":"Mod-Shift-K","key":"Mod-Alt-C","context":"rich"},
     {"label":"公式块","action":"math-block","pcKey":"Mod-Shift-M","key":"Mod-Alt-B","context":"rich"},
+    {"label":"插入分页符","action":"pagebreak","context":"document"},
     {"label":"引用","action":"quote","pcKey":"Mod-Shift-Q","key":"Mod-Alt-Q","context":"rich"},
     {"label":"有序列表","action":"ordered-list","pcKey":"Mod-Shift-[","key":"Mod-Alt-O","context":"rich"},
     {"label":"无序列表","action":"unordered-list","pcKey":"Mod-Shift-]","key":"Mod-Alt-U","context":"rich"},

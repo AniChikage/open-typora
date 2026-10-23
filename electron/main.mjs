@@ -1,3 +1,5 @@
+import { renderPdf } from "./pdf.mjs";
+import { previewSettings } from "./windows-preview.mjs";
 import {
   app,
   BrowserWindow,
@@ -101,6 +103,12 @@ const handlers = {
   installPlugin: async (folder = false) => { const result = await dialog.showOpenDialog(window, folder ? { title: "安装插件文件夹", properties: ["openDirectory"] } : { filters: [{ name: "JavaScript", extensions: ["js", "cjs"] }], properties: ["openFile"] }); return result.canceled ? null : authorizedPlugin(await installPlugin(result.filePaths[0], store.dataDir)); },
   themes: () => themes(store.dataDir),
   installTheme: async () => { const result = await dialog.showOpenDialog(window, { filters: [{ name: "CSS", extensions: ["css"] }], properties: ["openFile"] }); return result.canceled ? null : installTheme(result.filePaths[0], store.dataDir); },
+  previewSettings: (_, enable) => previewSettings(enable),
+  exportTheme: async (_, name, css) => {
+    if (typeof css !== "string" || Buffer.byteLength(css) > 4 * 1024 * 1024) throw new Error("主题内容过大。");
+    const result = await dialog.showSaveDialog(window, { defaultPath: String(name).replace(/[/\\]/g,"-") + ".css", filters: [{ name: "CSS", extensions: ["css"] }] });
+    if (result.canceled) return null; await atomicWrite(result.filePath, css); return result.filePath;
+  },
   readResource: async (_, address) => exportResource(address,store,path.join(root,"dist")),
   conversionSettings: async (_, choose) => { if (choose) { const result = await dialog.showOpenDialog(window, { title: "选择 Pandoc 可执行文件", properties: ["openFile"] }); if (!result.canceled) process.env.OPEN_TYPORA_PANDOC = result.filePaths[0]; } return { word: process.platform === "darwin", libreOffice: await libreOfficePath(), pandoc: await pandocPath() }; },
   importDocument: async () => { const result = await dialog.showOpenDialog(window, { title: "导入文档", properties: ["openFile"], filters: [{ name: "文档", extensions: ["docx", "doc", "rtf", "odt", "epub", "tex", "rst", "html", "txt"] }] }); return result.canceled ? null : convertImport(result.filePaths[0], store.dataDir); },
@@ -231,20 +239,10 @@ const handlers = {
     return store.acceptDisk(id, content, hash, disk.bom, disk.encoding);
   },
   image: (_, id, bytes, name, options) => store.importImage(id, bytes, name, options),
-  pdf: async () => {
-    const result = await dialog.showSaveDialog(window, {
-      title: "导出 PDF",
-      defaultPath: "文档.pdf",
-      filters: [{ name: "PDF", extensions: ["pdf"] }],
-    });
+  pdf: async (_, html, options) => {
+    const result = await dialog.showSaveDialog(window, { title:"导出 PDF", defaultPath:"文档.pdf", filters:[{name:"PDF",extensions:["pdf"]}] });
     if (result.canceled) return null;
-    const data = await window.webContents.printToPDF({
-      printBackground: true,
-      pageSize: "A4",
-      margins: { top: 0.6, bottom: 0.6, left: 0.6, right: 0.6 },
-    });
-    await atomicWrite(result.filePath, data);
-    return result.filePath;
+    const data = await renderPdf(html, options); await atomicWrite(result.filePath, data); return result.filePath;
   },
   link: async (_, url) => {
     const parsed = new URL(url);

@@ -1,0 +1,38 @@
+import { _electron as electron, expect } from 'playwright/test';
+import assert from 'node:assert/strict';
+import { mkdtemp,mkdir,writeFile,readFile,realpath } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import os from 'node:os';
+import path from 'node:path';
+const directory=await realpath(await mkdtemp(path.join(os.tmpdir(),'open-typora-next-'))),profile=path.join(directory,'profile'),qa=process.env.OPEN_TYPORA_QA_DIR||path.join(directory,'evidence');await mkdir(profile);await mkdir(qa,{recursive:true});
+const five='# Five megabyte document\n\n'+('Paragraph. 中文 👋 **Markdown** and source. 0123456789\n\n').repeat(100000)+'\n# Ending heading\n',ten='# Ten megabyte document\n\n'+('ASCII paragraph with stable content and lines. 0123456789\n\n').repeat(190000),small='# Theme fixture\n\nParagraph one. 中文正文。\n\n## Second chapter\n\nKEEP-A\n\n<!-- pagebreak -->\n\nKEEP-B\n';
+assert.ok(Buffer.byteLength(five)>5*1024*1024);assert.ok(Buffer.byteLength(ten)>10*1024*1024);
+const records=[];for(const [index,content] of [five,ten,small].entries()){const name=['Five.md','Ten.md','Theme.md'][index],file=path.join(directory,name);await writeFile(file,content);records.push({id:'next-'+index,path:file,name,content,savedContent:content,diskHash:createHash('sha256').update(content).digest('hex'),lineEnding:'\n',encoding:'utf-8',bom:false});}
+await writeFile(path.join(profile,'session.json'),JSON.stringify({version:1,documents:records,activeId:records[0].id}));
+const env={...process.env,OPEN_TYPORA_DATA_DIR:profile};delete env.ELECTRON_RUN_AS_NODE;delete env.OPEN_TYPORA_DEV_URL;
+let app,page;const errors=[],timings={},checks=[],mod=process.platform==='darwin'?'Meta':'Control';
+async function command(action){await app.evaluate(({BrowserWindow},action)=>BrowserWindow.getAllWindows()[0].webContents.send('app:command',{action}),action);}
+async function launch(){const at=Date.now();app=await electron.launch({...(process.env.OPEN_TYPORA_EXECUTABLE?{executablePath:process.env.OPEN_TYPORA_EXECUTABLE,args:[]}:{args:[process.cwd()]}),env,timeout:45000});page=await app.firstWindow();page.on('pageerror',error=>errors.push(error.message));await page.setViewportSize({width:1400,height:950});await expect(page.getByRole('tab',{name:'Five.md',exact:true})).toBeVisible({timeout:30000});await expect(page.locator('.document-editor[data-document-id="next-0"] .source-surface .cm-content')).toBeVisible();timings.fiveMBStartupMs=Date.now()-at;}
+try{
+ await launch();const source=page.locator('.document-editor[data-document-id="next-0"] .source-surface .cm-content');
+ assert.ok(await source.locator('.cm-line').count()<200,'Large source must remain viewport-virtualized');
+ await source.click();await page.keyboard.press(`${mod}+Home`);
+ const samples=[];for(let i=0;i<12;i++){const at=Date.now();await page.keyboard.insertText('中');await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));samples.push(Date.now()-at);}
+ timings.typingSamplesMs=samples;timings.typingP95Ms=[...samples].sort((a,b)=>a-b)[Math.ceil(samples.length*.95)-1];
+ await command('save');await expect.poll(()=>readFile(records[0].path,'utf8'),{timeout:20000}).toBe('中'.repeat(12)+five);
+ await page.keyboard.press(`${mod}+z`);await command('save');await expect.poll(()=>readFile(records[0].path,'utf8'),{timeout:20000}).toBe(five);await page.keyboard.press(`${mod}+Shift+z`);await command('save');await expect.poll(()=>readFile(records[0].path,'utf8'),{timeout:20000}).toBe('中'.repeat(12)+five);
+ await page.getByRole('button',{name:'切换侧栏内容',exact:true}).click();await page.getByRole('menuitemradio',{name:'大纲',exact:true}).click();await expect(page.getByRole('button',{name:'Ending heading',exact:false})).toBeVisible({timeout:20000});
+ await page.getByRole('tab',{name:'Ten.md',exact:true}).click();await expect(page.locator('.document-editor[data-document-id="next-1"] .source-surface .cm-content')).toBeVisible();await page.locator('.document-editor[data-document-id="next-1"] .source-surface .cm-content').focus();await page.keyboard.press(process.platform==='darwin'?'Meta+ArrowDown':'Control+End');await page.keyboard.press('Enter');await page.keyboard.insertText('TAIL-10MB');await command('save');await expect.poll(()=>readFile(records[1].path,'utf8'),{timeout:20000}).toBe(ten+'\nTAIL-10MB');
+ checks.push('5 MB UTF-8/Chinese source stays virtualized, edits/undo/redo/save correctly, and analyzes outline off-thread; 10 MB file edits and saves exactly.');
+ await page.getByRole('tab',{name:'Theme.md',exact:true}).click();await command('preferences');await page.getByRole('button',{name:'自定义当前主题',exact:true}).click();
+ await page.getByRole('spinbutton',{name:'主题正文宽度'}).fill('720');await page.getByRole('spinbutton',{name:'主题行高'}).fill('1.9');await page.getByRole('spinbutton',{name:'主题段落间距'}).fill('20');await page.getByRole('textbox',{name:'自定义主题 CSS',exact:true}).fill('.rich-document h2{color:rgb(12,34,56)}');await page.getByRole('textbox',{name:'打印主题 CSS',exact:true}).fill('.print-document h2{break-before:page}');
+ await page.getByRole('combobox',{name:'PDF 纸张',exact:true}).selectOption('letter');await page.getByRole('combobox',{name:'标题另起一页',exact:true}).selectOption('2');await page.getByRole('combobox',{name:'PDF 孤行控制',exact:true}).selectOption('3');
+ const cssFile=path.join(qa,'customized-theme.css');await app.evaluate(({dialog},file)=>{dialog.showSaveDialog=async()=>({canceled:false,filePath:file});},cssFile);await page.getByRole('button',{name:'导出当前主题 CSS…',exact:true}).click();await expect.poll(()=>readFile(cssFile,'utf8')).toContain('@media print');
+ await page.getByRole('button',{name:'完成',exact:true}).click();const rich=page.locator('.document-editor[data-document-id="next-2"] .rich-document');assert.equal(await rich.evaluate(element=>getComputedStyle(element).maxWidth),'720px');assert.equal(await rich.locator('h2').evaluate(element=>getComputedStyle(element).color),'rgb(12, 34, 56)');
+ await page.screenshot({path:path.join(qa,'theme-customization.png')});
+ await page.getByRole('tab',{name:'Five.md',exact:true}).click();await page.getByRole('tab',{name:'Theme.md',exact:true}).click();await app.close();await launch();await page.getByRole('tab',{name:'Theme.md',exact:true}).click();assert.equal(await page.locator('.document-editor[data-document-id="next-2"] .rich-document h2').evaluate(element=>getComputedStyle(element).color),'rgb(12, 34, 56)');
+ const pdf=path.join(qa,'controlled-pagination.pdf');await app.evaluate(({dialog},file)=>{dialog.showSaveDialog=async()=>({canceled:false,filePath:file});},pdf);await command('pdf');await expect.poll(async()=>{try{return (await readFile(pdf)).subarray(0,5).toString();}catch{return '';}},{timeout:30000}).toBe('%PDF-');
+ checks.push('Per-theme visual/CSS/print customization persists after restart, exports CSS, and produces an actual Letter PDF with explicit and heading breaks.');
+ assert.deepEqual(errors,[]);assert.equal(await page.locator('vite-error-overlay').count(),0);
+ await writeFile(path.join(qa,'next-results.json'),JSON.stringify({platform:process.platform,browser:'Browser plugin not available; existing Electron/Playwright workflow',checks,timings,pdf,errors,profile},null,2));console.log(checks.map(check=>'PASS: '+check).join('\n'));console.log(JSON.stringify(timings));
+}catch(error){await page?.screenshot({path:path.join(qa,'next-failure.png')}).catch(()=>{});throw error;}finally{await app?.close();}

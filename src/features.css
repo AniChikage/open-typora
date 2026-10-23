@@ -66,3 +66,15 @@
 .markdown-alert-title{font-weight:600;color:#3474b8}.markdown-alert-title::before{content:"ⓘ";margin-right:.45em}.markdown-alert-tip .markdown-alert-title{color:#29814e}.markdown-alert-warning .markdown-alert-title{color:#ae7619}.markdown-alert-caution .markdown-alert-title{color:#be4444}.markdown-alert-important .markdown-alert-title{color:#8050b3}
 .markdown-alert>p:first-child{font-weight:normal}
 .markdown-alert-title::before{content:none}.markdown-alert-title .alert-icon{display:inline-block;width:1em;height:1em;vertical-align:-.12em;margin-right:.45em}
+
+/* Public theme customization variables. Keep selectors stable for theme authors. */
+.rich-document,.source-surface .cm-content{max-width:var(--document-width,860px)}
+.rich-document{line-height:var(--document-line-height,1.6);font-family:var(--document-font,"Open Sans","PingFang SC",sans-serif)}
+.source-surface .cm-scroller{font-family:var(--document-font,"Open Sans","PingFang SC",sans-serif)!important;line-height:var(--document-line-height,1.6)!important}
+.rich-document>p,.rich-document>ul,.rich-document>ol,.rich-document>blockquote,.print-document>p{margin-top:var(--paragraph-spacing,12.8px);margin-bottom:var(--paragraph-spacing,12.8px)}
+.rich-document code,.rich-document pre,.rich-document .md-fence .cm-scroller,.print-document code,.print-document pre{font-family:var(--code-font,Menlo,Consolas,monospace)!important}
+.theme-customizer{margin:12px 0}.theme-customizer-fields{margin-top:12px}.theme-customizer-fields textarea{width:100%;resize:vertical;font:12px/1.6 Menlo,Consolas,monospace;min-height:80px}.theme-customizer-actions,.theme-color-field{display:flex;gap:8px;align-items:center}.theme-customizer-actions{flex-wrap:wrap}.theme-color-field input{width:48px;min-height:32px}
+
+.rich-document .print-page-break{position:relative;height:22px;margin:18px 0;border-top:1px dashed var(--muted);opacity:.65;user-select:none}
+.rich-document .print-page-break::after{content:"分页符";position:absolute;top:-9px;left:50%;padding:0 10px;background:var(--paper);font:12px/18px sans-serif;transform:translateX(-50%)}
+@media print{.print-page-break{height:0!important;margin:0!important;border:0!important;break-before:page;page-break-before:always}.print-page-break::after{display:none}}

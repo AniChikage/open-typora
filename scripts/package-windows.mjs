@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { build, Platform, Arch } from "electron-builder";
 import { readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
@@ -6,6 +7,7 @@ import pkg from "../package.json" with { type: "json" };
 import { prepareElectronApplication } from "./prepare-electron.mjs";
 
 if (process.platform !== "win32" || process.arch !== "x64") throw new Error("Build Windows x64 releases on a Windows x64 machine.");
+execFileSync("powershell.exe",["-NoProfile","-ExecutionPolicy","Bypass","-File","scripts/build-windows-preview.ps1"],{stdio:"inherit"});
 const application = await prepareElectronApplication("windows");
 await build({
   targets: Platform.WINDOWS.createTarget(["nsis", "zip"], Arch.x64),
@@ -14,11 +16,13 @@ await build({
     appId: pkg.build.appId, productName: pkg.build.productName,
     directories: { app: application, output: "release/windows" },
     files: ["**/*"], asar: true, npmRebuild: false,
+    extraResources: [{from:"build/windows-preview",to:"markdown-preview",filter:["MarkdownPreview.dll","Microsoft-WebView2-LICENSE.txt","dist/**/*"]}],
     electronVersion: pkg.devDependencies.electron,
     fileAssociations: pkg.build.fileAssociations,
     win: { icon: "build/icon.ico", artifactName: "Open-Typora-${version}-windows-${arch}.${ext}" },
     nsis: {
       artifactName: "Open-Typora-${version}-windows-${arch}-Setup.${ext}",
+      include: path.resolve("windows-preview/installer.nsh"),
       oneClick: false, perMachine: false, allowToChangeInstallationDirectory: true,
       createDesktopShortcut: true, runAfterFinish: false,
       deleteAppDataOnUninstall: false, installerLanguages: ["en_US"],

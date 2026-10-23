@@ -40,7 +40,7 @@
     "historyState",
     "viewState",
     "windowAction",
-    "exportHtml",
+    "exportHtml", "exportTheme", "previewSettings",
     "readClipboard",
     "writeClipboard",
     "chooseImage",

@@ -1,3 +1,5 @@
+import { customizationCss, customizationDefaults } from "./themeCustomization.ts";
+import type { ThemeCustomization } from "./themeCustomization.ts";
 export interface Theme { id: string; name: string; description: string; dark: boolean; paper: string; ink: string; accent: string; css: string }
 const make = (id: string, name: string, description: string, dark: boolean, colors: string[], serif = false): Theme => {
   const [paper, sidebar, ink, muted, border, accent, code, selected] = colors;
@@ -14,13 +16,15 @@ export const builtInThemes: Theme[] = [
 export function adaptThemeCss(css: string) {
   return css.replace(/#write\b/g, ":is(.rich-document,.print-document)").replace(/#typora-sidebar\b/g, ".sidebar").replace(/\.md-fences\b/g, ".md-fence");
 }
-export function applyTheme(id: string, custom: { id: string; css: string }[] = []) {
+export function applyTheme(id: string, custom: { id: string; css: string }[] = [], customization: ThemeCustomization = customizationDefaults) {
   const builtin = builtInThemes.find(theme => theme.id === id) || builtInThemes[0];
   const selected = custom.find(theme => id === "custom:" + theme.id);
   const style = document.createElement("style"); style.dataset.customTheme = "true";
   style.textContent = builtin.css + (selected ? adaptThemeCss(selected.css) + ":root[data-theme][data-appearance]{--paper:var(--bg-color,#fff);--ink:var(--text-color,#333);--sidebar:var(--side-bar-bg-color,#fafafa);--accent:var(--primary-color,#326eaa)}" : "");
-  document.head.append(style);
+  style.textContent += "\n" + adaptThemeCss(customizationCss(customization));
+  const print = document.createElement("style"); print.dataset.printTheme = "true"; print.media = "print"; print.textContent = adaptThemeCss(customization.printCss);
+  document.head.append(style, print);
   document.documentElement.dataset.theme = id;
   document.documentElement.dataset.appearance = builtin.dark ? "dark" : "light";
-  return () => style.remove();
+  return () => { style.remove(); print.remove(); };
 }

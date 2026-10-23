@@ -1,7 +1,8 @@
+import type { Preferences } from "../preferences";
 import DOMPurify from "dompurify";
 import { parseBlocks } from "./markdown.ts";
 import { imageReferences } from "./images.ts";
-export function exportHtml(content: HTMLElement) {
+export function exportHtml(content: HTMLElement, options?: Preferences) {
   const styles = [
     ...document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'),
   ]
@@ -10,10 +11,10 @@ export function exportHtml(content: HTMLElement) {
         `<link rel="stylesheet" href="${link.href.replaceAll('"', "&quot;")}" />`,
     )
     .join("");
-  const custom = [...document.querySelectorAll<HTMLStyleElement>("style[data-custom-theme]")].map(style => `<style>${style.textContent?.replace(/<\/style/gi, "<\\/style") || ""}</style>`).join("");
+  const custom = [...document.querySelectorAll<HTMLStyleElement>("style[data-custom-theme],style[data-print-theme]")].map(style => `<style${style.dataset.printTheme && !options ? ' media="print"' : ''}>${style.textContent?.replace(/<\/style/gi, "<\\/style") || ""}</style>`).join("");
   const theme = (document.documentElement.dataset.theme || "light").replace(/[&<>"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[character]!);
   const appearance = document.documentElement.dataset.appearance === "dark" ? "dark" : "light";
-  return `<!doctype html><html lang="zh-CN" data-theme="${theme}" data-appearance="${appearance}"><head><meta charset="utf-8"/>${styles}${custom}<style>
+  return `<!doctype html><html lang="zh-CN" data-theme="${theme}" data-appearance="${appearance}"><head><meta charset="utf-8"/>${styles}<style>
   html,body{margin:0!important;padding:0!important;height:auto!important;min-height:0!important;overflow:visible!important;background:var(--paper,white)!important;color:var(--ink,#333)!important}
   .print-document{display:flow-root!important;position:static!important;width:auto!important;max-width:none!important;padding:0 1px 0 0!important;font:13px/1.6 var(--document-font,"Open Sans","PingFang SC",sans-serif);color:var(--ink,#333)}
   .print-document h1{font-size:29px;line-height:1.2;margin:0 0 18px}.print-document h2{font-size:23px;margin:22px 0 12px}.print-document p{margin:12px 0}
@@ -21,7 +22,17 @@ export function exportHtml(content: HTMLElement) {
   .print-document .task-list-item{list-style:none}.print-document .task-list-item>input{margin-left:-20px;margin-right:6px}
   .print-document pre{background:var(--code,#f8f8f8);padding:12px;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.6 Menlo,monospace}.print-document blockquote{border-left:3px solid var(--border,#ddd);margin:12px 0;padding-left:14px;color:var(--muted,#666)}
   .print-document img{max-width:100%;height:auto}.print-document .mathjax-node[data-display="true"]{display:block;text-align:center;margin:14px 0}.print-document svg{max-width:100%}
-  </style></head><body>${content.outerHTML}</body></html>`;
+  .print-document{line-height:var(--document-line-height,1.6)}
+  .print-document code,.print-document pre{font-family:var(--code-font,Menlo,monospace)!important}
+  .print-document .print-page-break{height:0!important;margin:0!important;padding:0!important;border:0!important;break-before:page;page-break-before:always}
+  .print-document thead{display:table-header-group}.print-document tr{break-inside:avoid;page-break-inside:avoid}
+  </style>${custom}${options ? `<style>
+  @page{size:${options.pdfPaper === "letter" ? "Letter" : "A4"};margin:${options.pdfMargin}pt}
+  .print-document{--repeat-table-headers:${options.pdfRepeatTableHeaders ? 1 : 0}}
+  .print-document p{break-inside:${options.pdfKeepTogether ? "avoid" : "auto"};orphans:${options.pdfWidows};widows:${options.pdfWidows}}
+  .print-document thead{display:${options.pdfRepeatTableHeaders ? "table-header-group" : "table-row-group"}}
+  ${options.pdfHeadingLevel ? `.print-document h1:not(:first-child)${options.pdfHeadingLevel === 2 ? ",.print-document h2:not(:first-child)" : ""}{break-before:page;page-break-before:always}` : ""}
+  </style>` : ""}</head><body>${content.outerHTML}</body></html>`;
 }
 function dataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -39,7 +50,7 @@ async function resource(url: string) {
   if (!response.ok) throw new Error("无法读取导出资源。");
   const blob = await response.blob(); return { text: () => blob.text(), data: await dataUrl(blob) };
 }
-export async function portableHtml(content: HTMLElement, title: string) {
+export async function portableHtml(content: HTMLElement, title: string, options?: Preferences) {
   const clone = content.cloneNode(true) as HTMLElement;
   const styles = await Promise.all([...document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].map(async link => {
     const response = await resource(link.href);
@@ -55,7 +66,7 @@ export async function portableHtml(content: HTMLElement, title: string) {
   }));
   clone.innerHTML = DOMPurify.sanitize(clone.innerHTML, { ADD_URI_SAFE_ATTR: ["src"] });
   const safeTitle = title.replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]!);
-  return exportHtml(clone).replace(/<link rel="stylesheet"[^>]+\/>/g, "").replace("<head>", `<head><title>${safeTitle}</title><style>${styles.join("\n")}</style>`);
+  return exportHtml(clone, options).replace(/<link rel="stylesheet"[^>]+\/>/g, "").replace("<head>", `<head><title>${safeTitle}</title><style>${styles.join("\n")}</style>`);
 }
 
 async function diagramPNG(svg: SVGSVGElement) {

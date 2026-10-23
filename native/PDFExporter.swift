@@ -5,9 +5,11 @@ import WebKit
 final class PDFExporter: NSObject, WKNavigationDelegate {
   private let view: WKWebView
   private let window: NSWindow
+  private let paginationScript: String
   private var completion: ((Result<Data, Error>) -> Void)?
   private var options = [String: Any]()
   init(resources: URL, store: DocumentStore) {
+    paginationScript = (try? String(contentsOf: resources.appendingPathComponent("pagination.js"), encoding: .utf8)) ?? ""
     let configuration = WKWebViewConfiguration()
     let handler = Resources(resources, store: store)
     configuration.setURLSchemeHandler(handler, forURLScheme: "opentypora")
@@ -53,29 +55,8 @@ final class PDFExporter: NSObject, WKNavigationDelegate {
       const root = document.querySelector('.print-document'); root.getBoundingClientRect();
       await document.fonts.ready;
       await Promise.all([...document.images].map(image => image.complete ? Promise.resolve() : new Promise(resolve => { image.onload = image.onerror = resolve; setTimeout(resolve, 5000); })));
-      // The final block's bottom margin has no painted content. Counting it can
-      // create an otherwise empty last page when text fits within the page.
-      const range = document.createRange(); range.selectNodeContents(root);
-      const height = Math.ceil(Math.max(1, range.getBoundingClientRect().bottom));
-      const keep = [];
-      for (const block of root.querySelectorAll('p,pre,blockquote,tr,img,svg,figure,video,h1,h2,h3,h4,h5,h6')) {
-        const rect = block.getBoundingClientRect();
-        let bottom = rect.bottom;
-        if (/^H[1-6]$/.test(block.tagName)) { const next = block.nextElementSibling; if (next) bottom = Math.max(bottom, Math.min(next.getBoundingClientRect().bottom, next.getBoundingClientRect().top + 22)); }
-        if (bottom - rect.top < pageHeight && bottom > rect.top) keep.push([rect.top, bottom]);
-      }
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); let node;
-      while ((node = walker.nextNode())) { const line = document.createRange(); line.selectNodeContents(node); for (const rect of line.getClientRects()) if (rect.height > 0 && rect.height < pageHeight) keep.push([rect.top, rect.bottom]); }
-      const forced = [...root.querySelectorAll('*')].filter(element => ['always','page'].includes(getComputedStyle(element).breakBefore) || getComputedStyle(element).pageBreakBefore === 'always').map(element => element.getBoundingClientRect().top);
-      const breaks = [0]; let start = 0;
-      while (start < height && breaks.length <= 2000) {
-        let end = Math.min(height, start + pageHeight);
-        const explicit = forced.find(at => at > start + 1 && at < end); if (explicit) end = explicit;
-        for (let i = 0; i < 20; i++) { const crossing = keep.filter(([top,bottom]) => top > start + 1 && top < end - .1 && bottom > end + .1); if (!crossing.length) break; end = Math.min(...crossing.map(item => item[0])); }
-        if (end <= start + 1) end = Math.min(height, start + pageHeight);
-        breaks.push(end); start = end;
-      }
-      return {height, breaks};
+      \(paginationScript)
+      return openTyporaPagination(root, pageHeight);
       """
     let pageHeight = view.frame.height - ((options["header"] as? String ?? "").isEmpty ? 0 : 16) - ((options["footer"] as? String ?? "").isEmpty ? 0 : 16)
     view.callAsyncJavaScript(measurement, arguments: ["pageHeight": pageHeight], in: nil, in: .page) { result in
@@ -86,28 +67,36 @@ final class PDFExporter: NSObject, WKNavigationDelegate {
         #if WEBTEST
           print("PDF: measured height", height)
         #endif
-        self.capture(breaks, at: 0, pages: [])
+        let headers = measurements["headers"] as? [[String: Double]] ?? []
+        self.capture(breaks, headerRects: headers, at: 0, pages: [], headers: [])
       } catch { self.finish(.failure(error)) }
     }
   }
-  private func capture(_ breaks: [Double], at index: Int, pages: [Data]) {
+  private func capture(_ breaks: [Double], headerRects: [[String: Double]], at index: Int, pages: [Data], headers: [Data?]) {
     guard completion != nil else { return }
     if index + 1 >= breaks.count {
       let options = self.options
       DispatchQueue.global(qos: .userInitiated).async {
-        let output = Result { try Self.compose(pages, options: options) }
+        let output = Result { try Self.compose(pages, options: options, headers: headers) }
         DispatchQueue.main.async { self.finish(output) }
+      }; return
+    }
+    func body(_ header: Data?) {
+      let configuration = WKPDFConfiguration()
+      configuration.rect = CGRect(x: 0, y: breaks[index], width: self.view.frame.width, height: max(1, breaks[index + 1] - breaks[index]))
+      self.view.createPDF(configuration: configuration) { result in
+        do { self.capture(breaks, headerRects: headerRects, at: index + 1, pages: pages + [try result.get()], headers: headers + [header]) }
+        catch { self.finish(.failure(error)) }
       }
-      return
     }
-    let configuration = WKPDFConfiguration()
-    configuration.rect = CGRect(x: 0, y: breaks[index], width: view.frame.width, height: max(1, breaks[index + 1] - breaks[index]))
-    view.createPDF(configuration: configuration) { result in
-      do { self.capture(breaks, at: index + 1, pages: pages + [try result.get()]) }
-      catch { self.finish(.failure(error)) }
-    }
+    if index < headerRects.count, let top = headerRects[index]["top"], let height = headerRects[index]["height"], top >= 0, height > 0 {
+      let configuration = WKPDFConfiguration(); configuration.rect = CGRect(x: 0, y: top, width: view.frame.width, height: height)
+      view.createPDF(configuration: configuration) { result in
+        do { body(try result.get()) } catch { self.finish(.failure(error)) }
+      }
+    } else { body(nil) }
   }
-  static func compose(_ pages: [Data], options: [String: Any]) throws -> Data {
+  static func compose(_ pages: [Data], options: [String: Any], headers: [Data?] = []) throws -> Data {
     guard !pages.isEmpty, pages.count <= 2000 else { throw NativeFailure("导出页数超出支持范围。") }
     let width = options["paper"] as? String == "letter" ? 612.0 : 595.28
     let height = options["paper"] as? String == "letter" ? 792.0 : 841.89
@@ -120,8 +109,13 @@ final class PDFExporter: NSObject, WKNavigationDelegate {
       guard let provider = CGDataProvider(data: data as CFData), let document = CGPDFDocument(provider), let page = document.page(at: 1) else { throw NativeFailure("WebKit 未生成有效 PDF 页面。") }
       let source = page.getBoxRect(.mediaBox), scale = (width - margin * 2) / source.width
       context.beginPDFPage([kCGPDFContextMediaBox as String: CGRect(x: 0, y: 0, width: width, height: height).data] as CFDictionary)
+      var repeatedHeaderHeight = 0.0
+      if index < headers.count, let data = headers[index], let provider = CGDataProvider(data: data as CFData), let document = CGPDFDocument(provider), let headerPage = document.page(at: 1) {
+        let bounds = headerPage.getBoxRect(.mediaBox); repeatedHeaderHeight = bounds.height * scale
+        context.saveGState(); context.translateBy(x: margin, y: height - margin - headerSpace - repeatedHeaderHeight); context.scaleBy(x: scale, y: scale); context.translateBy(x: -bounds.minX, y: -bounds.minY); context.drawPDFPage(headerPage); context.restoreGState()
+      }
       context.saveGState()
-      let target = CGRect(x: margin, y: height - margin - headerSpace - source.height * scale, width: width - margin * 2, height: source.height * scale)
+      let target = CGRect(x: margin, y: height - margin - headerSpace - repeatedHeaderHeight - source.height * scale, width: width - margin * 2, height: source.height * scale)
       context.clip(to: target)
       context.translateBy(x: target.minX, y: target.minY)
       context.scaleBy(x: scale, y: scale)

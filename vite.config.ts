@@ -4,5 +4,5 @@ import { typoraPlugins } from "./scripts/plugin-build.mjs";
 export default defineConfig({
   plugins: [react(), typoraPlugins()],
   base: "./",
-  build: { target: "es2022" },
+  build: { target: "es2022", rolldownOptions: { input: ["index.html", "preview.html"] } },
 });

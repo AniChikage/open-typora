@@ -19,8 +19,11 @@ interface Snapshot {
   selection: SelectionBookmark;
 }
 interface Command {
-  before: Snapshot;
-  after: Snapshot;
+  from: number;
+  removed: string;
+  inserted: string;
+  before: SelectionBookmark;
+  after: SelectionBookmark;
   kind: string;
   time: number;
 }
@@ -119,6 +122,7 @@ export class MarkdownDocument {
   private parse() {
     const old = this.nodes;
     if (this.text.length > 300_000) {
+      this.environment = {};
       this.nodes = [];
       this.root.children = [
         {
@@ -232,40 +236,35 @@ export class MarkdownDocument {
     from = Math.max(0, Math.min(from, this.text.length));
     to = Math.max(from, Math.min(to, this.text.length));
     insert = insert.replace(/\r\n/g, "\n");
-    const before = { text: this.text, selection: { ...this.selection } };
+    const before = { ...this.selection };
+    const nextSelection = selection || { anchor: from + insert.length, head: from + insert.length };
+    // Source editors and mode/composition commits may supply a whole document.
+    // Retain only its changed span in history, including on multi-megabyte files.
+    if (from === 0 && to === this.text.length) {
+      let prefix = 0, suffix = 0;
+      while (prefix < to && prefix < insert.length && this.text.charCodeAt(prefix) === insert.charCodeAt(prefix)) prefix++;
+      while (suffix < to - prefix && suffix < insert.length - prefix && this.text.charCodeAt(to - suffix - 1) === insert.charCodeAt(insert.length - suffix - 1)) suffix++;
+      from = prefix; to -= suffix; insert = insert.slice(prefix, insert.length - suffix);
+    }
+    const removed = this.text.slice(from, to);
+    this.selection = nextSelection;
+    if (removed === insert) return false;
     this.text = this.text.slice(0, from) + insert + this.text.slice(to);
-    this.selection = selection || {
-      anchor: from + insert.length,
-      head: from + insert.length,
-    };
-    if (before.text === this.text) return false;
-    const now = Date.now(),
-      previous = this.undoStack.at(-1);
-    const after = { text: this.text, selection: { ...this.selection } };
-    if (
-      this.group &&
-      ["typing", "composition"].includes(kind) &&
-      previous?.kind === kind &&
-      (kind === "composition" || now - previous.time < 800) &&
-      previous.after.selection.head === before.selection.head &&
-      before.selection.anchor === before.selection.head
-    ) {
-      previous.after = after;
-      previous.time = now;
+    const now = Date.now(), previous = this.undoStack.at(-1);
+    const merge = this.group && ["typing", "composition"].includes(kind) && previous?.kind === kind &&
+      (kind === "composition" || now - previous.time < 800) && previous.after.head === before.head && before.anchor === before.head;
+    if (merge && from >= previous.from && to <= previous.from + previous.inserted.length) {
+      const at = from - previous.from;
+      previous.inserted = previous.inserted.slice(0, at) + insert + previous.inserted.slice(to - previous.from);
+      previous.after = { ...this.selection }; previous.time = now;
+    } else if (merge && from === previous.from + previous.inserted.length) {
+      previous.removed += removed; previous.inserted += insert;
+      previous.after = { ...this.selection }; previous.time = now;
     } else {
-      this.undoStack.push({ before, after, kind, time: now });
+      this.undoStack.push({ from, removed, inserted: insert, before, after: { ...this.selection }, kind, time: now });
       if (this.undoStack.length > 100) this.undoStack.shift();
     }
-    while (
-      this.undoStack.length > 1 &&
-      this.undoStack.reduce(
-        (bytes, command) =>
-          bytes + 2 * (command.before.text.length + command.after.text.length),
-        0,
-      ) >
-        16 * 1024 * 1024
-    )
-      this.undoStack.shift();
+    while (this.undoStack.length > 1 && this.undoStack.reduce((bytes, command) => bytes + 2 * (command.removed.length + command.inserted.length), 0) > 16 * 1024 * 1024) this.undoStack.shift();
     this.group = ["typing", "composition"].includes(kind);
     this.redoStack = [];
     this.parse();
@@ -295,8 +294,8 @@ export class MarkdownDocument {
     const command = this.undoStack.pop();
     if (!command) return false;
     this.redoStack.push(command);
-    this.text = command.before.text;
-    this.selection = { ...command.before.selection };
+    this.text = this.text.slice(0, command.from) + command.removed + this.text.slice(command.from + command.inserted.length);
+    this.selection = { ...command.before };
     this.closeGroup();
     this.parse();
     return true;
@@ -305,8 +304,8 @@ export class MarkdownDocument {
     const command = this.redoStack.pop();
     if (!command) return false;
     this.undoStack.push(command);
-    this.text = command.after.text;
-    this.selection = { ...command.after.selection };
+    this.text = this.text.slice(0, command.from) + command.inserted + this.text.slice(command.from + command.removed.length);
+    this.selection = { ...command.after };
     this.closeGroup();
     this.parse();
     return true;

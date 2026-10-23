@@ -11,7 +11,7 @@ import { extractHeadings, renderMarkdown, setMarkdownOptions } from "./editor/ma
 import { host } from "./host";
 import { renderDiagrams } from "./editor/diagrams";
 import { renderMath } from "./editor/math";
-import { exportHtml, portableHtml, conversionMarkdown } from "./editor/print";
+import { portableHtml, conversionMarkdown } from "./editor/print";
 import { commandForKey, commandKey, commandsByAction } from "./commands";
 import { loadPreferences } from "./preferences";
 import { PreferencesDialog } from "./components/PreferencesDialog";
@@ -27,7 +27,10 @@ import type { FileOperation } from "./types";
 import type { Command } from "./types";
 import appIcon from "../design/icon.svg";
 import { version as appVersion } from "../package.json";
-import { applyTheme } from "./themes";
+import { applyTheme, builtInThemes } from "./themes";
+import { customizationDefaults, exportedThemeCss, loadCustomizations, normalizeCustomization, themeCustomizationKey } from "./themeCustomization";
+import type { ThemeCustomization } from "./themeCustomization";
+import { useSourceAnalysis } from "./editor/useSourceAnalysis";
 import { PluginRuntime } from "./plugins/runtime";
 import { bundledPlugins, loadPluginPreferences, pluginPreferenceKey } from "./plugins/catalog";
 import type { PluginDefinition, PluginState } from "./plugins/types";
@@ -115,15 +118,17 @@ export default function App() {
     setInstalledPlugins(previous => previous.filter(item => item.id !== id));
     setPluginPreferences(previous => { const next = { ...previous }; delete next[id]; return next; });
   }
+  const largeDocument = (active?.content.length || 0) > 300_000;
+  const sourceAnalysis = useSourceAnalysis(largeDocument ? active!.content : "", preferences.readingSpeed);
   const headings = useMemo(
-    () => extractHeadings(active?.content || ""),
-    [active?.content, preferences],
+    () => largeDocument ? sourceAnalysis?.headings || [] : extractHeadings(active?.content || ""),
+    [active?.content, preferences, largeDocument, sourceAnalysis],
   );
   const characters = useMemo(
-    () => Array.from((active?.content || "").replace(/\s/g, "")).length,
-    [active?.content],
+    () => largeDocument ? sourceAnalysis?.compactCharacters ?? null : Array.from((active?.content || "").replace(/\s/g, "")).length,
+    [active?.content, largeDocument, sourceAnalysis],
   );
-  const wholeStatistics = useMemo(() => countUnit === "words" || dialog === "statistics" ? documentStatistics(active?.content || "", undefined, preferences.readingSpeed) : null, [active?.content, preferences, countUnit, dialog]);
+  const wholeStatistics = useMemo(() => largeDocument ? sourceAnalysis : countUnit === "words" || dialog === "statistics" ? documentStatistics(active?.content || "", undefined, preferences.readingSpeed) : null, [active?.content, preferences, countUnit, dialog, largeDocument, sourceAnalysis]);
   const statistics = useMemo(() => dialog === "statistics" && selection ? documentStatistics(selection, selection, preferences.readingSpeed) : wholeStatistics, [dialog, selection, wholeStatistics]);
   const selectionCharacters = useMemo(() => Array.from(selection.replace(/\s/g, "")).length, [selection]);
   useEffect(() => { localStorage.setItem("open-typora-count-unit", countUnit); }, [countUnit]);
@@ -134,7 +139,16 @@ export default function App() {
   useEffect(() => { if (window.desktop?.viewState) void window.desktop.viewState(focus, typewriter, sidebar).catch(() => {}); }, [focus, typewriter, sidebar]);
   async function refreshThemes() { const items = await host.themes(); setThemes(items); return items; }
   useEffect(() => { if (session.ready) void refreshThemes().catch(e => session.setMessage(e.message)); }, [session.ready]);
-  useEffect(() => applyTheme(theme, themes), [theme, themes]);
+  const [customizations, setCustomizations] = useState(loadCustomizations);
+  const themeCustomization = customizations[theme] || customizationDefaults;
+  useEffect(() => { localStorage.setItem(themeCustomizationKey, JSON.stringify(customizations)); }, [customizations]);
+  useEffect(() => applyTheme(theme, themes, themeCustomization), [theme, themes, themeCustomization]);
+  function customizeTheme(value: ThemeCustomization) { setCustomizations(previous => ({ ...previous, [theme]: normalizeCustomization(value) })); }
+  function resetTheme() { setCustomizations(previous => { const next = { ...previous }; delete next[theme]; return next; }); }
+  async function saveTheme() {
+    const custom = themes.find(item => theme === 'custom:' + item.id), builtin = builtInThemes.find(item => item.id === theme) || builtInThemes[0];
+    await host.exportTheme(custom?.name || builtin.name, exportedThemeCss(custom?.css || builtin.css, themeCustomization));
+  }
   async function refreshBackground() {
     const request = ++backgroundRequest.current, asset = await host.background();
     if (request === backgroundRequest.current) setBackground(asset);
@@ -162,7 +176,7 @@ export default function App() {
       await host.persist({ documents: session.documents, activeId: session.activeId, workspace: session.workspace });
       printDocument.current.innerHTML = renderMarkdown(active.content, active.id);
       await Promise.all([renderDiagrams(printDocument.current), renderMath(printDocument.current), document.fonts.ready]);
-      const result = kind === "pdf" ? await host.exportPdf(exportHtml(printDocument.current), { paper: preferences.pdfPaper, margin: preferences.pdfMargin, header: preferences.pdfHeader, footer: preferences.pdfFooter, title: active.name }) : kind === "html" ? await host.exportHtml(active.name, await portableHtml(printDocument.current, active.name)) : await host.exportConverted(active.id, kind, await conversionMarkdown(active.content, printDocument.current), await portableHtml(printDocument.current, active.name));
+      const result = kind === "pdf" ? await host.exportPdf(await portableHtml(printDocument.current, active.name, preferences), { paper: preferences.pdfPaper, margin: preferences.pdfMargin, header: preferences.pdfHeader, footer: preferences.pdfFooter, title: active.name }) : kind === "html" ? await host.exportHtml(active.name, await portableHtml(printDocument.current, active.name)) : await host.exportConverted(active.id, kind, await conversionMarkdown(active.content, printDocument.current), await portableHtml(printDocument.current, active.name));
       if (result) session.setMessage(`${kind.toUpperCase()} 已导出。`);
     } catch (error) { session.setMessage((error as Error).message); }
     finally { document.body.classList.remove("printing"); exportingRef.current = false; setExporting(false); }
@@ -175,6 +189,7 @@ export default function App() {
     const sync = (event: StorageEvent) => {
       if (event.key === pluginPreferenceKey) setPluginPreferences(loadPluginPreferences());
       if (event.key === "open-typora-theme") setTheme(event.newValue || "light");
+      if (event.key === themeCustomizationKey) setCustomizations(loadCustomizations());
       if (event.key === "open-typora-preferences") { const next = loadPreferences(); setMarkdownOptions(next); setPreferences(next); }
       if (event.key === backgroundRevisionKey) void refreshBackground().catch(error => session.setMessage(error.message));
     };
@@ -186,7 +201,7 @@ export default function App() {
   commands.current = ({ action, document: opened, anchor, line, message }) => {
     if (action === "newWindow" && window.desktop?.windowAction) { void host.windowAction(action).catch((error: Error) => session.setMessage(error.message)); return; }
     const context = commandsByAction.get(action)?.context;
-    if (readOnly && ((context && context !== "document") || ["delete-word", "indent", "outdent", "undo", "redo", "paste-plain", "image", "table", "link", "reference-link", "footnote", "copy-all-images", "move-all-images", "upload-all-images"].includes(action))) { session.setMessage("只读模式已开启，请先在插件管理中关闭或切换只读效果。"); return; }
+    if (readOnly && ((context && context !== "document") || ["delete-word", "pagebreak", "indent", "outdent", "undo", "redo", "paste-plain", "image", "table", "link", "reference-link", "footnote", "copy-all-images", "move-all-images", "upload-all-images"].includes(action))) { session.setMessage("只读模式已开启，请先在插件管理中关闭或切换只读效果。"); return; }
     if (context && !active) return;
     if (["rich", "table"].includes(context || "") && !editor()?.richMode()) return;
     if (action === "notice") { if (message) session.setMessage(message); }
@@ -208,6 +223,7 @@ export default function App() {
     }
     else if (action === "quit") void session.quit();
     else if (action === "close-window") void session.closeWindow();
+    else if (action === "pagebreak") editor()?.insert("\n\n<!-- pagebreak -->\n\n");
     else if (action === "source") setRendered((value) => !value);
     else if (action === "next-tab" || action === "previous-tab") session.nextTab(action === "previous-tab");
     else if (action === "split-right" || action === "split-down") void session.split(action === "split-right" ? "columns" : "rows");
@@ -382,7 +398,7 @@ export default function App() {
           title={`${status} · 第 ${cursor.line} 行，第 ${cursor.column} 列 · Markdown · ${encodingNames[active?.encoding || "utf-8"]}`}
           aria-label={`${characters} 字，${status}`}
         >
-          {countUnit === "characters" ? (selection ? selectionCharacters : characters) : (selection ? documentStatistics(selection, selection, preferences.readingSpeed).words : wholeStatistics?.words || 0)} {countUnit === "characters" ? "字" : "词"}{selection && "（选中）"}{exporting && " · 正在导出…"}
+          {countUnit === "characters" ? (selection ? selectionCharacters : characters ?? "统计中") : (selection ? documentStatistics(selection, selection, preferences.readingSpeed).words : wholeStatistics?.words || 0)} {countUnit === "characters" ? "字" : "词"}{selection && "（选中）"}{exporting && " · 正在导出…"}
         </button>
         {active && <button aria-label="更改文本编码" title="文本编码与字节顺序标记" onClick={() => setDialog("encoding")}>{encodingNames[active.encoding || "utf-8"]}{active.bom ? " BOM" : ""}</button>}
       </footer>
@@ -403,7 +419,7 @@ export default function App() {
       {dialog === "encoding" && active && <EncodingDialog key={active.id} record={active} change={session.changeEncoding} close={closeDialog} />}
       {dialog === "recent" && <RecentDialog entries={session.recent} action={session.recentAction} close={closeDialog} />}
       {dialog === "global-search" && <GlobalSearch folder={session.folder} close={closeDialog} open={async match => { const record = await session.openToken(match.token); if (record) requestAnimationFrame(() => editors.current.get(record.id)?.jump(match.line)); }} />}
-      {dialog === "preferences" && <PreferencesDialog value={preferences} change={changePreferences} theme={theme} changeTheme={setTheme} themes={themes} installTheme={installTheme} background={background} chooseBackground={chooseBackground} clearBackground={clearBackground} plugins={() => setDialog("plugins")} close={closeDialog} />}
+      {dialog === "preferences" && <PreferencesDialog value={preferences} change={changePreferences} theme={theme} changeTheme={setTheme} themes={themes} installTheme={installTheme} customization={themeCustomization} customize={customizeTheme} resetTheme={resetTheme} saveTheme={saveTheme} background={background} chooseBackground={chooseBackground} clearBackground={clearBackground} plugins={() => setDialog("plugins")} close={closeDialog} />}
       {dialog === "plugins" && <PluginsDialog definitions={pluginDefinitions} preferences={pluginPreferences} states={pluginStates} toggle={(id, enabled) => setPluginPreferences(previous => ({ ...previous, [id]: { ...previous[id], enabled } }))} configure={(id, config) => setPluginPreferences(previous => ({ ...previous, [id]: { ...previous[id], config } }))} invoke={async (id,action) => { await pluginRuntime.current?.invoke(id,action); }} actions={id => pluginRuntime.current?.actions(id) || []} install={installPlugin} remove={removePlugin} close={closeDialog} />}
       {dialog === "quick-open" && <QuickOpen documents={session.documents} files={session.files} recent={session.recent} openRecent={path => session.recentAction("open", path)} select={session.setActiveId} open={session.openToken} close={closeDialog} />}
       {dialog && ["table", "link", "reference-link", "footnote"].includes(dialog) && <InsertDialog kind={dialog as InsertKind} selected={selectedText} close={closeDialog} submit={value => {
@@ -411,7 +427,7 @@ export default function App() {
         else editor()?.command(dialog, value);
         closeDialog();
       }} />}
-      {dialog === "statistics" && statistics && <Dialog title="字数统计" close={closeDialog}><dl className="document-statistics"><dt>范围</dt><dd>{statistics.selected ? "选中文字" : "全文"}</dd><dt>单词</dt><dd>{statistics.words}</dd><dt>字符（不含空白）</dt><dd>{statistics.compactCharacters}</dd><dt>字符（含空白）</dt><dd>{statistics.characters}</dd><dt>行数</dt><dd>{statistics.lines}</dd><dt>预计阅读</dt><dd>{statistics.minutes} 分钟</dd></dl><label>底部显示<select aria-label="底部显示" value={countUnit} onChange={e => setCountUnit(e.target.value as typeof countUnit)}><option value="characters">字符数</option><option value="words">单词数</option></select></label><p className="dialog-note">单词不计格式符号，中文按每字一词；字符包含源码符号。阅读速度按每分钟 {preferences.readingSpeed} 词估算。</p></Dialog>}
+      {dialog === "statistics" && statistics && <Dialog title="字数统计" close={closeDialog}><dl className="document-statistics"><dt>范围</dt><dd>{statistics.selected ? "选中文字" : "全文"}</dd><dt>单词</dt><dd>{statistics.words}</dd><dt>字符（不含空白）</dt><dd>{statistics.compactCharacters}</dd><dt>字符（含空白）</dt><dd>{statistics.characters}</dd><dt>行数</dt><dd>{statistics.lines}</dd><dt>预计阅读</dt><dd>{statistics.minutes} 分钟</dd></dl><label>底部显示<select aria-label="底部显示" value={countUnit} onChange={e => setCountUnit(e.target.value as typeof countUnit)}><option value="characters">字符数</option><option value="words">单词数</option></select></label><p className="dialog-note">{largeDocument ? "大文件字词按 Markdown 源码估算；" : "单词不计格式符号，"}中文按每字一词；字符包含源码符号。阅读速度按每分钟 {preferences.readingSpeed} 词估算。</p></Dialog>}
       {about && (
         <div className="dialog-backdrop" onClick={() => setAbout(false)}>
           <section

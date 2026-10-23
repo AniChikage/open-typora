@@ -535,6 +535,18 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       NSPasteboard.general.clearContents(); NSPasteboard.general.setString(text, forType: .string)
       return nil
     case "readClipboard": return NSPasteboard.general.string(forType: .string) ?? ""
+    case "previewSettings": return ["supported":false,"available":false,"enabled":false]
+    case "exportTheme":
+      let name = try arg(args, 0, String.self), css = try arg(args, 1, String.self)
+      guard css.utf8.count <= 4 * 1024 * 1024 else { throw NativeFailure("主题内容过大。") }
+      #if WEBTEST
+        let destination = store.dataDirectory.appendingPathComponent("native-test-theme.css")
+      #else
+        let panel = NSSavePanel(); panel.allowedContentTypes = [UTType(filenameExtension: "css") ?? .plainText]
+        panel.nameFieldStringValue = URL(fileURLWithPath: name).deletingPathExtension().lastPathComponent + ".css"
+        guard panel.runModal() == .OK, let destination = panel.url else { return nil }
+      #endif
+      try atomicWrite(destination, Data(css.utf8)); return destination.path
     case "exportHtml":
       let name = try arg(args, 0, String.self), html = try arg(args, 1, String.self)
       guard html.utf8.count <= 100 * 1024 * 1024 else { throw NativeFailure("导出内容过大。") }

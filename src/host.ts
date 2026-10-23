@@ -121,6 +121,8 @@ const browser: Host = {
     window.print();
     return null;
   },
+  async previewSettings() { return {supported:false,available:false,enabled:false}; },
+  async exportTheme(name, css) { download(name + ".css", css, "text/css;charset=utf-8"); return null; },
   async exportHtml(name, html) { download(name.replace(/\.(?:md|markdown|mdown)$/i, "") + ".html", html, "text/html;charset=utf-8"); return null; },
   writeClipboard: text => navigator.clipboard.writeText(text),
   readClipboard: () => navigator.clipboard.readText(),
