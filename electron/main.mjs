@@ -351,7 +351,7 @@ app
       if (development) window.loadURL(development);
       else window.loadFile(path.join(root, "dist/index.html"));
       window.on("close", (event) => {
-        if (!closing && dirty) {
+        if (!closing) {
           event.preventDefault();
           send("quit");
         }

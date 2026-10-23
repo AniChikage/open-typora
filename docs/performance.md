@@ -19,3 +19,19 @@ An Apple Silicon macOS run with Node 26.7.0 and JSDOM 30.1.1 produced these medi
 The model now indexes old blocks by kind and source while preserving distinct identities for repeated content. The rich view keeps unchanged DOM, updates source positions when blocks move, and refreshes blocks when document-wide references or rendering preferences change. Opening a session initializes the selected document first; other editors initialize on first use and remain mounted afterward so their in-memory histories survive tab and pane changes.
 
 Full Markdown parsing still runs after edits. Documents above 300,000 characters use the virtualized source editor. Complex diagrams, mathematical macros, huge tables, plugins and storage can dominate overall performance and need separate measurements. The workspace desktop suite validates correct editing and saving of a 700-paragraph document, but does not assert a hardware-dependent latency threshold.
+
+
+## Large source documents in 0.14.0
+
+Documents above 300,000 UTF-16 code units open in the virtualized CodeMirror source editor. Large source mode omits Markdown syntax parsing/highlighting and bracket matching. The file limit remains 20 MiB; this is not a claim of multi-megabyte rich-document rendering.
+
+- Source edits apply the changed range instead of replacing the entire document on every input event.
+- Undo stores removed/inserted spans, up to 100 commands within a 16 MiB changed-text budget. Small edits no longer retain a whole document copy per undo step.
+- Outline and whole-document statistics run in a bundled worker after 250 ms of quiet time. The outline shows at most 2,000 headings; word counts in large files are estimates from source text. Pending results are labelled in the interface.
+- Recovery snapshots wait 1.2 seconds of quiet time for large sessions. Normal window close waits for the latest recovery record to be written.
+
+`npm run test:next` opens UTF-8 fixtures larger than 5 MiB and 10 MiB in Electron, checks viewport virtualization, editing, grouped undo/redo, exact saved bytes, background outline, theme persistence and actual PDF page contents. The macOS `test:webkit` suite separately exercises a multi-megabyte source document and the bundled worker in native WKWebView.
+
+A local Apple Silicon macOS Electron run recorded 1,640 ms from launch to the visible 5 MiB source editor. Twelve text-input-to-two-animation-frame samples were 15–45 ms (p95 45 ms). These are a small local automation sample, not physical-IME latency or a performance guarantee. CI records separate Windows/Linux measurements with the installed packages. Complex plugins, storage and hardware can change these results.
+
+Unit tests also retain 100 separate small undo steps in a roughly 7 MiB Unicode/CRLF document and compare randomized edits/undo/redo against an independent string reference.

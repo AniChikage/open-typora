@@ -411,7 +411,7 @@ try {
   const headerSource='# Native table header\n\n| Name | 中文 |';
   const headerRecord={id:'native-header-table',path:null,name:'Native-table-header.md',content:headerSource,savedContent:headerSource,diskHash:null,lineEnding:'\n'};
   const headerRegistered=await window.desktop.registerDraft(headerRecord);if(!headerRegistered.ok)throw Error(headerRegistered.error);
-  window.__openTypora.command({action:'opened',document:headerRecord});await wait(()=>document.querySelector('.document-title')?.textContent===headerRecord.name);
+  window.__openTypora.command({action:'opened',document:headerRecord});await wait(()=>document.querySelector('.document-title')?.textContent===headerRecord.name && root()?.textContent.includes('| Name | 中文 |'));
   pointText('| Name | 中文 |','| Name | 中文 |'.length);input('insertParagraph');
   check(root().querySelectorAll('th').length===2 && root().querySelectorAll('td').length===2 && !!getSelection().anchorNode.parentElement.closest('td'),'native header Enter creates a table and focuses its first body cell');
   input('insertText','你好|中国');await sourceMode(true);
@@ -449,7 +449,7 @@ try {
   check(document.querySelectorAll('.document-editor[data-document-id="native-large-qa"] .cm-line').length<200,'native multi-megabyte source editor remains viewport-virtualized');
   window.__openTypora.command({action:'outline'});await wait(()=>[...document.querySelectorAll('.outline button')].some(button=>button.textContent==='Large native heading'));
   check(true,'large native outline analysis completes through the bundled worker');
-  window.__openTypora.command({action:'opened',document:saved.value});await wait(()=>document.querySelector('.document-title')?.textContent===saved.value.name);
+  window.__openTypora.command({action:'opened',document:saved.value});await wait(()=>document.querySelector('.document-title')?.textContent===saved.value.name && root()?.textContent.includes('粗测新体'));
   pointText("粗测新体", 2);
   input("insertText", "保留");
   window.__openTypora.command({ action: "close-window" });

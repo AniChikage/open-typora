@@ -84,10 +84,10 @@ try {
   if (process.env.OPEN_TYPORA_QA_DIR) {
     await mkdir(process.env.OPEN_TYPORA_QA_DIR, { recursive: true });
     await cp(path.join(directory, "data/native-test-long.pdf"), path.join(process.env.OPEN_TYPORA_QA_DIR, "native-pagination.pdf"));
-    for (const name of await readdir(path.join(directory, "data"))) if ((name.startsWith("native-converted.") || name === "native-complex.pdf")) await cp(path.join(directory, "data", name), path.join(process.env.OPEN_TYPORA_QA_DIR, name), { recursive: true });
+    for (const name of await readdir(path.join(directory, "data"))) if ((name.startsWith("native-converted.") || ["native-complex.pdf", "native-controlled.pdf", "native-tableheaders.pdf"].includes(name))) await cp(path.join(directory, "data", name), path.join(process.env.OPEN_TYPORA_QA_DIR, name), { recursive: true });
   }
 } finally {
   await new Promise(resolve => server.close(resolve));
-  if (process.env.OPEN_TYPORA_QA_DIR) { try { for (const name of await readdir(path.join(directory, "data"))) if ((name.startsWith("native-converted.") || name === "native-complex.pdf")) await cp(path.join(directory, "data", name), path.join(process.env.OPEN_TYPORA_QA_DIR, name), { recursive: true }); } catch {} await mkdir(process.env.OPEN_TYPORA_QA_DIR, { recursive: true }); try { await cp(path.join(directory, "data/native-test-long.pdf"), path.join(process.env.OPEN_TYPORA_QA_DIR, "native-pagination.pdf")); } catch {} }
+  if (process.env.OPEN_TYPORA_QA_DIR) { try { for (const name of await readdir(path.join(directory, "data"))) if ((name.startsWith("native-converted.") || ["native-complex.pdf", "native-controlled.pdf", "native-tableheaders.pdf"].includes(name))) await cp(path.join(directory, "data", name), path.join(process.env.OPEN_TYPORA_QA_DIR, name), { recursive: true }); } catch {} await mkdir(process.env.OPEN_TYPORA_QA_DIR, { recursive: true }); try { await cp(path.join(directory, "data/native-test-long.pdf"), path.join(process.env.OPEN_TYPORA_QA_DIR, "native-pagination.pdf")); } catch {} }
   await rm(directory, { recursive: true, force: true });
 }

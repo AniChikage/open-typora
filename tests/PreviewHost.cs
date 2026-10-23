@@ -50,6 +50,7 @@ public static class PreviewProbe {
    timer.Tick+=(sender,eventArgs)=>{try{
     var names=Names(form.Handle);if(!names.Contains(expected[phase])){if((DateTime.UtcNow-started).TotalSeconds>75)throw new Exception("Native COM preview did not render: "+String.Join(" | ",names.Take(80)));return;}
     if(!names.Contains("Alpha"))throw new Exception("Markdown table cell missing from rendered accessibility tree");
+    if(phase==0&&!names.Contains("Local diagram"))throw new Exception("Local preview image missing from accessibility tree");
     Capture(form.Handle,Path.Combine(output,phase==0?"native-file.png":"native-stream.png"));File.WriteAllLines(Path.Combine(output,"native-tree-"+phase+".txt"),names);
     Marshal.ThrowExceptionForHR(preview.SetFocus());IntPtr focus;Marshal.ThrowExceptionForHR(preview.QueryFocus(out focus));if(focus==IntPtr.Zero)throw new Exception("Preview focus was not set");
     preview.Unload();if(stream!=null){Marshal.ReleaseComObject(stream);stream=null;}

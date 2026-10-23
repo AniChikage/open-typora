@@ -21,6 +21,8 @@ interface Props {
   files: FileEntry[];
   folder: string | null;
   headings: Heading[];
+  outlinePending?: boolean;
+  outlineTruncated?: boolean;
   tab: "files" | "outline" | "tree";
   setTab(tab: "files" | "outline" | "tree"): void;
   select(id: string): void;
@@ -184,7 +186,7 @@ export function Sidebar(props: Props) {
           </>
         ) : (
           <nav className="outline" aria-label="文档大纲">
-            {props.headings.length ? (
+            {props.outlinePending ? <p className="sidebar-empty" role="status">正在分析文档大纲…</p> : props.headings.length ? (
               props.headings.map((heading, index) => (
                 <button
                   key={`${heading.line}-${index}`}
@@ -201,6 +203,7 @@ export function Sidebar(props: Props) {
                 在这里看见文档结构。
               </p>
             )}
+            {props.outlineTruncated && <p className="sidebar-empty">仅显示前 2000 个标题。</p>}
           </nav>
         )}
       </div>

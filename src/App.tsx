@@ -339,6 +339,8 @@ export default function App() {
         files={session.files}
         folder={session.folder}
         headings={headings}
+        outlinePending={largeDocument && !sourceAnalysis}
+        outlineTruncated={sourceAnalysis?.truncated}
         tab={tab}
         setTab={setTab}
         select={session.setActiveId}
@@ -398,7 +400,7 @@ export default function App() {
           title={`${status} · 第 ${cursor.line} 行，第 ${cursor.column} 列 · Markdown · ${encodingNames[active?.encoding || "utf-8"]}`}
           aria-label={`${characters} 字，${status}`}
         >
-          {countUnit === "characters" ? (selection ? selectionCharacters : characters ?? "统计中") : (selection ? documentStatistics(selection, selection, preferences.readingSpeed).words : wholeStatistics?.words || 0)} {countUnit === "characters" ? "字" : "词"}{selection && "（选中）"}{exporting && " · 正在导出…"}
+          {!selection && largeDocument && !sourceAnalysis ? "正在统计…" : <>{!selection && largeDocument && countUnit === "words" && "约 "}{countUnit === "characters" ? (selection ? selectionCharacters : characters) : (selection ? documentStatistics(selection, selection, preferences.readingSpeed).words : wholeStatistics?.words || 0)} {countUnit === "characters" ? "字" : "词"}{selection && "（选中）"}</>}{exporting && " · 正在导出…"}
         </button>
         {active && <button aria-label="更改文本编码" title="文本编码与字节顺序标记" onClick={() => setDialog("encoding")}>{encodingNames[active.encoding || "utf-8"]}{active.bom ? " BOM" : ""}</button>}
       </footer>

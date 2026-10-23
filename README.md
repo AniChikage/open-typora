@@ -20,20 +20,23 @@
 
 Open Typora is an open-source Markdown editor inspired by Typora's inline editing experience. Write directly in the rendered document, switch to source when you need it, and save ordinary `.md` files in your own folders.
 
-**Status:** early development, version **0.13.4**. Release builds support **macOS 14+ on Apple Silicon**, **Windows 10/11 x64**, and **Linux x64**. The interface is currently in Simplified Chinese. This is an independent project, unaffiliated with Typora; full feature and behavior parity is still in progress.
+**Status:** early development, version **0.14.0**. Release builds support **macOS 14+ on Apple Silicon**, **Windows 10/11 x64**, and **Linux x64**. The interface is currently in Simplified Chinese. This is an independent project, unaffiliated with Typora; full feature and behavior parity is still in progress.
 
 ## Features
 
 - **Live Markdown editing** — headings, inline formatting, lists, tasks, tables, links, footnotes, and YAML front matter. Edit code and formulas in place, or switch to the full source view.
 - **Tabs and split editing** — reorder and navigate document tabs, compare two documents side by side or stacked, and use independent source/live modes. Restore the pane layout on restart.
-- **Responsive editing** — initialize documents on first use and reuse unchanged block views while typing; [benchmark scope](docs/performance.md).
+- **Responsive editing** — initialize documents on first use, reuse unchanged blocks, and edit large files in a virtualized source view with delta undo history and background outline analysis; [benchmarks and limits](docs/performance.md).
 - **A focused writing space** — outline navigation, focus and typewriter modes, word counts, find and replace, six built-in themes, and local CSS themes.
+- **Theme customization** — per-theme fonts, spacing, width and colors, live CSS, print-only CSS, and CSS export. [Theme guide](docs/themes.md).
 - **Personal backgrounds** — choose a local image, preview opacity, blur and placement, and keep it across restarts. Live and source modes share the background; exported documents stay free of it.
 - **Community plugins** — six bundled, adapted typora_plugin plugins; local CommonJS files and folders with relative JS/JSON/CSS modules, configuration, shortcuts, and unloading. [Compatibility scope](docs/plugins.md).
 - **Files you control** — folder tree, full-text search, quick open, recent files, autosave, session recovery, and external-change conflict detection.
 - **Images, math, and diagrams** — local and pasted images, path and size controls, offline MathJax, Mermaid, and a [legacy sequence/flow subset](docs/diagrams.md). Optional image uploads use a configured PicGo Server.
 - **More than UTF-8** — UTF-16 LE/BE, GB18030, GBK, Big5, Shift JIS, and Windows-1252. Preserve BOM and line endings; reject saves that would lose characters.
-- **Import and export** — built-in HTML and PDF export; additional formats such as DOCX, ODT, RTF, and EPUB through [Pandoc](https://pandoc.org/).
+- **Import and export** — built-in HTML and PDF export with manual/chapter breaks, repeated table headers and widow/orphan controls; [pagination guide](docs/printing.md). Additional formats such as DOCX, ODT, RTF, and EPUB through [Pandoc](https://pandoc.org/).
+
+- **Windows Markdown preview** — an opt-in native preview handler for Everything and File Explorer. Requires Microsoft Edge WebView2 Runtime. [Setup and limits](docs/windows-preview.md).
 
 See the [feature checklist](docs/feature-parity.md) for coverage and known differences.
 
@@ -53,23 +56,23 @@ The demo keeps documents in the current tab's memory; it does not upload or pers
 
 | Platform | Installer | Alternative |
 | --- | --- | --- |
-| Windows 10/11 · x64 | **[Download Setup.exe](https://github.com/AniChikage/open-typora/releases/download/v0.13.4/Open-Typora-0.13.4-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.13.4/Open-Typora-0.13.4-windows-x64.zip) |
-| macOS 14+ · Apple Silicon | **[Download DMG](https://github.com/AniChikage/open-typora/releases/download/v0.13.4/Open-Typora-0.13.4-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.13.4/Open-Typora-0.13.4-arm64.zip) |
-| Linux · x64 | **[Download DEB](https://github.com/AniChikage/open-typora/releases/download/v0.13.4/Open-Typora-0.13.4-linux-x64.deb)** | [AppImage](https://github.com/AniChikage/open-typora/releases/download/v0.13.4/Open-Typora-0.13.4-linux-x64.AppImage) |
+| Windows 10/11 · x64 | **[Download Setup.exe](https://github.com/AniChikage/open-typora/releases/download/v0.14.0/Open-Typora-0.14.0-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.14.0/Open-Typora-0.14.0-windows-x64.zip) |
+| macOS 14+ · Apple Silicon | **[Download DMG](https://github.com/AniChikage/open-typora/releases/download/v0.14.0/Open-Typora-0.14.0-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.14.0/Open-Typora-0.14.0-arm64.zip) |
+| Linux · x64 | **[Download DEB](https://github.com/AniChikage/open-typora/releases/download/v0.14.0/Open-Typora-0.14.0-linux-x64.deb)** | [AppImage](https://github.com/AniChikage/open-typora/releases/download/v0.14.0/Open-Typora-0.14.0-linux-x64.AppImage) |
 
-[SHA-256 checksums](https://github.com/AniChikage/open-typora/releases/download/v0.13.4/SHA256SUMS.txt) · [All releases](https://github.com/AniChikage/open-typora/releases)
+[SHA-256 checksums](https://github.com/AniChikage/open-typora/releases/download/v0.14.0/SHA256SUMS.txt) · [All releases](https://github.com/AniChikage/open-typora/releases)
 
 ### Install on Linux
 
 Ubuntu 22.04 or a compatible x64 distribution is the tested baseline. Download the DEB and install it with:
 
 ```sh
-sudo apt install ./Open-Typora-0.13.4-linux-x64.deb
+sudo apt install ./Open-Typora-0.14.0-linux-x64.deb
 ```
 
 The desktop launcher and Markdown file association are included. Uninstalling with `sudo apt remove open-typora` retains your documents and recovery data.
 
-For other compatible distributions, make the AppImage executable (`chmod +x Open-Typora-0.13.4-linux-x64.AppImage`) and run it. FUSE 2 may be required. If FUSE is unavailable, extract it with `./Open-Typora-0.13.4-linux-x64.AppImage --appimage-extract` and run `./squashfs-root/AppRun`. CI exercises the extracted AppImage payload; FUSE mounting and every desktop environment have not been manually verified. Do not disable Chromium's sandbox to run the application.
+For other compatible distributions, make the AppImage executable (`chmod +x Open-Typora-0.14.0-linux-x64.AppImage`) and run it. FUSE 2 may be required. If FUSE is unavailable, extract it with `./Open-Typora-0.14.0-linux-x64.AppImage --appimage-extract` and run `./squashfs-root/AppRun`. CI exercises the extracted AppImage payload; FUSE mounting and every desktop environment have not been manually verified. Do not disable Chromium's sandbox to run the application.
 
 Additional document conversion on Windows/Linux requires [Pandoc](https://pandoc.org/installing.html). ODT imports with older Pandoc 2.x also require LibreOffice to retain equations and headers. Legacy DOC/RTF imports also require [LibreOffice](https://www.libreoffice.org/download/download-libreoffice/), detected from its standard installation or PATH. Image copy, move, rename, download and Trash operations are available on all three platforms.
 
@@ -77,11 +80,13 @@ Additional document conversion on Windows/Linux requires [Pandoc](https://pandoc
 
 Run **Setup.exe**, choose an installation folder, and launch Open Typora from the Start menu. The installer also provides an optional desktop shortcut and Markdown file associations. Updates install into the same application folder; uninstalling preserves your recovery data.
 
+To preview Markdown without opening the editor, enable **系统 Markdown 预览** in Preferences, then show the preview pane in Everything or File Explorer. This is optional and restores the previous handler when disabled. See the [preview guide](docs/windows-preview.md).
+
 The Windows build is currently **not code-signed**. Windows may display an unknown-publisher or SmartScreen notice. Only use downloads from this repository's Releases page and verify the checksum if needed.
 
 ### Install on macOS
 
-1. Download **[Open-Typora-0.13.4-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.13.4/Open-Typora-0.13.4-arm64.dmg)** from [Releases](https://github.com/AniChikage/open-typora/releases/latest).
+1. Download **[Open-Typora-0.14.0-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.14.0/Open-Typora-0.14.0-arm64.dmg)** from [Releases](https://github.com/AniChikage/open-typora/releases/latest).
 2. Open the DMG and drag **Open Typora** into **Applications**.
 3. Launch Open Typora from Applications.
 
@@ -108,7 +113,7 @@ node scripts/install.mjs
 
 Quit a running Open Typora before replacing it. The installer preserves application data and removes the previous application after verifying the replacement. The build also produces a ZIP in `release/native/`; `npm run package:release` builds the DMG and checksum file too.
 
-On Windows, use the same clone and install steps, then build the installer:
+On Windows x64, also install Visual Studio 2022 Build Tools with the Desktop development with C++ workload and PowerShell 7 (`pwsh`). The build compiles the native preview handler using a pinned WebView2 SDK. Use the same clone and install steps, then build the installer:
 
 ```sh
 npm run package:win

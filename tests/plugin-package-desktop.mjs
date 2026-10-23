@@ -32,7 +32,13 @@ try {
   await openPlugins();await card().getByRole('checkbox').uncheck();await expect.poll(()=>card().locator('.plugin-toggle').textContent()).toContain('未启用');
   const ticks=await page.evaluate(()=>window.packageProbe.ticks);await page.waitForTimeout(100);assert.equal(await page.evaluate(()=>window.packageProbe.ticks),ticks);
   assert.equal(await page.locator('style[data-plugin^="local-"]').count(),0);checks.push('Disabling removes styles and stops module timers');
-  await page.screenshot({path:path.join(qa,'plugin-package.png')});await stop();await launch();await openPlugins();await expect(card()).toBeVisible();
+  await page.screenshot({path:path.join(qa,'plugin-package.png')});
+  await Promise.all([app.waitForEvent('close',{timeout:15000}),app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].close())]);app=null;
+  const recovery=JSON.parse(await readFile(path.join(profile,'session.json'),'utf8'));
+  const restored=recovery.documents.find(record=>record.name==='欢迎.md');
+  assert.equal(restored.content,original,'normal close flushes the latest editor content');assert.equal(restored.savedContent,original,'normal close flushes the saved revision');
+  await launch();await expect(page.getByRole('alert')).toHaveCount(0);checks.push('Normal window close flushes recovery before exit and restart has no false disk conflict');
+  await openPlugins();await expect(card()).toBeVisible();
   await card().getByRole('checkbox').check();await expect.poll(()=>page.evaluate(()=>window.packageProbe?.cached)).toBe(true);checks.push('Installed package and module loading survive restart without the original folder');
   await card().getByRole('checkbox').uncheck();assert.deepEqual(errors,[]);
   await writeFile(path.join(qa,'plugin-package-results.json'),JSON.stringify({platform:process.platform,checks,errors},null,2));

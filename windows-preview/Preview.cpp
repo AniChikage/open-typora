@@ -20,7 +20,7 @@ static std::wstring modulePath(){wchar_t path[32768];DWORD size=GetModuleFileNam
 static std::wstring directory(){auto path=modulePath();return path.substr(0,path.find_last_of(L"\\/"));}
 static std::wstring quoted(const std::wstring& value){
  std::wstring out=L"\"";wchar_t hex[7];
- for(wchar_t c:value){if(c==L'"'||c==L'\\'){out+=L'\\';out+=c;}else if(c<32){swprintf_s(hex,L"\\u%04x",static_cast<unsigned>(c));out+=hex;}else out+=c;}
+ for(wchar_t c:value){if(c==L'"'||c==L'\\'){out+=L'\\';out+=c;}else if(c<32||(c>=0xd800&&c<=0xdfff)){swprintf_s(hex,L"\\u%04x",static_cast<unsigned>(c));out+=hex;}else out+=c;}
  return out+L"\"";
 }
 static std::wstring regGet(const std::wstring& key,const wchar_t* name=nullptr){
@@ -30,7 +30,7 @@ static std::wstring regGet(const std::wstring& key,const wchar_t* name=nullptr){
 static LONG regSet(const std::wstring& key,const wchar_t* name,const std::wstring& value){HKEY handle;LONG result=RegCreateKeyExW(HKEY_CURRENT_USER,key.c_str(),0,nullptr,0,KEY_SET_VALUE,nullptr,&handle,nullptr);if(result)return result;result=RegSetValueExW(handle,name,0,REG_SZ,reinterpret_cast<const BYTE*>(value.c_str()),static_cast<DWORD>((value.size()+1)*2));RegCloseKey(handle);return result;}
 static HRESULT registration(bool enable,bool extensions){
  const std::wstring root=L"Software\\Classes\\CLSID\\"+std::wstring(clsid), list=L"Software\\Microsoft\\Windows\\CurrentVersion\\PreviewHandlers";
- if(!enable&&regGet(root+L"\\InprocServer32")!=modulePath())return S_OK;
+ if(!enable&&_wcsicmp(regGet(root+L"\\InprocServer32").c_str(),modulePath().c_str())!=0)return S_OK;
  if(enable){
   if(regSet(root,nullptr,L"Open Typora Markdown Preview")||regSet(root,L"AppID",L"{6d2b5079-2f0b-48dd-ab7f-97cec514d30b}")||regSet(root+L"\\InprocServer32",nullptr,modulePath())||regSet(root+L"\\InprocServer32",L"ThreadingModel",L"Apartment")||regSet(list,clsid,L"Open Typora Markdown Preview"))return E_ACCESSDENIED;
  }
@@ -73,16 +73,19 @@ class Preview final:public IPreviewHandler,public IInitializeWithStream,public I
    if(!size)size=MultiByteToWideChar(CP_UTF8,0,bytes.data()+offset,count-static_cast<int>(offset),nullptr,0);
    source.resize(size);if(size)MultiByteToWideChar(encoding,0,bytes.data()+offset,count-static_cast<int>(offset),source.data(),size);
   }
-  payload=L"{\"source\":"+quoted(source)+L",\"truncated\":"+(truncated?L"true":L"false")+L",\"name\":"+quoted(PathFindFileNameW(filename.c_str()))+L"}";return S_OK;
+  payload=L"{\"source\":"+quoted(source)+L",\"truncated\":"+(truncated?L"true":L"false")+L",\"name\":"+quoted(PathFindFileNameW(filename.c_str()))+L",\"base\":"+quoted(filename.empty()?L"":L"https://document.opentypora.local/")+L"}";return S_OK;
  }
  HRESULT configure(){
   ComPtr<ICoreWebView2Settings> settings;web->get_Settings(&settings);settings->put_AreDefaultContextMenusEnabled(FALSE);settings->put_AreDevToolsEnabled(FALSE);settings->put_IsStatusBarEnabled(FALSE);
   ComPtr<ICoreWebView2_3> mapping;if(FAILED(web.As(&mapping)))return E_NOINTERFACE;
   HRESULT result=mapping->SetVirtualHostNameToFolderMapping(L"app.opentypora.local",(directory()+L"\\dist").c_str(),COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_DENY_CORS);if(FAILED(result))return result;
+  if(!filename.empty()) { const auto slash=filename.find_last_of(L"\\/"); if(slash!=std::wstring::npos)mapping->SetVirtualHostNameToFolderMapping(L"document.opentypora.local",filename.substr(0,slash).c_str(),COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_DENY_CORS); }
   web->AddWebResourceRequestedFilter(L"*",COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
   web->add_WebResourceRequested(Callback<ICoreWebView2WebResourceRequestedEventHandler>([this](ICoreWebView2*,ICoreWebView2WebResourceRequestedEventArgs* args)->HRESULT{
    ComPtr<ICoreWebView2WebResourceRequest> request;args->get_Request(&request);LPWSTR uri=nullptr;request->get_Uri(&uri);std::wstring address=uri?uri:L"";CoTaskMemFree(uri);
-   if(address.rfind(L"https://app.opentypora.local/",0)!=0&&address.rfind(L"data:",0)!=0){ComPtr<ICoreWebView2WebResourceResponse> blocked;environment->CreateWebResourceResponse(nullptr,403,L"Blocked",L"",&blocked);args->put_Response(blocked.Get());}return S_OK;
+   COREWEBVIEW2_WEB_RESOURCE_CONTEXT context;args->get_ResourceContext(&context);
+   const bool localImage=!filename.empty()&&context==COREWEBVIEW2_WEB_RESOURCE_CONTEXT_IMAGE&&address.rfind(L"https://document.opentypora.local/",0)==0;
+   if(!localImage&&address.rfind(L"https://app.opentypora.local/",0)!=0&&address.rfind(L"data:",0)!=0){ComPtr<ICoreWebView2WebResourceResponse> blocked;environment->CreateWebResourceResponse(nullptr,403,L"Blocked",L"",&blocked);args->put_Response(blocked.Get());}return S_OK;
   }).Get(),&resourcesToken);
   web->add_NavigationStarting(Callback<ICoreWebView2NavigationStartingEventHandler>([](ICoreWebView2*,ICoreWebView2NavigationStartingEventArgs* args)->HRESULT{LPWSTR uri=nullptr;args->get_Uri(&uri);bool allowed=uri&&std::wstring(uri)==L"https://app.opentypora.local/preview.html";CoTaskMemFree(uri);args->put_Cancel(!allowed);return S_OK;}).Get(),&navigationToken);
   web->add_NewWindowRequested(Callback<ICoreWebView2NewWindowRequestedEventHandler>([](ICoreWebView2*,ICoreWebView2NewWindowRequestedEventArgs* args)->HRESULT{args->put_Handled(TRUE);return S_OK;}).Get(),&newWindowToken);

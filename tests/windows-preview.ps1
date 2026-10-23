@@ -20,7 +20,9 @@ try {
   if ($register.ExitCode -ne 0) { throw "Register preview handler failed: $($register.ExitCode)" }
   foreach ($ext in $extensions) { if ((Get-Item "HKCU:\Software\Classes\$ext\$key").GetValue('') -ne $handler) { throw "Missing preview registration for $ext" } }
   $first = Join-Path $qa '中文 preview one.md'; $second = Join-Path $qa 'preview two.markdown'
-  [IO.File]::WriteAllText($first,"# Native preview one`n`n中文预览 👋 **bold**`n`n| Key | Value |`n|---|---|`n| Alpha | 123 |`n`n``````js`nconst answer = 42;`n```````n`n<script>document.title='injected'</script>`n![Blocked](https://example.invalid/private.png)`n",[Text.UTF8Encoding]::new($false))
+  Add-Type -AssemblyName System.Drawing
+  $bitmap=[Drawing.Bitmap]::new(300,100);$graphics=[Drawing.Graphics]::FromImage($bitmap);$graphics.Clear([Drawing.Color]::SteelBlue);$graphics.FillRectangle([Drawing.Brushes]::LightSkyBlue,20,20,80,60);$bitmap.Save((Join-Path $qa 'preview-image.png'),[Drawing.Imaging.ImageFormat]::Png);$graphics.Dispose();$bitmap.Dispose()
+  [IO.File]::WriteAllText($first,"# Native preview one`n`n中文预览 👋 **bold**`n`n| Key | Value |`n|---|---|`n| Alpha | 123 |`n`n``````js`nconst answer = 42;`n```````n`n<script>document.title='injected'</script>`n![Local diagram](preview-image.png)`n`n![Blocked](https://example.invalid/private.png)`n",[Text.UTF8Encoding]::new($false))
   [IO.File]::WriteAllText($second,"# Native preview two`n`nStream initialization and rapid selection.`n`n| Key | Value |`n|---|---|`n| Alpha | 456 |`n",[Text.UnicodeEncoding]::new($false,$true))
   $hashes = @((Get-FileHash $first).Hash,(Get-FileHash $second).Hash)
   $framework = Join-Path $env:SystemRoot 'Microsoft.NET/Framework64/v4.0.30319'

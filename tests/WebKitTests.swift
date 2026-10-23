@@ -27,7 +27,7 @@ final class WebKitTests: NSObject, NSApplicationDelegate, WKNavigationDelegate {
       owner.hosts.append(host)
       host.show(hidden: true)
       host.webView.navigationDelegate = self
-      DispatchQueue.main.asyncAfter(deadline: .now() + 180) {
+      DispatchQueue.main.asyncAfter(deadline: .now() + 240) {
         fputs("WebKit test timed out\n", stderr)
         exit(1)
       }

@@ -7,10 +7,17 @@ import { renderDiagrams } from '../editor/diagrams';
 setMarkdownOptions({ highlight:true,subscript:true,superscript:true,emoji:true,inlineMath:true, ...{remoteImages:false} });
 const root=document.getElementById('markdown-preview')!,status=document.getElementById('preview-status')!;
 let revision=0;
-export async function showPreview(value: {source:string;truncated?:boolean;name?:string}) {
+export async function showPreview(value: {source:string;truncated?:boolean;name?:string;base?:string}) {
   const current=++revision;
   root.dataset.ready='false';
-  root.innerHTML=renderMarkdown(value.source.slice(0,1024*1024));
+  root.innerHTML=renderMarkdown(value.source.slice(0,1024*1024), 'preview');
+  for(const image of root.querySelectorAll<HTMLImageElement>('img')) {
+    const address=image.getAttribute('src')||'';
+    if(!address.startsWith('open-typora-asset:'))continue;
+    let relative='';try{relative=decodeURIComponent(new URL(address).pathname.split('/').slice(2).join('/'));}catch{/* invalid image path remains blocked */}
+    if(value.base==='https://document.opentypora.local/'&&relative&&!/^[\\/]|^[a-z][a-z\d+.-]*:/i.test(relative)&&!relative.replaceAll('\\','/').split('/').includes('..'))image.src=new URL(relative.replaceAll('\\','/'),value.base).href;
+    else image.replaceWith(document.createTextNode(image.alt||'本地图片'));
+  }
   root.querySelectorAll('iframe,video,audio,source').forEach(element=>element.remove());
   root.querySelectorAll('[contenteditable]').forEach(element=>element.removeAttribute('contenteditable'));
   root.querySelectorAll('input').forEach(element=>(element as HTMLInputElement).disabled=true);
