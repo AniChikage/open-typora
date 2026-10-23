@@ -141,7 +141,7 @@ export default function App() {
   useEffect(() => { if (session.ready) void refreshThemes().catch(e => session.setMessage(e.message)); }, [session.ready]);
   const [customizations, setCustomizations] = useState(loadCustomizations);
   const themeCustomization = customizations[theme] || customizationDefaults;
-  useEffect(() => { localStorage.setItem(themeCustomizationKey, JSON.stringify(customizations)); }, [customizations]);
+  useEffect(() => { try { localStorage.setItem(themeCustomizationKey, JSON.stringify(customizations)); } catch { session.setMessage("主题设置存储空间不足，请导出当前主题 CSS 保存。当前预览仍可使用。"); } }, [customizations]);
   useEffect(() => applyTheme(theme, themes, themeCustomization), [theme, themes, themeCustomization]);
   function customizeTheme(value: ThemeCustomization) { setCustomizations(previous => ({ ...previous, [theme]: normalizeCustomization(value) })); }
   function resetTheme() { setCustomizations(previous => { const next = { ...previous }; delete next[theme]; return next; }); }

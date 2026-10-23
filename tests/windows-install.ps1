@@ -47,10 +47,17 @@ if (!$command.Contains($env:OPEN_TYPORA_EXECUTABLE) -or !$command.Contains('%1')
 $retained = (Get-Content (Join-Path $env:OPEN_TYPORA_QA_DIR 'desktop-results.json') -Raw | ConvertFrom-Json).dataDir
 $sessionFile = Join-Path $retained 'session.json'
 $sessionHash = (Get-FileHash $sessionFile -Algorithm SHA256).Hash
+$previewMapping='HKCU:\Software\Classes\.md\shellex\{8895b1c6-b41f-4c1c-a562-0d564250836f}'
+$previousPreview='{11111111-2222-3333-4444-555555555555}'
+New-Item $previewMapping -Force | Out-Null;Set-Item $previewMapping -Value $previousPreview
+$previewRegistration=Start-Process (Join-Path $env:SystemRoot 'System32/regsvr32.exe') -ArgumentList @('/s',"`"$(Join-Path $destination 'resources/markdown-preview/MarkdownPreview.dll')`"") -Wait -PassThru
+if($previewRegistration.ExitCode -ne 0){throw 'Cannot enable preview before uninstall acceptance'}
 $uninstaller = Join-Path $destination 'Uninstall Open Typora.exe'
 Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait | Out-Null
 for ($attempt = 0; $attempt -lt 60 -and (Test-Path $env:OPEN_TYPORA_EXECUTABLE); $attempt++) { Start-Sleep -Milliseconds 500 }
 if (Test-Path $env:OPEN_TYPORA_EXECUTABLE) { throw 'Uninstaller left the application executable behind' }
+if ((Get-Item $previewMapping).GetValue('') -ne $previousPreview) { throw 'Uninstall did not restore the previous preview handler' }
+if (Test-Path 'HKCU:\Software\Classes\CLSID\{726747EB-6A31-4BF2-898F-11620814C1F2}') { throw 'Uninstall retained preview component registration' }
 if ((Get-FileHash $sessionFile -Algorithm SHA256).Hash -ne $sessionHash) { throw 'Uninstall changed document recovery data' }
 @{ upgradeFrom = '0.13.4'; install = 'passed'; installedRegression = 'passed'; fileAssociation = 'passed'; uninstall = 'passed'; recoveryPreserved = $true } | ConvertTo-Json | Set-Content (Join-Path $env:OPEN_TYPORA_QA_DIR 'installer-results.json')
 Write-Output 'PASS: NSIS install, installed application tests, Markdown association and uninstall with retained recovery data'

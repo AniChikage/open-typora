@@ -6,6 +6,8 @@ $dll = Join-Path $destination 'resources/markdown-preview/MarkdownPreview.dll'
 if (!(Test-Path $dll)) { throw 'Installed preview handler missing' }
 $regsvr = Join-Path $env:SystemRoot 'System32/regsvr32.exe'
 $handler = '{726747EB-6A31-4BF2-898F-11620814C1F2}'
+$classPath="HKCU:\Software\Classes\CLSID\$handler\InprocServer32"
+if (!(Test-Path $classPath) -or (Get-Item $classPath).GetValue('') -ne $dll) { throw 'Installer did not register the native x64 preview component' }
 $key = 'shellex\{8895b1c6-b41f-4c1c-a562-0d564250836f}'
 $extensions = @('.md','.markdown','.mdown')
 $original = @{}
