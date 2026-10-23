@@ -21,7 +21,7 @@ The model now indexes old blocks by kind and source while preserving distinct id
 Full Markdown parsing still runs after edits. Documents above 300,000 characters use the virtualized source editor. Complex diagrams, mathematical macros, huge tables, plugins and storage can dominate overall performance and need separate measurements. The workspace desktop suite validates correct editing and saving of a 700-paragraph document, but does not assert a hardware-dependent latency threshold.
 
 
-## Large source documents in 0.14.2
+## Large source documents in 0.14.3
 
 Documents above 300,000 UTF-16 code units open in the virtualized CodeMirror source editor. Large source mode omits Markdown syntax parsing/highlighting and bracket matching. The file limit remains 20 MiB; this is not a claim of multi-megabyte rich-document rendering.
 
