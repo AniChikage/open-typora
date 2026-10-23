@@ -1,13 +1,14 @@
 $ErrorActionPreference = 'Stop'
 $qa = Join-Path $env:OPEN_TYPORA_QA_DIR 'system-preview'
 New-Item -ItemType Directory -Force $qa | Out-Null
-$destination = Split-Path $env:OPEN_TYPORA_EXECUTABLE -Parent
-$dll = Join-Path $destination 'resources/markdown-preview/MarkdownPreview.dll'
+$component=$env:OPEN_TYPORA_PREVIEW_COMPONENT
+$destination = if($component){$component}else{Split-Path $env:OPEN_TYPORA_EXECUTABLE -Parent}
+$dll = Join-Path $destination $(if($component){'MarkdownPreview.dll'}else{'resources/markdown-preview/MarkdownPreview.dll'})
 if (!(Test-Path $dll)) { throw 'Installed preview handler missing' }
 $regsvr = Join-Path $env:SystemRoot 'System32/regsvr32.exe'
 $handler = '{726747EB-6A31-4BF2-898F-11620814C1F2}'
 $classPath="HKCU:\Software\Classes\CLSID\$handler\InprocServer32"
-if (!(Test-Path $classPath) -or (Get-Item $classPath).GetValue('') -ne $dll) { throw 'Installer did not register the native x64 preview component' }
+if (!$component -and (!(Test-Path $classPath) -or (Get-Item $classPath).GetValue('') -ne $dll)) { throw 'Installer did not register the native x64 preview component' }
 $key = 'shellex\{8895b1c6-b41f-4c1c-a562-0d564250836f}'
 $extensions = @('.md','.markdown','.mdown')
 $original = @{}
@@ -29,7 +30,9 @@ try {
   $hashes = @((Get-FileHash $first).Hash,(Get-FileHash $second).Hash)
   $framework = Join-Path $env:SystemRoot 'Microsoft.NET/Framework64/v4.0.30319'
   $previewHost = Join-Path $qa 'PreviewHost.exe'
-  & (Join-Path $framework 'csc.exe') /nologo /codepage:65001 /platform:x64 /target:exe "/out:$previewHost" /r:System.Windows.Forms.dll /r:System.Drawing.dll "/r:$framework/WPF/UIAutomationClient.dll" "/r:$framework/WPF/UIAutomationTypes.dll" "/r:$framework/WPF/WindowsBase.dll" tests/PreviewHost.cs
+  $probeSource=Join-Path $PSScriptRoot 'PreviewHost.cs'
+  $references=@('UIAutomationClient.dll','UIAutomationTypes.dll','WindowsBase.dll') | ForEach-Object { '/r:'+(Join-Path $framework ('WPF\'+$_)) }
+  & (Join-Path $framework 'csc.exe') /nologo /codepage:65001 /platform:x64 /target:exe "/out:$previewHost" /r:System.Windows.Forms.dll /r:System.Drawing.dll @references $probeSource
   if ($LASTEXITCODE -ne 0) { throw 'Native preview acceptance host compilation failed' }
   & $previewHost $qa $first $second
   if ($LASTEXITCODE -ne 0) { throw 'Native preview COM acceptance failed' }

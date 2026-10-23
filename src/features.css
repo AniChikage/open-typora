@@ -78,3 +78,6 @@
 .rich-document .print-page-break{position:relative;height:22px;margin:18px 0;border-top:1px dashed var(--muted);opacity:.65;user-select:none}
 .rich-document .print-page-break::after{content:"分页符";position:absolute;top:-9px;left:50%;padding:0 10px;background:var(--paper);font:12px/18px sans-serif;transform:translateX(-50%)}
 @media print{.print-page-break{height:0!important;margin:0!important;border:0!important;break-before:page;page-break-before:always}.print-page-break::after{display:none}}
+
+/* Page-break comments have a writing marker, not a code-language badge. */
+.md-html:has(.print-page-break) > .fence-language{display:none}
