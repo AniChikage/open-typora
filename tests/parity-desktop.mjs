@@ -103,9 +103,10 @@ try {
   await page.getByRole('button',{name:'源码',exact:true}).click();
   await expect(surface.locator('.source-surface .cm-content')).toContainText('Alice->Bob: Hello Bob');
   const sourceContent = surface.locator('.source-surface .cm-content');
+  await expect(sourceContent).toBeVisible();await sourceContent.focus();await expect(sourceContent).toBeFocused();
   await sourceContent.press(process.platform === 'darwin' ? 'Meta+ArrowUp' : 'Control+Home');
   await sourceContent.press('ArrowRight'); await sourceContent.press('ArrowRight'); await sourceContent.press('ArrowRight');
-  await sourceContent.press(`${mod}+d`); await page.keyboard.insertText('Selected');
+  await sourceContent.press(`${mod}+d`);await expect.poll(()=>page.evaluate(()=>getSelection()?.toString())).toBe('Editing');await page.keyboard.insertText('Selected');
   await saved(original.replace('Editing parity','Selected parity'));
   await page.keyboard.press(`${mod}+z`); await saved(original);
   checks.push('Full source and local code views share word selection, replacement and undo');

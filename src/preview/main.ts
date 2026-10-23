@@ -16,7 +16,7 @@ export async function showPreview(value: {source:string;truncated?:boolean;name?
     if(!address.startsWith('open-typora-asset:'))continue;
     let relative='';try{relative=decodeURIComponent(new URL(address).pathname.split('/').slice(2).join('/'));}catch{/* invalid image path remains blocked */}
     if(value.base==='https://document.opentypora.local/'&&relative&&!/^[\\/]|^[a-z][a-z\d+.-]*:/i.test(relative)&&!relative.replaceAll('\\','/').split('/').includes('..'))image.src=new URL(relative.replaceAll('\\','/'),value.base).href;
-    else image.replaceWith(document.createTextNode(image.alt||'本地图片'));
+    else image.replaceWith(document.createTextNode((image.alt||'本地图片')+'（图片路径不可用于系统预览）'));
   }
   root.querySelectorAll('iframe,video,audio,source').forEach(element=>element.remove());
   root.querySelectorAll('[contenteditable]').forEach(element=>element.removeAttribute('contenteditable'));

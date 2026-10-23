@@ -54,8 +54,9 @@ $previewRegistration=Start-Process (Join-Path $env:SystemRoot 'System32/regsvr32
 if($previewRegistration.ExitCode -ne 0){throw 'Cannot enable preview before uninstall acceptance'}
 $uninstaller = Join-Path $destination 'Uninstall Open Typora.exe'
 Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait | Out-Null
-for ($attempt = 0; $attempt -lt 60 -and (Test-Path $env:OPEN_TYPORA_EXECUTABLE); $attempt++) { Start-Sleep -Milliseconds 500 }
+for ($attempt = 0; $attempt -lt 60 -and ((Test-Path $env:OPEN_TYPORA_EXECUTABLE) -or (Test-Path (Join-Path $destination 'resources/markdown-preview/MarkdownPreview.dll'))); $attempt++) { Start-Sleep -Milliseconds 500 }
 if (Test-Path $env:OPEN_TYPORA_EXECUTABLE) { throw 'Uninstaller left the application executable behind' }
+if (Test-Path (Join-Path $destination 'resources/markdown-preview/MarkdownPreview.dll')) { throw 'Uninstaller left the preview DLL behind' }
 if ((Get-Item $previewMapping).GetValue('') -ne $previousPreview) { throw 'Uninstall did not restore the previous preview handler' }
 if (Test-Path 'HKCU:\Software\Classes\CLSID\{726747EB-6A31-4BF2-898F-11620814C1F2}') { throw 'Uninstall retained preview component registration' }
 if ((Get-FileHash $sessionFile -Algorithm SHA256).Hash -ne $sessionHash) { throw 'Uninstall changed document recovery data' }

@@ -13,7 +13,7 @@ Registration is per-user; no administrator permission is requested. Enabling sav
 
 - Read-only headings, lists, tables, code, offline math and supported diagrams use the shared Markdown renderer. There is no document editing bridge or plugin execution.
 - Reads at most the first 1 MiB of the source file and labels truncated previews. UTF-8, BOM-marked UTF-16 LE/BE and a GB18030 fallback are supported. The editor remains the place for explicit encoding selection.
-- Images inside the document's folder can load when the host provides its filename. Absolute paths, parent traversal and remote images are blocked. A stream without a filename cannot resolve local images.
+- Images inside the document's folder can load when the host provides its filename. Absolute paths, parent traversal and remote images are blocked. A stream without a filename cannot resolve local images. In the tested Everything 1.4.1.1032 stream path, such images show explanatory text; local images were separately verified through file initialization.
 - Links and new windows do not navigate. The preview does not fetch remote scripts, fonts or media.
 - Windows x64 and WebView2 Runtime are required. Missing runtime produces an explanatory message. The handler retains WebView2's normal process isolation.
 
