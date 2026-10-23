@@ -246,9 +246,12 @@ export class MarkdownDocument {
       while (suffix < to - prefix && suffix < insert.length - prefix && this.text.charCodeAt(to - suffix - 1) === insert.charCodeAt(insert.length - suffix - 1)) suffix++;
       from = prefix; to -= suffix; insert = insert.slice(prefix, insert.length - suffix);
     }
-    const removed = this.text.slice(from, to);
+    let removed = this.text.slice(from, to);
     this.selection = nextSelection;
     if (removed === insert) return false;
+    // Sliced strings can retain a multi-megabyte parent. Serialize only the delta
+    // into independent strings; structuredClone also preserves lone UTF-16 units.
+    removed = structuredClone(removed); insert = structuredClone(insert);
     this.text = this.text.slice(0, from) + insert + this.text.slice(to);
     const now = Date.now(), previous = this.undoStack.at(-1);
     const merge = this.group && ["typing", "composition"].includes(kind) && previous?.kind === kind &&

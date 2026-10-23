@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { analyzeSource } from '../src/editor/sourceAnalysis.ts';
 import { normalizeCustomization, customizationCss, exportedThemeCss } from '../src/themeCustomization.ts';
 const dom=new JSDOM('<!doctype html><body></body>');for(const key of ['window','document','DOMParser','Node'])globalThis[key]=dom.window[key];
@@ -43,4 +45,15 @@ test('theme customization validates generated values and exports print CSS with 
  const value=normalizeCustomization({fontFamily:'x;}body{display:none}',lineHeight:900,contentWidth:-1,ink:'red;display:none',accent:'#123456',css:'.rich-document h2{color:green}',printCss:'.print-document h2{break-before:page}'});
  assert.equal(value.fontFamily,'');assert.equal(value.ink,'');assert.equal(value.lineHeight,2.5);assert.equal(value.contentWidth,480);
  assert.match(customizationCss(value),/--accent:#123456/);assert.match(exportedThemeCss('/* original */',value),/@media print/);assert.match(exportedThemeCss('',value),/break-before:page/);
+});
+
+test('delta history releases large parent strings after small replacements',()=>{
+ const report=JSON.parse(execFileSync(process.execPath,['--expose-gc',fileURLToPath(new URL('./history-memory.mjs',import.meta.url))],{encoding:'utf8',timeout:30000}));
+ assert.ok(report.growthBytes<32*1024*1024,`100 small history entries retained ${report.growthBytes} bytes`);
+ assert.equal(report.undoSteps,100);
+});
+test('detached undo deltas retain exact UTF-16 units including lone surrogates',()=>{
+ const original='x'.repeat(310000),model=new MarkdownDocument(original),insert='A\ud800B\udc00👋';
+ model.replace(20,24,insert);assert.equal(model.text,original.slice(0,20)+insert+original.slice(24));
+ assert.ok(model.undo());assert.equal(model.text,original);assert.ok(model.redo());assert.equal(model.text.slice(20,20+insert.length),insert);
 });
