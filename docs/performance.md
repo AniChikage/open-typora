@@ -21,7 +21,7 @@ The model now indexes old blocks by kind and source while preserving distinct id
 Full Markdown parsing still runs after edits. Documents above 300,000 characters use the virtualized source editor. Complex diagrams, mathematical macros, huge tables, plugins and storage can dominate overall performance and need separate measurements. The workspace desktop suite validates correct editing and saving of a 700-paragraph document, but does not assert a hardware-dependent latency threshold.
 
 
-## Large source documents in 0.14.1
+## Large source documents in 0.14.2
 
 Documents above 300,000 UTF-16 code units open in the virtualized CodeMirror source editor. Large source mode omits Markdown syntax parsing/highlighting and bracket matching. The file limit remains 20 MiB; this is not a claim of multi-megabyte rich-document rendering.
 
@@ -36,4 +36,4 @@ A local Apple Silicon macOS Electron run recorded 1,640 ms from launch to the vi
 
 Unit tests also retain 100 separate small undo steps in a roughly 7 MiB Unicode/CRLF document and compare randomized edits/undo/redo against an independent string reference.
 
-A separate Node/V8 heap regression uses a 5 MiB ASCII document and 100 independent 100-character replacements. After explicit garbage collection, retained-heap growth fell from about 500 MiB with source-backed substrings to about 5 MiB after detaching history deltas. This isolates the document model; it is not the complete application's memory usage. The test also undoes all 100 changes exactly and runs in a fresh process with a conservative 32 MiB growth limit.
+A separate Node/V8 heap regression uses a 5 MiB ASCII document and 100 independent 100-character replacements. After explicit garbage collection, retained-heap growth fell from about 500 MiB with source-backed substrings to about 5 MiB after detaching history deltas. The same check passes with Node 26.7.0 and 26.12.1. This isolates the document model; it is not the complete application's memory usage. The test also undoes all 100 changes exactly and runs in a fresh process with a conservative 32 MiB growth limit.

@@ -147,6 +147,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci --ignore-scripts
+      - run: node --test tests/large-documents.test.mjs
       - run: npm run build
       - name: Compile and exercise the native preview component in Everything
         shell: pwsh

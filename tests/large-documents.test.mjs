@@ -53,7 +53,7 @@ test('delta history releases large parent strings after small replacements',()=>
  assert.equal(report.undoSteps,100);
 });
 test('detached undo deltas retain exact UTF-16 units including lone surrogates',()=>{
- const original='x'.repeat(310000),model=new MarkdownDocument(original),insert='A\ud800B\udc00👋';
+ const original='x'.repeat(310000),model=new MarkdownDocument(original),insert='A'.repeat(8191)+'👋\ud800'+'中'.repeat(16000)+'\udc00';
  model.replace(20,24,insert);assert.equal(model.text,original.slice(0,20)+insert+original.slice(24));
  assert.ok(model.undo());assert.equal(model.text,original);assert.ok(model.redo());assert.equal(model.text.slice(20,20+insert.length),insert);
 });

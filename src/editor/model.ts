@@ -28,6 +28,18 @@ interface Command {
   time: number;
 }
 let sequence = 0;
+// Build strings from UTF-16 units so history never retains a source substring.
+// Primitive structuredClone may return the original backing storage on newer V8.
+function detachedSpan(value: string): string {
+  if (!value.length) return "";
+  const chunks: string[] = [];
+  for (let from = 0; from < value.length; from += 8192) {
+    const end = Math.min(value.length, from + 8192), units = new Uint16Array(end - from);
+    for (let index = from; index < end; index++) units[index - from] = value.charCodeAt(index);
+    chunks.push(String.fromCharCode(...units));
+  }
+  return chunks.length === 1 ? chunks[0] : chunks.join("");
+}
 export class MarkdownDocument {
   text: string;
   nodes: DocumentNode[] = [];
@@ -249,9 +261,7 @@ export class MarkdownDocument {
     let removed = this.text.slice(from, to);
     this.selection = nextSelection;
     if (removed === insert) return false;
-    // Sliced strings can retain a multi-megabyte parent. Serialize only the delta
-    // into independent strings; structuredClone also preserves lone UTF-16 units.
-    removed = structuredClone(removed); insert = structuredClone(insert);
+    removed = detachedSpan(removed); insert = detachedSpan(insert);
     this.text = this.text.slice(0, from) + insert + this.text.slice(to);
     const now = Date.now(), previous = this.undoStack.at(-1);
     const merge = this.group && ["typing", "composition"].includes(kind) && previous?.kind === kind &&
