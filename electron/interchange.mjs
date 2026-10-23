@@ -113,7 +113,7 @@ export async function convertImport(file, directory) {
 export async function themes(directory) { const root = path.join(directory, "themes"); await mkdir(root, { recursive: true }); return Promise.all((await readdir(root)).filter(name => name.endsWith(".css")).map(async id => ({ id, name: id.slice(0, -4), css: await readFile(path.join(root, id), "utf8") }))); }
 export async function installTheme(file, directory) {
   if (path.extname(file).toLowerCase() !== ".css") throw new Error("请选择 CSS 主题。");
-  const base = await realpath(path.dirname(file)), seen = new Set(); let total = 0;
+  const base = await realpath(path.dirname(file)), seen = new Set(); let total = 0, cssTotal = 0;
   const inside = target => { const relative = path.relative(base, target); return relative !== ".." && !relative.startsWith(".." + path.sep) && !path.isAbsolute(relative); };
   const local = async (from, reference) => {
     if (/^[a-z][a-z\d+.-]*:|^\/\//i.test(reference)) throw new Error("请先下载主题字体和图片到本地。");
@@ -122,7 +122,7 @@ export async function installTheme(file, directory) {
   };
   async function embed(file, depth = 0) {
     if (depth > 4 || seen.has(file)) throw new Error("主题包含循环引用或嵌套过深。"); seen.add(file);
-    const bytes = await readFile(file); if (bytes.length > 1_000_000) throw new Error("CSS 主题必须小于 1 MB。"); total += bytes.length;
+    const bytes = await readFile(file); cssTotal += bytes.length; if (cssTotal > 32 * 1024 * 1024) throw new Error("CSS 主题超过 32 MB。");
     let css = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
     const imports = [...css.matchAll(/@import\s+(?:url\()?['"]([^'"]+)['"]\)?\s*;/g)];
     for (const match of imports.reverse()) css = css.slice(0, match.index) + await embed(await local(file, match[1]), depth + 1) + css.slice(match.index + match[0].length);
@@ -133,6 +133,7 @@ export async function installTheme(file, directory) {
       const mime = { ".woff2": "font/woff2", ".woff": "font/woff", ".ttf": "font/ttf", ".png": "image/png", ".svg": "image/svg+xml", ".jpg": "image/jpeg", ".jpeg": "image/jpeg" }[path.extname(asset).toLowerCase()] || "application/octet-stream";
       css = css.slice(0, match.index) + `url(data:${mime};base64,${bytes.toString("base64")})` + css.slice(match.index + match[0].length);
     }
+    if (Buffer.byteLength(css) > 32 * 1024 * 1024) throw new Error("完整主题超过 32 MB。");
     seen.delete(file); return css;
   }
   const css = await embed(await realpath(file)), id = path.basename(file);

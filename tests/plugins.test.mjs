@@ -285,3 +285,14 @@ test("plugin DOM bindings follow the focused pane when both documents are visibl
   try { assert.equal(document.getElementById('write'),second.firstElementChild); first.dataset.active='true';second.dataset.active='false';run.value.documentChanged();assert.equal(document.getElementById('write'),first.querySelector('.rich-document')); }
   finally { await run.value.destroy();second.remove();delete first.dataset.active; }
 });
+
+
+test("self-contained themes with embedded font data can be reimported above the old 1 MB limit", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "open-typora-theme-roundtrip-"));
+  try {
+    const css = '@font-face{font-family:Owned;src:url(data:font/woff2;base64,'+'A'.repeat(5*1024*1024)+')}';
+    const file=path.join(root,'shared.css');await writeFile(file,css);await installTheme(file,path.join(root,'profile'));
+    assert.equal((await themes(path.join(root,'profile')))[0].css,css);
+    await writeFile(file,' '.repeat(32*1024*1024+1));await assert.rejects(installTheme(file,path.join(root,'profile')),/32 MB/);
+  } finally { await rm(root,{recursive:true,force:true}); }
+});

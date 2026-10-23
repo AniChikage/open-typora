@@ -299,12 +299,13 @@ final class Interchange {
     return try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil).filter { $0.pathExtension == "css" }.sorted { $0.lastPathComponent < $1.lastPathComponent }.map { ["id": $0.lastPathComponent, "name": $0.deletingPathExtension().lastPathComponent, "css": try String(contentsOf: $0, encoding: .utf8)] }
   }
   static func installTheme(_ file: URL, directory: URL) throws -> String {
-    guard file.pathExtension.lowercased() == "css", (try file.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 1_000_001) <= 1_000_000 else { throw NativeFailure("请选择小于 1 MB 的 CSS 主题。") }
-    var seen = Set<String>(), total = 0
+    guard file.pathExtension.lowercased() == "css", (try file.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? Int.max) <= 32 * 1024 * 1024 else { throw NativeFailure("请选择小于 32 MB 的 CSS 主题。") }
+    var seen = Set<String>(), total = 0, cssTotal = 0
     func embed(_ url: URL, depth: Int = 0) throws -> String {
       guard depth <= 4, !seen.contains(url.path), contained(canonicalFileURL(file.deletingLastPathComponent()), canonicalFileURL(url)) else { throw NativeFailure("主题资源包含循环引用或位于主题目录之外。") }
       seen.insert(url.path)
-      var css = try String(contentsOf: url, encoding: .utf8)
+      let cssBytes = try Data(contentsOf: url); cssTotal += cssBytes.count
+      guard cssTotal <= 32 * 1024 * 1024, var css = String(data: cssBytes, encoding: .utf8) else { throw NativeFailure("CSS 主题无效或超过 32 MB。") }
       let imports = try NSRegularExpression(pattern: "@import\\s+(?:url\\()?['\"]([^'\"]+)['\"]\\)?\\s*;")
       for match in imports.matches(in: css, range: NSRange(css.startIndex..., in: css)).reversed() {
         let reference = (css as NSString).substring(with: match.range(at: 1))
@@ -324,6 +325,7 @@ final class Interchange {
         let mime = ["woff2":"font/woff2", "woff":"font/woff", "ttf":"font/ttf", "png":"image/png", "svg":"image/svg+xml", "jpg":"image/jpeg"][asset.pathExtension] ?? "application/octet-stream"
         css = (css as NSString).replacingCharacters(in: match.range, with: "url(data:\(mime);base64,\(bytes.base64EncodedString()))")
       }
+      guard css.utf8.count <= 32 * 1024 * 1024 else { throw NativeFailure("完整主题超过 32 MB。") }
       return css
     }
     let css = try embed(canonicalFileURL(file))

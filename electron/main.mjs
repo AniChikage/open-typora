@@ -105,7 +105,7 @@ const handlers = {
   installTheme: async () => { const result = await dialog.showOpenDialog(window, { filters: [{ name: "CSS", extensions: ["css"] }], properties: ["openFile"] }); return result.canceled ? null : installTheme(result.filePaths[0], store.dataDir); },
   previewSettings: (_, enable) => previewSettings(enable),
   exportTheme: async (_, name, css) => {
-    if (typeof css !== "string" || Buffer.byteLength(css) > 4 * 1024 * 1024) throw new Error("主题内容过大。");
+    if (typeof css !== "string" || Buffer.byteLength(css) > 32 * 1024 * 1024) throw new Error("主题内容过大。");
     const result = await dialog.showSaveDialog(window, { defaultPath: String(name).replace(/[/\\]/g,"-") + ".css", filters: [{ name: "CSS", extensions: ["css"] }] });
     if (result.canceled) return null; await atomicWrite(result.filePath, css); return result.filePath;
   },

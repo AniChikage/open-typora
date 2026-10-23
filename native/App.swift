@@ -539,7 +539,7 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
     case "previewSettings": return ["supported":false,"available":false,"enabled":false]
     case "exportTheme":
       let name = try arg(args, 0, String.self), css = try arg(args, 1, String.self)
-      guard css.utf8.count <= 4 * 1024 * 1024 else { throw NativeFailure("主题内容过大。") }
+      guard css.utf8.count <= 32 * 1024 * 1024 else { throw NativeFailure("主题内容过大。") }
       #if WEBTEST
         let destination = store.dataDirectory.appendingPathComponent("native-test-theme.css")
       #else

@@ -13,6 +13,10 @@ $process = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$destina
 if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
 $env:OPEN_TYPORA_EXECUTABLE = Join-Path $destination 'Open Typora.exe'
 if (!(Test-Path $env:OPEN_TYPORA_EXECUTABLE)) { throw 'Installer did not produce the application executable' }
+node tests/next-desktop.mjs
+if ($LASTEXITCODE -ne 0) { throw 'Large document, theme and print acceptance failed' }
+& pwsh.exe -NoProfile -ExecutionPolicy Bypass -File tests/windows-preview.ps1
+if ($LASTEXITCODE -ne 0) { throw 'Native and actual Everything preview acceptance failed' }
 node tests/desktop.mjs
 $desktopExit = $LASTEXITCODE
 node tests/electron-shell.mjs
@@ -37,10 +41,6 @@ if ($desktopExit -ne 0) { throw 'Installed desktop regression failed' }
 if ($shellExit -ne 0) { throw 'Windows shell and plugin regression failed' }
 if ($compatibilityExit -ne 0) { throw 'Installed image and office-format regression failed' }
 if ($parityExit -ne 0) { throw 'Installed editing parity regression failed' }
-node tests/next-desktop.mjs
-if ($LASTEXITCODE -ne 0) { throw 'Large document, theme and print acceptance failed' }
-& pwsh.exe -NoProfile -ExecutionPolicy Bypass -File tests/windows-preview.ps1
-if ($LASTEXITCODE -ne 0) { throw 'Native and actual Everything preview acceptance failed' }
 $extension = Get-ItemPropertyValue 'HKCU:\Software\Classes\.md' '(default)'
 $command = Get-ItemPropertyValue "HKCU:\Software\Classes\$extension\shell\open\command" '(default)'
 if (!$command.Contains($env:OPEN_TYPORA_EXECUTABLE) -or !$command.Contains('%1')) { throw "Invalid Markdown file association: $command" }

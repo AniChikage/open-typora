@@ -213,6 +213,10 @@ func runStoreTests() throws {
   try atomicWrite(css, Data("#write { color: #123456; }".utf8))
   let installedTheme = try Interchange.installTheme(css, directory: store.dataDirectory)
   try expect(try Interchange.themes(store.dataDirectory).contains { $0["id"] == installedTheme && $0["css"]!.contains("#123456") }, "CSS theme installation persists the selected theme")
+  let embeddedTheme = directory.appendingPathComponent("embedded-theme.css")
+  let embeddedCSS = "@font-face{font-family:Owned;src:url(data:font/woff2;base64," + String(repeating:"A",count:5*1024*1024) + ")}"
+  try atomicWrite(embeddedTheme,Data(embeddedCSS.utf8));let embeddedID = try Interchange.installTheme(embeddedTheme,directory:store.dataDirectory)
+  try expect(try Interchange.themes(store.dataDirectory).contains { $0["id"] == embeddedID && $0["css"] == embeddedCSS }, "self-contained theme larger than 1 MB reimports without losing font data")
   let pluginFile = directory.appendingPathComponent("owned-plugin.js"), pluginSource = "class Example extends BasePlugin { call() { this.utils.notification.show('fixture') } }; module.exports = {plugin: Example};"
   try atomicWrite(pluginFile, Data(pluginSource.utf8))
   let installedPlugin = try Interchange.installPlugin(pluginFile, directory: store.dataDirectory)

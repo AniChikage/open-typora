@@ -398,7 +398,7 @@ export default function App() {
       <footer className="statusbar">
         <button id="footer-word-count-label" onClick={() => setDialog("statistics")}
           title={`${status} · 第 ${cursor.line} 行，第 ${cursor.column} 列 · Markdown · ${encodingNames[active?.encoding || "utf-8"]}`}
-          aria-label={`${characters} 字，${status}`}
+          aria-label={`${characters === null ? "正在统计" : characters + " 字"}，${status}`}
         >
           {!selection && largeDocument && !sourceAnalysis ? "正在统计…" : <>{!selection && largeDocument && countUnit === "words" && "约 "}{countUnit === "characters" ? (selection ? selectionCharacters : characters) : (selection ? documentStatistics(selection, selection, preferences.readingSpeed).words : wholeStatistics?.words || 0)} {countUnit === "characters" ? "字" : "词"}{selection && "（选中）"}</>}{exporting && " · 正在导出…"}
         </button>
