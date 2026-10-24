@@ -43,6 +43,7 @@ export class RichEditor {
   private compositionText: string | null = null;
   private mutating = false;
   private pointing = false;
+  private fullSelection = false;
   private blocks = new Map<string, { node: DocumentNode; element: HTMLElement; leaves: Leaf[]; environment: string }>();
   private fence: { id: string; leaf: Leaf; view: EditorView } | null = null;
   private emojiPopup: HTMLDivElement;
@@ -229,6 +230,7 @@ export class RichEditor {
     return leaf.positions[Math.min(local, leaf.positions.length - 1)];
   }
   bookmark(): SelectionBookmark {
+    if(this.fullSelection)return {...this.model.selection};
     if (this.fence?.view.hasFocus) {
       const selection = this.fence.view.state.selection.main,
         start = this.fence.leaf.positions[0];
@@ -362,6 +364,7 @@ export class RichEditor {
     void Promise.all([renderDiagrams(this.root),renderMath(this.root)]).then(measure).catch(() => {});
   }
   private publish(restore = true) {
+    this.fullSelection=false;
     this.render(restore);
     if (!this.fence && !this.composing && this.model.selection.anchor === this.model.selection.head) {
       const leaf = [...this.leaves.values()].find(leaf => leaf.kind === "fence" && this.model.selection.head >= leaf.positions[0] && this.model.selection.head <= leaf.positions.at(-1)!);
@@ -452,6 +455,7 @@ export class RichEditor {
     this.reportCursor();
   };
   private pointerDown = () => {
+    this.fullSelection=false;
     this.pointing = true;
   };
   private pointerUp = () => {
@@ -923,9 +927,12 @@ export class RichEditor {
       return;
     }
     if(this.model.text.length>300_000 && (event.metaKey||event.ctrlKey)) {
-      if(event.key.toLowerCase()==="a") { event.preventDefault();this.select({anchor:0,head:this.model.text.length});return; }
+      if(event.key.toLowerCase()==="a") { event.preventDefault();this.fullSelection=true;this.select({anchor:0,head:this.model.text.length});return; }
       const start=event.key==="Home"||(event.metaKey&&event.key==="ArrowUp"),end=event.key==="End"||(event.metaKey&&event.key==="ArrowDown");
-      if(start||end){event.preventDefault();const head=end?this.model.text.length:0;this.select({anchor:event.shiftKey?this.model.selection.anchor:head,head});return;}
+      if(start||end){event.preventDefault();this.fullSelection=false;const head=end?this.model.text.length:0;this.select({anchor:event.shiftKey?this.model.selection.anchor:head,head});return;}
+    }
+    if(this.fullSelection&&["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(event.key)) {
+      event.preventDefault();const at=["ArrowLeft","ArrowUp"].includes(event.key)?0:this.model.text.length;this.fullSelection=false;this.select({anchor:at,head:at});return;
     }
     if (event.key === "z" && (event.metaKey || event.ctrlKey)) {
       event.preventDefault();

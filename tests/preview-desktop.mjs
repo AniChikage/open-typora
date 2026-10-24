@@ -1,9 +1,8 @@
 import { _electron as electron, expect } from 'playwright/test';
-import { mkdtemp,mkdir,writeFile,readFile,stat } from 'node:fs/promises';
+import { mkdtemp,mkdir,writeFile,readFile } from 'node:fs/promises';
 import os from 'node:os';import path from 'node:path';import {createServer} from 'node:http';import assert from 'node:assert/strict';import sharp from 'sharp';
 const directory=await mkdtemp(path.join(os.tmpdir(),'open-typora-preview-')),qa=process.env.OPEN_TYPORA_QA_DIR||path.join(directory,'evidence');await mkdir(qa,{recursive:true});
 const image=await sharp({create:{width:300,height:100,channels:3,background:{r:70,g:130,b:180}}}).png().toBuffer();
-const html=await readFile('dist/preview.html','utf8'),entry=/type="module"[^>]+src="([^"]+)"/.exec(html)[1];
 const mime={'.html':'text/html','.js':'text/javascript','.css':'text/css','.woff2':'font/woff2'};
 const server=createServer(async(req,res)=>{try{const file=path.resolve('dist','.'+decodeURIComponent(new URL(req.url,'http://local').pathname));assert.ok(file.startsWith(path.resolve('dist')+path.sep));res.setHeader('Content-Type',mime[path.extname(file)]||'application/octet-stream');res.end(await readFile(file));}catch{res.writeHead(404);res.end();}});await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const main=path.join(directory,'main.cjs');await writeFile(main,`const {app,BrowserWindow}=require('electron');app.whenReady().then(()=>{const w=new BrowserWindow({width:1080,height:850,webPreferences:{sandbox:true}});w.loadURL(process.env.OPEN_TYPORA_PREVIEW_URL)});`);

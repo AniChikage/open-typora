@@ -38,8 +38,11 @@ try{
  await cdp.send('Input.imeSetComposition',{text:'zhong',selectionStart:5,selectionEnd:5});await cdp.send('Input.insertText',{text:'中国'});await command('save');
  await expect.poll(()=>readFile(records[0].path,'utf8'),{timeout:20000}).toBe(baseline.replace('代码：end','代码：中国end'));
  await code.press(`${mod}+z`);await command('save');await expect.poll(()=>readFile(records[0].path,'utf8'),{timeout:20000}).toBe(baseline);
+ await source.getByRole('heading',{name:'Middle checkpoint',exact:true}).click();await page.keyboard.press(`${mod}+a`);
+ const copied=await source.evaluate(root=>{const data=new DataTransfer();root.dispatchEvent(new ClipboardEvent('copy',{bubbles:true,cancelable:true,clipboardData:data}));return data.getData('text/plain');});assert.equal(copied,baseline);
+ await page.keyboard.press('Backspace');await command('save');await expect.poll(()=>readFile(records[0].path,'utf8'),{timeout:20000}).toBe('');await page.keyboard.press(`${mod}+z`);await command('save');await expect.poll(()=>readFile(records[0].path,'utf8'),{timeout:20000}).toBe(baseline);
  await page.screenshot({path:path.join(qa,'large-rich-mixed-editing.png')});
- checks.push('Chinese Chromium composition in unmounted middle-document paragraphs, lists, table cells and local code commits and undoes exactly once.');
+ checks.push('Chinese Chromium composition in unmounted middle-document paragraphs, lists, table cells and local code commits and undoes exactly once; full-document copy/delete/undo preserves every byte.');
  await page.getByRole('tab',{name:'Ten.md',exact:true}).click();await expect(page.locator('.document-editor[data-document-id="next-1"] .rich-document')).toBeVisible();await page.locator('.document-editor[data-document-id="next-1"] .rich-document').focus();await page.keyboard.press(process.platform==='darwin'?'Meta+ArrowDown':'Control+End');await page.keyboard.insertText('TAIL-10MB');await command('save');await expect.poll(()=>readFile(records[1].path,'utf8'),{timeout:20000}).toBe(ten+'TAIL-10MB');
  await writeFile(path.join(qa,'large-document-measurements.json'),JSON.stringify({bytes:[Buffer.byteLength(five),Buffer.byteLength(ten)],timings},null,2));console.log(JSON.stringify(timings));
  checks.push('5 MB UTF-8/Chinese rich editing stays virtualized, edits/undo/redo/save correctly, and analyzes outline off-thread; 10 MB file edits and saves exactly.');
