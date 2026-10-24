@@ -15,9 +15,16 @@ using System.Windows.Forms;
 }
 [ComImport,Guid("b7d14566-0509-4cce-a71f-0a554233bd9b"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)] public interface IFileInit { [PreserveSig]int Initialize([MarshalAs(UnmanagedType.LPWStr)]string path,uint mode); }
 [ComImport,Guid("b824b49d-22ac-4161-ac8a-9916e8fa3f7f"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)] public interface IStreamInit { [PreserveSig]int Initialize(IStream stream,uint mode); }
-[ComImport,Guid("7f73be3f-fb79-493c-a6c7-7ee14e245841"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)] public interface IItemInit { [PreserveSig]int Initialize([MarshalAs(UnmanagedType.Interface)]object item,uint mode); }
+[ComImport,Guid("43826d1e-e718-42ee-bc55-a1e261c37bfe"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)] public interface IShellItem {
+ [PreserveSig]int BindToHandler(IntPtr context,ref Guid handler,ref Guid id,out IntPtr result);
+ [PreserveSig]int GetParent(out IShellItem parent);
+ [PreserveSig]int GetDisplayName(uint display,out IntPtr name);
+ [PreserveSig]int GetAttributes(uint mask,out uint attributes);
+ [PreserveSig]int Compare(IShellItem item,uint hint,out int order);
+}
+[ComImport,Guid("7f73be3f-fb79-493c-a6c7-7ee14e245841"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)] public interface IItemInit { [PreserveSig]int Initialize([MarshalAs(UnmanagedType.Interface)]IShellItem item,uint mode); }
 public static class PreviewProbe {
- [DllImport("shell32.dll",CharSet=CharSet.Unicode,PreserveSig=true)]public static extern int SHCreateItemFromParsingName(string path,IntPtr context,ref Guid id,[MarshalAs(UnmanagedType.Interface)]out object item);
+ [DllImport("shell32.dll",CharSet=CharSet.Unicode,PreserveSig=true)]public static extern int SHCreateItemFromParsingName(string path,IntPtr context,ref Guid id,[MarshalAs(UnmanagedType.Interface)]out IShellItem item);
  [DllImport("shlwapi.dll",CharSet=CharSet.Unicode)]public static extern int SHCreateStreamOnFileEx(string file,uint mode,uint attributes,bool create,IntPtr template,out IStream stream);
  [DllImport("user32.dll")]public static extern bool GetWindowRect(IntPtr window,out PreviewRect rect);
  [DllImport("user32.dll")]public static extern bool SetForegroundWindow(IntPtr window);
@@ -60,7 +67,7 @@ public static class PreviewProbe {
    Application.EnableVisualStyles();var form=new Form{Text="Open Typora native preview acceptance",Width=1050,Height=800,StartPosition=FormStartPosition.CenterScreen};
    object instance=null;IPreview preview=null;IStream stream=null;int phase=0;var started=DateTime.UtcNow;
    var timer=new System.Windows.Forms.Timer{Interval=350};Exception failure=null;
-   Action initialize=()=>{Console.WriteLine("PROBE: initialize native phase "+phase);var bounds=new PreviewRect(form.ClientSize.Width,form.ClientSize.Height);Marshal.ThrowExceptionForHR(preview.SetWindow(form.Handle,ref bounds));if(phase==0)Marshal.ThrowExceptionForHR(((IFileInit)instance).Initialize(files[phase],0));else{object item;var iid=new Guid("43826d1e-e718-42ee-bc55-a1e261c37bfe");Marshal.ThrowExceptionForHR(SHCreateItemFromParsingName(files[phase],IntPtr.Zero,ref iid,out item));try{Marshal.ThrowExceptionForHR(((IItemInit)instance).Initialize(item,0));}finally{Marshal.ReleaseComObject(item);}}Marshal.ThrowExceptionForHR(preview.DoPreview());started=DateTime.UtcNow;};
+   Action initialize=()=>{Console.WriteLine("PROBE: initialize native phase "+phase);var bounds=new PreviewRect(form.ClientSize.Width,form.ClientSize.Height);Marshal.ThrowExceptionForHR(preview.SetWindow(form.Handle,ref bounds));if(phase==0)Marshal.ThrowExceptionForHR(((IFileInit)instance).Initialize(files[phase],0));else{IShellItem item;var iid=new Guid("43826d1e-e718-42ee-bc55-a1e261c37bfe");Marshal.ThrowExceptionForHR(SHCreateItemFromParsingName(files[phase],IntPtr.Zero,ref iid,out item));try{Marshal.ThrowExceptionForHR(((IItemInit)instance).Initialize(item,0));}finally{Marshal.ReleaseComObject(item);}}Marshal.ThrowExceptionForHR(preview.DoPreview());started=DateTime.UtcNow;};
    form.Shown+=(sender,eventArgs)=>{try{instance=Activator.CreateInstance(Type.GetTypeFromCLSID(new Guid("726747EB-6A31-4BF2-898F-11620814C1F2")));preview=(IPreview)instance;initialize();timer.Start();}catch(Exception error){failure=error;form.Close();}};
    form.Resize+=(sender,eventArgs)=>{if(preview!=null){var bounds=new PreviewRect(form.ClientSize.Width,form.ClientSize.Height);preview.SetRect(ref bounds);}};
    timer.Tick+=(sender,eventArgs)=>{timer.Stop();try{
