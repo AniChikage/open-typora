@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <climits>
 #include "WebView2.h"
 using Microsoft::WRL::ComPtr;
 using Microsoft::WRL::Callback;
@@ -48,7 +49,7 @@ static HRESULT registration(bool enable,bool extensions){
  if(!enable){RegDeleteTreeW(HKEY_CURRENT_USER,root.c_str());HKEY handle;if(RegOpenKeyExW(HKEY_CURRENT_USER,list.c_str(),0,KEY_SET_VALUE,&handle)==ERROR_SUCCESS){RegDeleteValueW(handle,clsid);RegCloseKey(handle);}}
  SHChangeNotify(SHCNE_ASSOCCHANGED,SHCNF_IDLIST,nullptr,nullptr);return S_OK;
 }
-class Preview final:public IPreviewHandler,public IInitializeWithStream,public IInitializeWithFile,public IObjectWithSite,public IOleWindow,public IPreviewHandlerVisuals{
+class Preview final:public IPreviewHandler,public IInitializeWithItem,public IInitializeWithFile,public IObjectWithSite,public IOleWindow,public IPreviewHandlerVisuals{
  std::atomic<ULONG> refs{1};HWND parent=nullptr,window=nullptr;RECT rect{};unsigned generation=0;
  ComPtr<IStream> stream;std::wstring filename;
  ComPtr<IUnknown> site;ComPtr<IPreviewHandlerFrame> frame;
@@ -60,9 +61,10 @@ class Preview final:public IPreviewHandler,public IInitializeWithStream,public I
  void failure(HRESULT result){if(window){wchar_t text[180];swprintf_s(text,L"Markdown preview could not start (0x%08X). Microsoft Edge WebView2 Runtime is required.",static_cast<unsigned>(result));SetWindowTextW(window,text);}}
  HRESULT read(){
   if(!stream){HRESULT result=SHCreateStreamOnFileEx(filename.c_str(),STGM_READ|STGM_SHARE_DENY_NONE,FILE_ATTRIBUTE_NORMAL,FALSE,nullptr,&stream);if(FAILED(result))return result;}
-  LARGE_INTEGER zero{};stream->Seek(zero,STREAM_SEEK_SET,nullptr);STATSTG stat{};
-  if(SUCCEEDED(stream->Stat(&stat,STATFLAG_DEFAULT))){truncated=stat.cbSize.QuadPart>1024*1024;if(filename.empty()&&stat.pwcsName&&PathIsRelativeW(stat.pwcsName)==FALSE)filename=stat.pwcsName;CoTaskMemFree(stat.pwcsName);}
-  std::vector<char> bytes(1024*1024);ULONG count=0;HRESULT result=stream->Read(bytes.data(),static_cast<ULONG>(bytes.size()),&count);if(FAILED(result))return result;
+  LARGE_INTEGER zero{};stream->Seek(zero,STREAM_SEEK_SET,nullptr);
+  std::vector<char> bytes;char chunk[65536];
+  while(true){ULONG count=0;HRESULT result=stream->Read(chunk,sizeof(chunk),&count);if(FAILED(result))return result;if(!count)break;if(bytes.size()+count>INT_MAX)return HRESULT_FROM_WIN32(ERROR_FILE_TOO_LARGE);bytes.insert(bytes.end(),chunk,chunk+count);}
+  const int count=static_cast<int>(bytes.size());truncated=false;
   std::wstring source;size_t offset=0;
   if(count>=2&&((static_cast<unsigned char>(bytes[0])==0xff&&static_cast<unsigned char>(bytes[1])==0xfe)||(static_cast<unsigned char>(bytes[0])==0xfe&&static_cast<unsigned char>(bytes[1])==0xff))){
    bool little=static_cast<unsigned char>(bytes[0])==0xff;for(size_t i=2;i+1<count;i+=2){unsigned a=static_cast<unsigned char>(bytes[i]),b=static_cast<unsigned char>(bytes[i+1]);source+=static_cast<wchar_t>(little?a|(b<<8):(a<<8)|b);}
@@ -85,6 +87,23 @@ class Preview final:public IPreviewHandler,public IInitializeWithStream,public I
    ComPtr<ICoreWebView2WebResourceRequest> request;args->get_Request(&request);LPWSTR uri=nullptr;request->get_Uri(&uri);std::wstring address=uri?uri:L"";CoTaskMemFree(uri);
    COREWEBVIEW2_WEB_RESOURCE_CONTEXT context;args->get_ResourceContext(&context);
    const bool localImage=!filename.empty()&&context==COREWEBVIEW2_WEB_RESOURCE_CONTEXT_IMAGE&&address.rfind(L"https://document.opentypora.local/",0)==0;
+   if(localImage){
+    const auto query=address.find(L"?path=");
+    if(query!=std::wstring::npos){
+      std::wstring relative=address.substr(query+6);std::vector<wchar_t> decoded(relative.size()+1);DWORD size=static_cast<DWORD>(decoded.size());
+      HRESULT decodedResult=UrlUnescapeW(relative.data(),decoded.data(),&size,URL_UNESCAPE_AS_UTF8);
+      std::wstring path=SUCCEEDED(decodedResult)?decoded.data():L"";
+      // Only document-relative raster/SVG images are served. No URLs or absolute/UNC paths.
+      const auto extension=PathFindExtensionW(path.c_str());std::wstring type;
+      if(!_wcsicmp(extension,L".png"))type=L"image/png";else if(!_wcsicmp(extension,L".jpg")||!_wcsicmp(extension,L".jpeg"))type=L"image/jpeg";else if(!_wcsicmp(extension,L".gif"))type=L"image/gif";else if(!_wcsicmp(extension,L".webp"))type=L"image/webp";else if(!_wcsicmp(extension,L".svg"))type=L"image/svg+xml";
+      ComPtr<IStream> image;HRESULT found=E_ACCESSDENIED;
+      if(!path.empty()&&path.find(L':')==std::wstring::npos&&path[0]!=L'/'&&path[0]!=L'\\'&&!type.empty()){
+        auto slash=filename.find_last_of(L"\\/");auto file=filename.substr(0,slash+1)+path;
+        found=SHCreateStreamOnFileEx(file.c_str(),STGM_READ|STGM_SHARE_DENY_NONE,FILE_ATTRIBUTE_NORMAL,FALSE,nullptr,&image);
+      }
+      ComPtr<ICoreWebView2WebResourceResponse> response;environment->CreateWebResourceResponse(image.Get(),SUCCEEDED(found)?200:404,SUCCEEDED(found)?L"OK":L"Not found",(L"Content-Type: "+type+L"\r\nCache-Control: no-store").c_str(),&response);args->put_Response(response.Get());return S_OK;
+    }
+   }
    if(!localImage&&address.rfind(L"https://app.opentypora.local/",0)!=0&&address.rfind(L"data:",0)!=0){ComPtr<ICoreWebView2WebResourceResponse> blocked;environment->CreateWebResourceResponse(nullptr,403,L"Blocked",L"",&blocked);args->put_Response(blocked.Get());}return S_OK;
   }).Get(),&resourcesToken);
   web->add_NavigationStarting(Callback<ICoreWebView2NavigationStartingEventHandler>([](ICoreWebView2*,ICoreWebView2NavigationStartingEventArgs* args)->HRESULT{LPWSTR uri=nullptr;args->get_Uri(&uri);bool allowed=uri&&std::wstring(uri)==L"https://app.opentypora.local/preview.html";CoTaskMemFree(uri);args->put_Cancel(!allowed);return S_OK;}).Get(),&navigationToken);
@@ -94,9 +113,9 @@ class Preview final:public IPreviewHandler,public IInitializeWithStream,public I
  }
 public:
  Preview(){objects++;}~Preview(){Unload();objects--;}
- IFACEMETHODIMP QueryInterface(REFIID id,void** out)override{if(!out)return E_POINTER;*out=nullptr;if(id==IID_IUnknown||id==__uuidof(IPreviewHandler))*out=static_cast<IPreviewHandler*>(this);else if(id==__uuidof(IInitializeWithStream))*out=static_cast<IInitializeWithStream*>(this);else if(id==__uuidof(IInitializeWithFile))*out=static_cast<IInitializeWithFile*>(this);else if(id==__uuidof(IObjectWithSite))*out=static_cast<IObjectWithSite*>(this);else if(id==__uuidof(IOleWindow))*out=static_cast<IOleWindow*>(this);else if(id==__uuidof(IPreviewHandlerVisuals))*out=static_cast<IPreviewHandlerVisuals*>(this);else return E_NOINTERFACE;AddRef();return S_OK;}
+ IFACEMETHODIMP QueryInterface(REFIID id,void** out)override{if(!out)return E_POINTER;*out=nullptr;if(id==IID_IUnknown||id==__uuidof(IPreviewHandler))*out=static_cast<IPreviewHandler*>(this);else if(id==__uuidof(IInitializeWithItem))*out=static_cast<IInitializeWithItem*>(this);else if(id==__uuidof(IInitializeWithFile))*out=static_cast<IInitializeWithFile*>(this);else if(id==__uuidof(IObjectWithSite))*out=static_cast<IObjectWithSite*>(this);else if(id==__uuidof(IOleWindow))*out=static_cast<IOleWindow*>(this);else if(id==__uuidof(IPreviewHandlerVisuals))*out=static_cast<IPreviewHandlerVisuals*>(this);else return E_NOINTERFACE;AddRef();return S_OK;}
  IFACEMETHODIMP_(ULONG) AddRef()override{return ++refs;}IFACEMETHODIMP_(ULONG) Release()override{ULONG count=--refs;if(!count)delete this;return count;}
- IFACEMETHODIMP Initialize(IStream* input,DWORD)override{if(!input)return E_INVALIDARG;if(stream||!filename.empty())return HRESULT_FROM_WIN32(ERROR_ALREADY_INITIALIZED);stream=input;return S_OK;}
+ IFACEMETHODIMP Initialize(IShellItem* item,DWORD mode)override{if(!item)return E_INVALIDARG;PWSTR path=nullptr;HRESULT result=item->GetDisplayName(SIGDN_FILESYSPATH,&path);if(FAILED(result))return result;result=Initialize(path,mode);CoTaskMemFree(path);return result;}
  IFACEMETHODIMP Initialize(LPCWSTR file,DWORD)override{if(!file)return E_INVALIDARG;if(stream||!filename.empty())return HRESULT_FROM_WIN32(ERROR_ALREADY_INITIALIZED);filename=file;return S_OK;}
  IFACEMETHODIMP SetSite(IUnknown* input)override{site=input;frame.Reset();if(site)site.As(&frame);return S_OK;}
  IFACEMETHODIMP GetSite(REFIID id,void** out)override{return site?site->QueryInterface(id,out):E_FAIL;}

@@ -1,3 +1,4 @@
+import { BlockViewport, blockSpacer } from "./blockViewport.ts";
 import { codeSelectionCommand, selectionActions, wordRange } from "./selectionCommands.ts";
 import emojiNames from "markdown-it-emoji/lib/data/full.mjs";
 import { clearInlineFormats } from "./inlineFormats.ts";
@@ -64,6 +65,14 @@ export class RichEditor {
     }
     event.preventDefault(); event.stopImmediatePropagation();
   };
+  private viewport = new BlockViewport();
+  private viewportFrame = 0;
+  private resizeObserver: ResizeObserver | null = null;
+  private viewportWidth = 0;
+  private scrollViewport = () => {
+    if(this.viewportFrame || this.model.text.length<=300_000) return;
+    this.viewportFrame=requestAnimationFrame(()=>{this.viewportFrame=0;if(!this.composing)this.render(false);});
+  };
   private scrollFrame = 0;
   private fenceBehavior = new Compartment();
   private fenceOptions() { return [EditorState.readOnly.of(this.readOnly), EditorView.editable.of(!this.readOnly), indentUnit.of(" ".repeat(this.tabSize)), ...(this.autoPair ? [closeBrackets(), keymap.of(closeBracketsKeymap)] : [])]; }
@@ -124,12 +133,20 @@ export class RichEditor {
     this.emojiPopup.addEventListener("mousedown", event => event.preventDefault());
     root.parentElement!.append(this.emojiPopup);
     root.parentElement!.append(this.tableToolbar);
+    model.enableRichParsing();
+    root.parentElement!.addEventListener("scroll",this.scrollViewport,{passive:true});
+    if(typeof ResizeObserver!=="undefined") {
+      this.resizeObserver=new ResizeObserver(()=>{const width=root.clientWidth;if(width!==this.viewportWidth){this.viewportWidth=width;this.viewport.reset();this.scrollViewport();}});
+      this.resizeObserver.observe(root);
+    }
     this.render(false);
   }
   destroy() {
     if (this.compositionTimer !== null) clearTimeout(this.compositionTimer);
     for (const type of ["beforeinput", "keydown", "paste", "cut", "drop", "compositionstart"]) this.root.removeEventListener(type, this.protectReadOnly, true);
     cancelAnimationFrame(this.scrollFrame);
+    cancelAnimationFrame(this.viewportFrame); this.resizeObserver?.disconnect();
+    this.root.parentElement?.removeEventListener("scroll",this.scrollViewport);
     this.fence?.view.destroy();
     this.tableToolbar.remove(); this.emojiPopup.remove();
     document.removeEventListener("selectionchange", this.selectionChange);
@@ -298,7 +315,17 @@ export class RichEditor {
     const fresh = new Map<string, Leaf>(), desired: HTMLElement[] = [], next = new Map<string, { node: DocumentNode; element: HTMLElement; leaves: Leaf[]; environment: string }>();
     const existing = new Map([...this.root.children].map(element => [(element as HTMLElement).dataset.cid, element as HTMLElement]));
     const environment = markdownOptionsVersion + ":" + JSON.stringify(this.model.environment);
-    for (const node of this.model.nodes) {
+    const virtual=this.model.text.length>300_000, scroller=this.root.parentElement!;
+    this.root.dataset.virtualized=String(virtual);
+    this.viewport.setNodes(this.model.nodes);
+    const pins=[this.model.selection.anchor,this.model.selection.head].map(position=>this.model.nodes.indexOf(this.model.nodeAt(position)!));
+    const top=scroller.scrollTop-this.root.offsetTop;
+    const indices=virtual?this.viewport.visible(top,scroller.clientHeight,pins):this.model.nodes.map((_,i)=>i);
+    let cursor=0;
+    for (const index of indices) {
+      const node=this.model.nodes[index];
+      if(virtual&&index>cursor)desired.push(blockSpacer(this.viewport.offset(index)-this.viewport.offset(cursor)));
+      cursor=index+1;
       const previous = existing.get(node.id), cached = this.blocks.get(node.id);
       if (cached && previous === cached.element && this.fence?.id !== node.id && cached.node.source === node.source && cached.node.kind === node.kind && cached.environment === environment) {
         const delta = node.from - cached.node.from;
@@ -316,6 +343,7 @@ export class RichEditor {
       if (previous) previous.replaceWith(element);
       desired.push(element); next.set(node.id, { node, element, leaves: [...leaves.values()], environment });
     }
+    if(virtual&&cursor<this.model.nodes.length)desired.push(blockSpacer(this.viewport.offset(this.model.nodes.length)-this.viewport.offset(cursor)));
     this.blocks = next;
     this.leaves = fresh;
     for (let i = 0; i < desired.length; i++)
@@ -324,8 +352,14 @@ export class RichEditor {
     for (const element of [...this.root.children]) if (!retained.has(element as HTMLElement)) element.remove();
     if (restore && !this.fence) this.restore();
     this.mutating = false;
-    void renderDiagrams(this.root).catch(() => {});
-    void renderMath(this.root).catch(() => {});
+    const measure=()=>{
+      if(!virtual)return;
+      let changed=false;
+      for(const [id,block] of this.blocks){const style=getComputedStyle(block.element);changed=this.viewport.measure(id,block.element.getBoundingClientRect().height+parseFloat(style.marginTop||"0")+parseFloat(style.marginBottom||"0"))||changed;}
+      if(changed)this.scrollViewport();
+    };
+    measure();
+    void Promise.all([renderDiagrams(this.root),renderMath(this.root)]).then(measure).catch(() => {});
   }
   private publish(restore = true) {
     this.render(restore);
@@ -337,9 +371,9 @@ export class RichEditor {
     this.reportCursor();
   }
   private reportCursor() {
-    const before = this.model.text.slice(0, this.model.selection.head),
-      lines = before.split("\n");
-    this.callbacks.cursor(lines.length, lines.at(-1)!.length + 1);
+    const node=this.model.nodeAt(this.model.selection.head),from=node?.from||0;
+    const before=this.model.text.slice(from,this.model.selection.head),at=before.lastIndexOf("\n");
+    this.callbacks.cursor((node?.line||1)+(before.match(/\n/g)?.length||0),before.length-at);
     this.updateWritingMode(); this.updateEmoji();
   }
   setOptions(options: { spellcheck: boolean; tabSize: number; typewriter: boolean; autoPair?: boolean; emoji?: boolean; readOnly?: boolean }) {
@@ -715,6 +749,8 @@ export class RichEditor {
       to = Math.max(selection.anchor, selection.head);
     if (from === to) return { markdown: "", plain: "", html: "" };
     let markdown = this.model.text.slice(from, to);
+    // A DOM Range can cross unmounted blocks; never return a partial clipboard.
+    if(this.model.text.length>300_000 && to-from>20_000) return {markdown,plain:markdown,html:""};
     let plain = markdown, html = "";
     const range = window.getSelection()?.rangeCount
       ? window.getSelection()!.getRangeAt(0)
@@ -885,6 +921,11 @@ export class RichEditor {
       else if (event.key === "Enter" || event.key === "Tab") this.chooseEmoji(this.emojiIndex);
       else { this.emojiIndex = (this.emojiIndex + (event.key === "ArrowDown" ? 1 : -1) + this.emojiOptions.length) % this.emojiOptions.length; this.updateEmoji(); }
       return;
+    }
+    if(this.model.text.length>300_000 && (event.metaKey||event.ctrlKey)) {
+      if(event.key.toLowerCase()==="a") { event.preventDefault();this.select({anchor:0,head:this.model.text.length});return; }
+      const start=event.key==="Home"||(event.metaKey&&event.key==="ArrowUp"),end=event.key==="End"||(event.metaKey&&event.key==="ArrowDown");
+      if(start||end){event.preventDefault();const head=end?this.model.text.length:0;this.select({anchor:event.shiftKey?this.model.selection.anchor:head,head});return;}
     }
     if (event.key === "z" && (event.metaKey || event.ctrlKey)) {
       event.preventDefault();
@@ -1393,6 +1434,7 @@ export class RichEditor {
       anchor: Math.min(from, this.model.text.length),
       head: Math.min(from, this.model.text.length),
     };
+    this.render(false);
     this.restore();
     const node = this.model.nodeAt(from);
     this.root

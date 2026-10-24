@@ -445,8 +445,8 @@ try {
   const largeSource = '# Large native heading\n\n'+('Native 中文 large document paragraph. 0123456789\n\n').repeat(120000);
   const largeRecord = {id:'native-large-qa',name:'Native-Large.md',path:null,content:largeSource,savedContent:'',diskHash:null,lineEnding:'\n',encoding:'utf-8',bom:false};
   const registeredLarge=await window.desktop.registerDraft(largeRecord);if(!registeredLarge.ok)throw new Error(registeredLarge.error);
-  window.__openTypora.command({action:'opened',document:largeRecord});await wait(()=>document.querySelector('.document-editor[data-document-id="native-large-qa"] .source-surface:not([hidden]) .cm-content'));
-  check(document.querySelectorAll('.document-editor[data-document-id="native-large-qa"] .cm-line').length<200,'native multi-megabyte source editor remains viewport-virtualized');
+  window.__openTypora.command({action:'opened',document:largeRecord});await wait(()=>document.querySelector('.document-editor[data-document-id="native-large-qa"] .rich-scroller:not([hidden]) .rich-document[data-virtualized="true"]'));
+  check(document.querySelectorAll('.document-editor[data-document-id="native-large-qa"] [data-cid]').length<200,'native multi-megabyte rich editor remains viewport-virtualized');
   window.__openTypora.command({action:'outline'});await wait(()=>[...document.querySelectorAll('.outline button')].some(button=>button.textContent==='Large native heading'));
   check(true,'large native outline analysis completes through the bundled worker');
   window.__openTypora.command({action:'opened',document:saved.value});await wait(()=>document.querySelector('.document-title')?.textContent===saved.value.name && root()?.textContent.includes('粗测新体'));

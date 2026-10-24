@@ -53,24 +53,26 @@ export class MarkdownDocument {
   private undoStack: Command[] = [];
   private redoStack: Command[] = [];
   private group = false;
-  private compositionSession: { entry: Snapshot; undo: Command[]; redo: Command[] } | null = null;
+  private compositionSession: { entry: Snapshot; undo: Command[]; redo: Command[]; nodes:DocumentNode[];environment:Record<string,unknown> } | null = null;
   beginComposition() {
     if (this.compositionSession) return;
     this.closeGroup();
-    this.compositionSession = { entry: { text:this.text,selection:{...this.selection} }, undo:this.undoStack, redo:this.redoStack };
+    this.compositionSession = { entry: { text:this.text,selection:{...this.selection} }, undo:this.undoStack, redo:this.redoStack,nodes:this.nodes,environment:this.environment };
     this.undoStack=[]; this.redoStack=[];
   }
   endComposition() {
     const session=this.compositionSession; if (!session) return false;
     const after={text:this.text,selection:{...this.selection}};
     this.undoStack=session.undo; this.redoStack=session.redo;
-    this.text=session.entry.text; this.selection=session.entry.selection; this.compositionSession=null;
+    this.text=session.entry.text; this.selection=session.entry.selection; this.nodes=session.nodes;this.environment=session.environment; this.compositionSession=null;
     this.closeGroup();
     const changed=this.replace(0,this.text.length,after.text,"composition",after.selection);
     this.closeGroup(); return changed;
   }
   private sourceSession: {
     entry: Snapshot;
+    nodes: DocumentNode[];
+    environment: Record<string,unknown>;
     undo: Command[];
     redo: Command[];
   } | null = null;
@@ -84,6 +86,7 @@ export class MarkdownDocument {
     if (this.sourceSession) return;
     this.closeGroup();
     this.sourceSession = {
+      nodes:this.nodes,environment:this.environment,
       entry: { text: this.text, selection: { ...this.selection } },
       undo: this.undoStack,
       redo: this.redoStack,
@@ -98,6 +101,7 @@ export class MarkdownDocument {
     this.undoStack = session.undo;
     this.redoStack = session.redo;
     this.text = session.entry.text;
+    this.nodes=session.nodes;this.environment=session.environment;
     this.selection = session.entry.selection;
     this.sourceSession = null;
     this.closeGroup();
@@ -131,9 +135,76 @@ export class MarkdownDocument {
     }
     return this.serializedMarkdown;
   }
-  private parse() {
+  private richParsing = false;
+  enableRichParsing() {
+    if (this.richParsing) return;
+    this.richParsing = true;
+    if (this.text.length > 300_000) this.parse();
+  }
+  private incremental(edit: {from:number;to:number;insert:string;removed:string}) {
     const old = this.nodes;
-    if (this.text.length > 300_000) {
+    if (!old.length || /(?:^|\n) {0,3}\[[^\]\n]+\]:/.test(edit.insert + "\n" + edit.removed)) return false;
+    let first = 0, last = old.length - 1;
+    // Find affected blocks without walking the document's text or inline tokens.
+    while (first < last) { const middle = (first + last) >>> 1; if (old[middle].to < edit.from) first = middle + 1; else last = middle; }
+    const begin = Math.max(0, first - 2);
+    let finish = first;
+    while (finish < old.length && old[finish].from <= edit.to) finish++;
+    finish = Math.min(old.length, finish + 3);
+    const delta = edit.insert.length - (edit.to - edit.from);
+    const lineDelta = (edit.insert.match(/\n/g)?.length || 0) - (edit.removed.match(/\n/g)?.length || 0);
+    const start = old[begin].from, startLine = old[begin].line;
+    // Changes to a definition can affect reference resolution anywhere in the file.
+    if (old.slice(begin, finish).some(node => /(?:^|\n) {0,3}\[[^\]\n]+\]:/.test(node.source))) return false;
+    while (true) {
+      const end = finish < old.length ? old[finish].from + delta : this.text.length;
+      const source = this.text.slice(start, end), offsets = [0];
+      for (let i=0;i<source.length;i++) if(source[i] === "\n") offsets.push(i+1);
+      const env = {...this.environment, fragment:false, lineOffset:startLine-1};
+      const parsed = parseBlocks(source,env).map(block => ({
+        id:"",from:start+offsets[block.fromLine-1],to:start+(offsets[block.toLine] ?? source.length+1)-1,
+        source:block.source,kind:block.kind,line:startLine+block.fromLine-1,
+      }));
+      const tail = old.slice(begin,finish).filter(node=>node.kind!=="empty").slice(-2);
+      const nextTail = parsed.slice(-tail.length);
+      const stable = tail.length>0 && nextTail.length===tail.length && tail.every((node,index)=>node.source===nextTail[index].source && node.kind===nextTail[index].kind && node.to+delta===nextTail[index].to);
+      if (!stable && finish < old.length) { finish = Math.min(old.length, finish + Math.max(8,finish-begin)); continue; }
+      const candidates = new Map<string,DocumentNode[]>();
+      for(const node of old.slice(begin,finish)) { const key=node.kind+"\0"+node.source;const entries=candidates.get(key)||[];entries.push(node);candidates.set(key,entries); }
+      for(const node of parsed) node.id=candidates.get(node.kind+"\0"+node.source)?.shift()?.id || `node-${++sequence}`;
+      this.nodes = [...old.slice(0,begin),...parsed,...old.slice(finish).map(node=>({...node,from:node.from+delta,to:node.to+delta,line:node.line+lineDelta}))];
+      if (finish===old.length && (!this.nodes.length || /\n$/.test(this.text))) this.nodes.push({id:`node-${++sequence}`,from:this.text.length,to:this.text.length,source:"",kind:"empty",line:startLine+offsets.length-1});
+      // Existing headings keep their IDs; updated headings are supplied by the fragment parser.
+      if (Array.isArray(this.environment.headings)) {
+        const oldEndLine=finish<old.length?old[finish].line:Infinity;
+        const before=(this.environment.headings as Array<{line:number}>).filter(item=>item.line<startLine);
+        const after=(this.environment.headings as Array<{line:number}>).filter(item=>item.line>=oldEndLine).map(item=>({...item,line:item.line+lineDelta}));
+        this.environment={...this.environment,headings:[...before,...((env as Record<string,unknown>).headings as unknown[]||[]).filter((item:any)=>item.line>=startLine&&item.line<oldEndLine+lineDelta),...after]};
+      }
+      this.ensureCaretNode();this.rebuildRoot();
+      return true;
+    }
+  }
+  private ensureCaretNode() {
+    const caret=this.selection.head;
+    this.nodes=this.nodes.filter(node=>node.kind!=="empty"||node.from===this.text.length||node.from===caret);
+    if(caret<this.text.length&&!this.nodes.some(node=>caret>=node.from&&caret<=node.to)) {
+      this.nodes.push({id:`gap-${caret}`,from:caret,to:caret,source:"",kind:"empty",line:1+(this.text.slice(0,caret).match(/\n/g)?.length||0)});
+      this.nodes.sort((a,b)=>a.from-b.from);
+    }
+  }
+  private rebuildRoot() {
+    const children: DocumentNode[] = []; let end=0;
+    for(const node of this.nodes) {
+      if(node.from>end) children.push({id:`source-gap-${end}`,from:end,to:node.from,source:this.text.slice(end,node.from),kind:"separator",line:0});
+      children.push(node);end=node.to;
+    }
+    if(end<this.text.length) children.push({id:`source-gap-${end}`,from:end,to:this.text.length,source:this.text.slice(end),kind:"separator",line:0});
+    this.root={children};
+  }
+  private parse(edit?: {from:number;to:number;insert:string;removed:string}) {
+    const old = this.nodes;
+    if (this.text.length > 300_000 && !this.richParsing) {
       this.environment = {};
       this.nodes = [];
       this.root.children = [
@@ -148,6 +219,7 @@ export class MarkdownDocument {
       ];
       return;
     }
+    if (edit && this.richParsing && this.text.length > 300_000 && this.incremental(edit)) return;
     const offsets = [0];
     for (let i = 0; i < this.text.length; i++)
       if (this.text[i] === "\n") offsets.push(i + 1);
@@ -236,7 +308,8 @@ export class MarkdownDocument {
     this.group = false;
   }
   refreshCaret() {
-    this.parse();
+    if (this.text.length <= 300_000) this.parse();
+    else if(this.richParsing){this.ensureCaretNode();this.rebuildRoot();}
   }
   replace(
     from: number,
@@ -280,7 +353,7 @@ export class MarkdownDocument {
     while (this.undoStack.length > 1 && this.undoStack.reduce((bytes, command) => bytes + 2 * (command.removed.length + command.inserted.length), 0) > 16 * 1024 * 1024) this.undoStack.shift();
     this.group = ["typing", "composition"].includes(kind);
     this.redoStack = [];
-    this.parse();
+    this.parse({from,to,insert,removed});
     return true;
   }
   replaceExternal(
@@ -310,7 +383,7 @@ export class MarkdownDocument {
     this.text = this.text.slice(0, command.from) + command.removed + this.text.slice(command.from + command.inserted.length);
     this.selection = { ...command.before };
     this.closeGroup();
-    this.parse();
+    this.parse({from:command.from,to:command.from+command.inserted.length,insert:command.removed,removed:command.inserted});
     return true;
   }
   redo() {
@@ -320,7 +393,7 @@ export class MarkdownDocument {
     this.text = this.text.slice(0, command.from) + command.inserted + this.text.slice(command.from + command.removed.length);
     this.selection = { ...command.after };
     this.closeGroup();
-    this.parse();
+    this.parse({from:command.from,to:command.from+command.removed.length,insert:command.inserted,removed:command.removed});
     return true;
   }
   nodeAt(position: number) {

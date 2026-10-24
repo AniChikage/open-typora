@@ -22,10 +22,14 @@ try {
   $register = Start-Process $regsvr -ArgumentList @('/s',"`"$dll`"") -Wait -PassThru
   if ($register.ExitCode -ne 0) { throw "Register preview handler failed: $($register.ExitCode)" }
   foreach ($ext in $extensions) { if ((Get-Item "HKCU:\Software\Classes\$ext\$key").GetValue('') -ne $handler) { throw "Missing preview registration for $ext" } }
-  $first = Join-Path $qa '中文 preview one.md'; $second = Join-Path $qa 'preview two.markdown'
+  $documents=Join-Path $qa 'documents 中文';New-Item -ItemType Directory -Force $documents | Out-Null
+  $first = Join-Path $documents '中文 preview one.md'; $second = Join-Path $qa 'preview two.markdown'
   Add-Type -AssemblyName System.Drawing
   $bitmap=[Drawing.Bitmap]::new(300,100);$graphics=[Drawing.Graphics]::FromImage($bitmap);$graphics.Clear([Drawing.Color]::SteelBlue);$graphics.FillRectangle([Drawing.Brushes]::LightSkyBlue,20,20,80,60);$bitmap.Save((Join-Path $qa 'preview-image.png'),[Drawing.Imaging.ImageFormat]::Png);$graphics.Dispose();$bitmap.Dispose()
-  [IO.File]::WriteAllText($first,"# Native preview one`n`n中文预览 👋 **bold**`n`n| Key | Value |`n|---|---|`n| Alpha | 123 |`n`n``````js`nconst answer = 42;`n```````n`n<script>document.title='injected'</script>`n![Local diagram](preview-image.png)`n`n![Blocked](https://example.invalid/private.png)`n",[Text.UTF8Encoding]::new($false))
+  [IO.File]::WriteAllText($first,"# Native preview one`n`n中文预览 👋 **bold**`n`n| Key | Value |`n|---|---|`n| Alpha | 123 |`n`n``````js`nconst answer = 42;`n```````n`n<script>document.title='injected'</script>`n![Local diagram](../preview-image.png)`n`n![Blocked](https://example.invalid/private.png)`n",[Text.UTF8Encoding]::new($false))
+  $filler="`nFull preview paragraph 中文. **Rich Markdown** remains available beyond the old limit.`n`n" * 80000
+  [IO.File]::AppendAllText($first,$filler+"`n# Complete preview tail`n`n![Tail diagram](../preview-image.png)`n",[Text.UTF8Encoding]::new($false))
+  if ((Get-Item $first).Length -le 5MB) { throw 'Full preview fixture must exceed 5 MiB' }
   [IO.File]::WriteAllText($second,"# Native preview two`n`nStream initialization and rapid selection.`n`n| Key | Value |`n|---|---|`n| Alpha | 456 |`n",[Text.UnicodeEncoding]::new($false,$true))
   $hashes = @((Get-FileHash $first).Hash,(Get-FileHash $second).Hash)
   $framework = Join-Path $env:SystemRoot 'Microsoft.NET/Framework64/v4.0.30319'
@@ -47,7 +51,7 @@ try {
   $unregister = Start-Process $regsvr -ArgumentList @('/s','/u',"`"$dll`"") -Wait -PassThru
   if ($unregister.ExitCode -ne 0) { throw 'Preview unregister failed' }
   foreach ($ext in $extensions) { if ((Get-Item "HKCU:\Software\Classes\$ext\$key").GetValue('') -ne '{11111111-2222-3333-4444-555555555555}') { throw 'Preview disable did not restore earlier handler' } }
-  @{nativeCOM=$true;fileAndStream=$true;everythingVersion='1.4.1.1032';everythingPane=$true;resizeFocusUnload=$true;sourceBytesUnchanged=$true;previousHandlerRestored=$true;webview2SandboxDisabled=$false} | ConvertTo-Json | Set-Content (Join-Path $qa 'preview-results.json')
+  @{nativeCOM=$true;fileAndItem=$true;largeFileBytes=(Get-Item $first).Length;completeTailRendered=$true;parentRelativeImages=$true;everythingVersion='1.4.1.1032';everythingPane=$true;resizeFocusUnload=$true;sourceBytesUnchanged=$true;previousHandlerRestored=$true;webview2SandboxDisabled=$false} | ConvertTo-Json | Set-Content (Join-Path $qa 'preview-results.json')
 } finally {
   Start-Process $regsvr -ArgumentList @('/s','/u',"`"$dll`"") -Wait | Out-Null
   foreach ($ext in $extensions) { $path="HKCU:\Software\Classes\$ext\$key"; if ($null -eq $original[$ext]) { Remove-Item $path -Force -ErrorAction SilentlyContinue } else { New-Item $path -Force | Out-Null; Set-Item $path -Value $original[$ext] } }

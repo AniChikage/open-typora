@@ -83,7 +83,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
       requested = useRef(rendered),
       activeMode = useRef(rendered);
     const [visibleMode, setVisibleMode] = useState(
-      rendered && record.content.length <= 300_000,
+      rendered,
     );
     const [editingImage, setEditingImage] = useState<ImageReference | null>(null);
     const imageQueue = useRef(Promise.resolve());
@@ -381,7 +381,6 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
     function setMode(value: boolean) {
       const doc = model.current;
       if (!doc) return;
-      value = value && doc.text.length <= 300_000;
       if (isComposing()) return;
       doc.closeGroup();
       if (value) {
@@ -498,6 +497,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
         original.content,
         original.lineEnding || "\n",
       );
+      if(original.content.length>300_000)model.current.selection={anchor:0,head:0};
       rich.current = new RichEditor(root.current!, model.current, original.id, {
         change: publish,
         cursor: (line, column) => { callbacks.current.onCursor(line, column); callbacks.current.onSelection?.(rich.current?.clipboard().plain || ""); historyState(); },

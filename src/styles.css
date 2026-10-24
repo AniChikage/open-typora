@@ -1133,3 +1133,8 @@ svg {
   flex-direction: column;
   overflow: hidden;
 }
+
+/* Offscreen rich blocks retain measured space without mounting editable leaves. */
+.rich-document[data-virtualized="true"]{display:flex;flex-direction:column}
+.rich-document[data-virtualized="true"] > *{flex-shrink:0}
+.virtual-block-spacer{user-select:none;overflow-anchor:none}

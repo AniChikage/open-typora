@@ -57,3 +57,15 @@ test('detached undo deltas retain exact UTF-16 units including lone surrogates',
  model.replace(20,24,insert);assert.equal(model.text,original.slice(0,20)+insert+original.slice(24));
  assert.ok(model.undo());assert.equal(model.text,original);assert.ok(model.redo());assert.equal(model.text.slice(20,20+insert.length),insert);
 });
+
+test('large rich documents reparse affected blocks and retain exact structure through undo and IME',()=>{
+ const original=('# Heading\n\nParagraph **bold** 中文 text.\n\n- one\n- two\n\n').repeat(6500);
+ const model=new MarkdownDocument(original);model.enableRichParsing();
+ assert.ok(model.nodes.length>15000);assert.equal(model.serialize(),model.text);
+ const same=()=>{const expected=new MarkdownDocument(model.text);expected.selection={...model.selection};expected.enableRichParsing();assert.deepEqual(model.nodes.map(({from,to,kind,source,line})=>({from,to,kind,source,line})),expected.nodes.map(({from,to,kind,source,line})=>({from,to,kind,source,line})));assert.equal(model.serialize(),model.text);};
+ for(const insert of ['你好','\n\n## New heading\n\n','```js\n','\n```\n','\n[reference]: https://example.com\n']) {
+  const at=Math.floor(model.text.length/2);model.closeGroup();model.replace(at,at+3,insert);same();assert.ok(model.undo());same();assert.ok(model.redo());same();
+ }
+ model.beginComposition();model.replace(25,25,'zhong','composition');model.replace(25,30,'中国','composition');model.endComposition();same();assert.ok(model.undo());same();
+ model.beginSourceSession();model.replace(0,2,'##');model.endSourceSession();same();
+});
