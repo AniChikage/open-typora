@@ -1,3 +1,4 @@
+import { compactTable } from "./tableData.ts";
 import MarkdownIt from "markdown-it";
 import taskLists from "markdown-it-task-lists";
 import { configureMath } from "./mathMarkdown.ts";
@@ -43,6 +44,7 @@ export function setMarkdownOptions(options: { highlight: boolean; subscript: boo
   for (const [rule, enabled] of [["mark", options.highlight], ["sub", options.subscript], ["sup", options.superscript], ["emoji", options.emoji], ["math_inline", options.inlineMath]] as const)
     enabled ? md.enable(rule, true) : md.disable(rule, true);
 }
+md.block.ruler.before("table", "compact_table", compactTable);
 const defaultFence = md.renderer.rules.fence!;
 md.renderer.rules.fence = (tokens, index, options, env, self) =>
   /^(mermaid|sequence|flow)$/.test(tokens[index].info.trim())
@@ -111,7 +113,12 @@ export function parseBlocks(
       });
     }
   }
-  for (const token of md.parse(source, environment)) {
+  const compactBefore = environment.compactBlocks;
+  environment.compactBlocks = true;
+  let tokens: Token[];
+  try { tokens = md.parse(source, environment); }
+  finally { if (compactBefore === undefined) delete environment.compactBlocks; else environment.compactBlocks = compactBefore; }
+  for (const token of tokens) {
     if (
       !token.map ||
       token.level !== 0 ||

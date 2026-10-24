@@ -148,6 +148,19 @@ export class MarkdownDocument {
     let first = 0, last = old.length - 1;
     // Find affected blocks without walking the document's text or inline tokens.
     while (first < last) { const middle = (first + last) >>> 1; if (old[middle].to < edit.from) first = middle + 1; else last = middle; }
+    const affected = old[first];
+    if (affected && edit.from >= affected.from && edit.to <= affected.to && !/[\n`~|]/.test(edit.insert + edit.removed)) {
+      const open = affected.kind === "fence" && /^ {0,3}(`{3,}|~{3,})[^\n]*\n/.exec(affected.source);
+      const lineStart = this.text.lastIndexOf("\n", Math.max(0, edit.from - 1)) + 1, lineEnd = this.text.indexOf("\n", edit.from);
+      const tableBody = affected.kind === "table_open" && edit.from > affected.from + affected.source.indexOf("\n", affected.source.indexOf("\n") + 1) && !this.text.slice(lineStart, lineEnd < 0 ? this.text.length : lineEnd).includes("[^");
+      const closing = open && new RegExp(`(?:^|\\n) {0,3}${open[1][0]}{${open[1].length},}[ \\t]*$`).exec(affected.source);
+      const fencedBody = open && closing && edit.from >= affected.from + open[0].length && edit.to <= affected.from + closing.index;
+      if (fencedBody || tableBody) {
+        const delta = edit.insert.length - edit.removed.length;
+        this.nodes = old.map((node, index) => index === first ? {...node, to: node.to + delta, source: this.text.slice(node.from, node.to + delta)} : index > first ? {...node, from: node.from + delta, to: node.to + delta} : node);
+        this.ensureCaretNode(); this.rebuildRoot(); return true;
+      }
+    }
     const begin = Math.max(0, first - 2);
     let finish = first;
     while (finish < old.length && old[finish].from <= edit.to) finish++;

@@ -1,3 +1,6 @@
+import { contiguousPositions, mappedPositions } from "./sourcePositions.ts";
+import { tableRowCells } from "./tableData.ts";
+export { tableRowCells } from "./tableData.ts";
 import { alertTitle } from "./markdownExtensions.ts";
 import {
   editableHtml,
@@ -16,6 +19,10 @@ export interface Leaf {
   fenceLine?: number;
 }
 export function codeBody(node: DocumentNode, startLine: number) {
+  if (startLine === 0 && /^(`{3,}|~{3,})/.test(node.source)) {
+    const range = fenceRange(node), raw = node.source.slice(range.start, range.end);
+    return {from: range.start, to: range.end, prefix: "", raw, positions: contiguousPositions(node.from + range.start, raw.length), closed: range.closingOnNewLine};
+  }
   const lines = node.source.split("\n"),
     offsets = [0];
   for (let i = 0; i < lines.length; i++)
@@ -40,24 +47,24 @@ export function codeBody(node: DocumentNode, startLine: number) {
   }
   const from = Math.min(node.source.length, offsets[startLine + 1]),
     to = Math.min(node.source.length, offsets[endLine]);
-  let raw = "";
-  const positions: number[] = [];
+  const parts: string[] = [], rawOffsets: number[] = [], sourceOffsets: number[] = [];
+  let length = 0;
   for (let i = startLine + 1; i < endLine; i++) {
-    const skip = lines[i].startsWith(prefix) ? prefix.length : 0,
-      line = lines[i].slice(skip);
-    for (let c = 0; c < line.length; c++) {
-      raw += line[c];
-      positions.push(node.from + offsets[i] + skip + c);
-    }
-    if (offsets[i] + lines[i].length < to) {
-      raw += "\n";
-      positions.push(node.from + offsets[i] + lines[i].length);
-    }
+    const skip = lines[i].startsWith(prefix) ? prefix.length : 0;
+    const line = lines[i].slice(skip) + (offsets[i] + lines[i].length < to ? "\n" : "");
+    rawOffsets.push(length); sourceOffsets.push(node.from + offsets[i] + skip); parts.push(line); length += line.length;
   }
-  positions.push(node.from + to);
+  const raw = parts.join("");
+  const positions = !prefix ? contiguousPositions(node.from + from, raw.length) : mappedPositions(raw.length, index => {
+    if (index === raw.length) return node.from + to;
+    let low = 0, high = rawOffsets.length;
+    while (low < high) { const middle = (low + high) >>> 1; if (rawOffsets[middle] <= index) low = middle + 1; else high = middle; }
+    const line = Math.max(0, low - 1); return sourceOffsets[line] + index - rawOffsets[line];
+  });
   return { from, to, prefix, raw, positions, closed };
 }
 export function encodeCodeBody(raw: string, prefix: string) {
+  if (!prefix) return raw;
   return raw ? prefix + raw.replace(/\n(?!$)/g, "\n" + prefix) : "";
 }
 export function codePosition(
@@ -66,6 +73,7 @@ export function codePosition(
   prefix: string,
   position: number,
 ) {
+  if (!prefix) return from + position;
   return (
     from +
     (position === 0 && raw
@@ -94,17 +102,10 @@ export function fenceRange(node: DocumentNode) {
   const open = /^ {0,3}(`{3,}|~{3,})[^\n]*(?:\n|$)/.exec(node.source);
   if (!open)
     return { start: 0, end: node.source.length, closingOnNewLine: false };
-  const closing = new RegExp(
-    `(?:^|\\n) {0,3}${open[1][0]}{${open[1].length},}[ \\t]*$`,
-  ).exec(node.source);
-  return {
-    start: open[0].length,
-    closingOnNewLine: !!closing && closing.index >= open[0].length - 1,
-    end:
-      closing && closing.index >= open[0].length - 1
-        ? closing.index + (closing[0].startsWith("\n") ? 1 : 0)
-        : node.source.length,
-  };
+  const limit = node.source.endsWith("\n") ? node.source.length - 1 : node.source.length;
+  const newline = node.source.lastIndexOf("\n", limit - 1), closingStart = newline + 1;
+  const closed = closingStart >= open[0].length && new RegExp(`^ {0,3}${open[1][0]}{${open[1].length},}[ \\t]*$`).test(node.source.slice(closingStart, limit));
+  return {start: open[0].length, closingOnNewLine: closed, end: closed ? closingStart : node.source.length};
 }
 const meta = (text: string) =>
   `<span class="md-meta">${escapeHtml(text)}</span>`;
@@ -172,10 +173,7 @@ export function renderNode(
       raw,
       positions:
         body?.positions ||
-        Array.from(
-          { length: raw.length + 1 },
-          (_, i) => node.from + range.start + i,
-        ),
+        contiguousPositions(node.from + range.start, raw.length),
       kind: "fence",
       fenceLine: startLine,
     });
@@ -240,6 +238,7 @@ export function renderNode(
         const { id, raw } = fenceLeaf(token.map?.[0] || 0);
         if (/^(mermaid|sequence|flow)$/.test(token.info.trim()))
           return `<div class="md-fence" contenteditable="false" data-fence="${id}"><div class="fence-preview">${renderMarkdown(node.source, documentId)}</div><pre class="fence-body"><code>${escapeHtml(token.content)}</code></pre><span class="fence-language">${token.info.trim()}</span></div>`;
+        if (raw.length > 100_000) return `<div class="md-fence large-code" contenteditable="false" data-fence="${id}"><pre class="fence-body"></pre><span class="fence-language">${escapeHtml(token.info)}</span></div>`;
         return `<div class="md-fence" contenteditable="false" data-fence="${id}"><pre class="fence-body"><code data-leaf="${id}">${highlightCode(raw, token.info.trim().split(/\s/)[0])}</code></pre><span class="fence-language">${escapeHtml(token.info)}</span></div>`;
       },
       { ...environment, lineOffset: node.line - 1 },
@@ -258,28 +257,6 @@ export function renderNode(
       box.contentEditable = "false";
     });
   return element;
-}
-export function tableRowCells(line: string) {
-  const cells: { raw: string; start: number; end: number }[] = [];
-  let start = /^\s*\|/.test(line) ? line.indexOf("|") + 1 : 0;
-  for (let i = start; i <= line.length; i++) {
-    if (line[i] === "\\" && i + 1 < line.length) {
-      i++;
-      continue;
-    }
-    if (i === line.length || line[i] === "|") {
-      if (i === line.length && !line.slice(start).trim() && /\|\s*$/.test(line))
-        break;
-      const original = line.slice(start, i),
-        raw = original.trim(),
-        // Empty cells have no text boundary. Keep one leading padding space
-        // so the first edit lands inside the cell rather than against its pipe.
-        from = start + (raw ? original.length - original.trimStart().length : Math.min(1, original.length));
-      cells.push({ raw, start: from, end: from + raw.length });
-      start = i + 1;
-    }
-  }
-  return cells;
 }
 function tableCells(source: string) {
   const cells: { raw: string; start: number; end: number }[] = [];
@@ -300,7 +277,7 @@ function tableCells(source: string) {
   return cells;
 }
 // Markdown-it owns recognition; DOM text retains the original spelling and delimiters.
-function tokenInlineHtml(
+export function tokenInlineHtml(
   raw: string,
   documentId: string,
   environment: Record<string, unknown>,
@@ -322,6 +299,7 @@ function tokenInlineHtml(
   const object = (source: string, view: string, mark: string, from: number) =>
     `<span class="md-inline" data-mark="${mark}" data-inline-from="${from}" data-inline-to="${from + source.length}"><span class="md-object-source">${escapeHtml(source)}</span><span class="md-view" contenteditable="false">${view}</span></span>`;
   const text = (value: string) => {
+    if (raw.startsWith(value, cursor)) { cursor += value.length; return escapeHtml(value); }
     let decoded = "",
       html = "",
       attempts = 0;

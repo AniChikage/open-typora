@@ -23,7 +23,7 @@ Small documents use full Markdown parsing. Large rendered documents reparse the 
 
 ## Large rendered documents in 0.15.0
 
-Documents above 300,000 UTF-16 code units keep rendered editing enabled. The editor mounts visible blocks plus the caret/selection endpoints, keeps measured space for offscreen content and parses only the affected block range where its surrounding syntax remains stable. Headings, inline formatting, paragraphs, lists, tables and local code retain the existing editing interactions. Source mode remains available; its large-file configuration omits syntax highlighting and bracket matching. The editor file limit remains 20 MiB.
+Documents above 300,000 UTF-16 code units keep rendered editing enabled. The editor mounts visible blocks plus the caret/selection endpoints, keeps measured space for offscreen content and parses only the affected block range where its surrounding syntax remains stable. Headings, inline formatting, paragraphs, lists, tables and local code retain the existing editing interactions. Source mode remains available; its large-file configuration omits syntax highlighting and bracket matching. The fixed 20 MiB Markdown limit was removed in 0.16.0; see the large-block validation below.
 
 - Rendered block identities survive incremental edits, including local code IME updates and final candidate commits. Cross-viewport Markdown selection uses document positions rather than copying only mounted text.
 - Source edits apply the changed range instead of replacing the entire document on every input event.
@@ -38,3 +38,16 @@ A local Apple Silicon macOS Electron run recorded 1,971 ms from launch to the vi
 Unit tests also retain 100 separate small undo steps in a roughly 7 MiB Unicode/CRLF document and compare randomized edits/undo/redo against an independent string reference.
 
 A separate Node/V8 heap regression uses a 5 MiB ASCII document and 100 independent 100-character replacements. After explicit garbage collection, retained-heap growth fell from about 500 MiB with source-backed substrings to about 5 MiB after detaching history deltas. The same check passes with Node 26.7.0 and 26.12.1. This isolates the document model; it is not the complete application's memory usage. The test also undoes all 100 changes exactly and runs in a fresh process with a conservative 32 MiB growth limit.
+
+## Large blocks and file sizes in 0.16.0
+
+Markdown open, encoded save, draft registration and recovery no longer reject files at 20 MiB. They still load source in memory; available RAM, runtime string/IPC limits and storage determine practical sizes. This is not a disk-backed unlimited-size editor. Converted imports and media retain separate budgets.
+
+- Code bodies use computed source-position maps instead of a number for every UTF-16 unit. Plain fences map edits as changed spans, use indexed cursor lines and avoid redundant whole-code scans.
+- Code bodies above 100,000 characters use bounded read-only/editable CodeMirror viewports. They omit syntax highlighting and soft wrapping; their full text remains available, with horizontal/vertical scrolling, selection, IME and undo.
+- Tables of 200 or more rows, or over 50,000 characters, use an inner row viewport and a sticky header. Measured row heights, logical cell navigation and local row operations retain the complete Markdown source. Unchanged visible rows keep their DOM when scrolling.
+- Regular top-level pipe tables avoid parsing inline tokens for offscreen cells while indexing document blocks. Irregular rows, nested structures and footnote-bearing tables use the general parser and can have higher initial cost. Print/export still render the complete source.
+
+`npm run test:huge` opens an actual 36,260,060-byte UTF-8 code file through the desktop file-open path, checks bounded DOM, typing, Chinese composition, undo and exact bytes. An 80,000-row / 7,417,850-byte table checks tail navigation, cell edits, composition, Tab-created rows and exact undo. It restarts with a dirty large file and saves after source/rendered round trips. The installed Windows executable, installed Linux DEB and extracted AppImage payload run this suite in CI. Native store tests separately verify 32 MiB open/save/recovery and encoded UTF-16 output over 64 MiB; native WebKit exercises giant code and table viewports.
+
+One local Apple Silicon Electron sample opened the code viewport in 606 ms and the table in 89 ms. Six code-input samples were 38–537 ms (median 43 ms); the cell edit sample was 34 ms. These include a background-work spike, are small automation samples and are not physical-IME latency or hardware-independent guarantees. Large initial parses, complex individual cells, unusual nested syntax, plugins and simultaneous large tabs can still be expensive.

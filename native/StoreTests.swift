@@ -256,5 +256,20 @@ func runStoreTests() throws {
   try expect(
     corrupt.restoreError != nil && backups.contains(where: { $0.hasPrefix("session-backup-") }),
     "corrupt session is retained as backup")
+  let hugeDirectory = directory.appendingPathComponent("huge-data")
+  let hugeFile = directory.appendingPathComponent("huge.md")
+  let hugeText = "# Large native file\n" + String(repeating: "x", count: 32 * 1024 * 1024) + "\n"
+  try atomicWrite(hugeFile, Data(hugeText.utf8))
+  let hugeStore = DocumentStore(hugeDirectory)
+  var hugeRecord = try hugeStore.open(hugeFile)
+  try expect(hugeRecord.content == hugeText, "32 MiB native Markdown opens beyond the previous byte limit")
+  hugeRecord = try hugeStore.save(hugeRecord.id, text: hugeText + "保存")
+  try expect(try Data(contentsOf: hugeFile) == Data((hugeText + "保存").utf8), "32 MiB native save retains exact UTF-8 bytes")
+  hugeRecord.content = hugeText + "草稿"
+  try hugeStore.persist(SessionRecord(documents: [hugeRecord], activeId: hugeRecord.id))
+  let hugeRestored = try DocumentStore(hugeDirectory).restore()!
+  try expect(hugeRestored.documents.first?.content == hugeText + "草稿", "native recovery retains dirty content beyond 20 MiB")
+  let hugeEncoded = try DocumentStore.encode(hugeText, encoding: "utf-16le", bom: true)
+  try expect(hugeEncoded.count > 64 * 1024 * 1024 && hugeEncoded.starts(with: [0xff,0xfe]), "native encoded output can exceed 64 MiB")
   print("Native document store checks passed. Artifacts: \(directory.path)")
 }

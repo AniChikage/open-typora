@@ -1138,3 +1138,13 @@ svg {
 .rich-document[data-virtualized="true"]{display:flex;flex-direction:column}
 .rich-document[data-virtualized="true"] > *{flex-shrink:0}
 .virtual-block-spacer{user-select:none;overflow-anchor:none}
+
+/* Large blocks keep their full source while their inner viewport stays bounded. */
+.large-code .fence-body{padding:0;overflow:hidden;white-space:normal}
+.large-code .cm-editor{height:min(55vh,480px);text-align:left}
+.large-code .cm-scroller{overflow:auto;font-family:var(--font-family-monospace,monospace);line-height:1.65}
+.md-large-table{max-height:min(65vh,640px);overflow:auto;overscroll-behavior:contain;margin:1em 0}
+.md-large-table table{table-layout:fixed;width:100%;margin:0}
+.md-large-table thead{position:sticky;top:0;z-index:1;background:var(--bg-panel,#f5f6f8)}
+.md-large-table td,.md-large-table th{overflow-wrap:anywhere}
+.md-large-table .table-row-spacer,.md-large-table .table-row-spacer td{padding:0!important;border:0!important;background:transparent!important}

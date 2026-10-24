@@ -1,4 +1,4 @@
-Open Typora 0.15.0 adds large-document rendered editing and complete Windows Markdown previews.
+Open Typora 0.16.0 improves giant code/table editing and removes the old 20 MiB Markdown limit.
 
 This is an independent, unofficial project, unaffiliated with Typora. If you can afford it, please [buy Typora](https://store.typora.io/) and support its official developers.
 
@@ -6,23 +6,21 @@ This is an independent, unofficial project, unaffiliated with Typora. If you can
 
 | Platform | Recommended | Alternative |
 | --- | --- | --- |
-| macOS 14+, Apple Silicon | `Open-Typora-0.15.0-arm64.dmg` | macOS ZIP |
-| Windows 10/11, x64 | `Open-Typora-0.15.0-windows-x64-Setup.exe` | Windows ZIP |
-| Linux x64 | `Open-Typora-0.15.0-linux-x64.deb` | AppImage |
+| macOS 14+, Apple Silicon | `Open-Typora-0.16.0-arm64.dmg` | macOS ZIP |
+| Windows 10/11, x64 | `Open-Typora-0.16.0-windows-x64-Setup.exe` | Windows ZIP |
+| Linux x64 | `Open-Typora-0.16.0-linux-x64.deb` | AppImage |
 
 SHA-256 checksums are included. macOS is locally signed, not notarized; Windows is unsigned.
 
 ## Changes
 
-- **Large rendered documents:** files above 300,000 characters keep live editing enabled. Only visible blocks and selection endpoints mount, and ordinary edits reparse their affected block range. Tests edit and save 5/10 MiB files exactly, navigate to offscreen headings and round-trip source mode. Code blocks retain their identity through Chinese marked text, candidate commit and undo. Distant reference definitions remain available when updating headings and footnotes.
-- **Complete Windows previews:** removes the old 1 MiB truncation. The read-only preview loads the complete source and renders visible blocks. Jumping to the end remains anchored when text wraps in narrow panes or images finish loading. Standard file/Shell Item initialization preserves the document directory in Everything; anonymous stream initialization is no longer advertised.
-- **Relative preview images:** resolves folder and parent-relative images with Chinese/space filenames and URL encoding. The native handler serves image bytes from the selected document's path. Remote resources, plugins and document scripts remain blocked; WebView2's normal isolation remains enabled.
-- Existing themes, print controls, local files, tabs, split panes and recovery remain available.
+- **Giant code blocks:** compact source-position maps replace per-character arrays. Code bodies above 100,000 characters use bounded CodeMirror viewports before and during editing, with exact source offsets and delta updates. Cursor tracking no longer scans the whole block. Large blocks omit syntax highlighting and soft wrapping.
+- **Large tables:** visible rows mount in an inner viewport with a sticky header. Unchanged rows retain their DOM, the tail stays anchored while heights settle, and Tab uses logical rows across the viewport. Adding/removing/moving rows updates a local source range. Regular top-level pipe tables avoid indexing every inline cell token.
+- **Larger Markdown files:** removes the fixed 20 MiB rejection from open, encoding/save, drafts and recovery on macOS and Electron. The full source remains in memory; there is no unlimited-size guarantee.
+- Existing plugins, themes, lossless Markdown, source mode, tabs, split panes, printing and complete Windows previews remain available.
 
 ## Validation and limits
 
-Unit regressions compare incremental block structure and heading IDs against full parsing, verify composition/source-session undo and retain exact UTF-16/CRLF history. Native WebKit and installed Electron suites exercise existing editor, plugin, conversion and PDF paths. The large rich fixture includes Chinese composition in its middle paragraph, list, table and local code. Chromium event tests do not substitute for all physical input methods.
+Desktop acceptance opens a 36,260,060-byte code file and an 80,000-row table, verifies bounded rendered DOM, Chinese Chromium composition, single undo, exact saved bytes and large-file recovery after restart. Native tests cover 32 MiB open/save/recovery, UTF-16 output over 64 MiB and WebKit giant-block rendering. Installed Windows/Linux suites also retain the existing editing, plugin, conversion, PDF, upgrade and uninstall regressions. Actual Everything 1.4 previews remain a separate Windows acceptance gate.
 
-Windows acceptance hosts the registered handler through real file and Shell Item COM interfaces and uses actual Everything 1.4.1.1032. A 5+ MiB fixture checks its final heading and actual image pixels for Chinese/space parent-relative image paths; source hashes and prior-handler restoration are checked. The bundled preview also has a separate full-document message/rendering test.
-
-The editor still limits files to 20 MiB. Preview has no fixed byte cap, but memory and platform decoding limits apply. Very large individual blocks, arbitrary themes/plugins and complex layouts are not universally covered. Initial parsing can still be expensive. Linux acceptance uses Ubuntu 22.04 and the extracted AppImage payload; real FUSE mounting and this version on a complete Kubuntu 26.04 desktop remain unverified. See the [feature checklist](https://github.com/AniChikage/open-typora/blob/main/docs/feature-parity.md).
+Available memory, runtime string/IPC limits, initial parsing and concurrent large tabs still bound file sizes. Complex cells, footnote-bearing/irregular tables and nested syntax may need full parsing and remain slower. Converted imports and media retain their separate budgets. Chromium event tests do not substitute for every physical IME. Linux acceptance uses Ubuntu 22.04 and the extracted AppImage payload; real FUSE mounting and this version on a complete Kubuntu 26.04 desktop remain unverified. See [performance](https://github.com/AniChikage/open-typora/blob/main/docs/performance.md) and the [feature checklist](https://github.com/AniChikage/open-typora/blob/main/docs/feature-parity.md).

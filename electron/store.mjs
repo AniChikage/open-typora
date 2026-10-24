@@ -69,7 +69,6 @@ export function encodeText(text, encoding = "utf-8", bom = false) {
   if (iconv.decode(bytes, encoding, { stripBOM: false }) !== text) throw Object.assign(new Error("此编码无法无损保存部分字符，请改用 UTF-8。原文件未修改。"), { code: "ENCODING_LOSS" });
   const prefix = bom ? { "utf-8": [0xef, 0xbb, 0xbf], "utf-16le": [0xff, 0xfe], "utf-16be": [0xfe, 0xff] }[encoding] || [] : [];
   const output = Buffer.concat([Buffer.from(prefix), bytes]);
-  if (output.length > 20 * 1024 * 1024) throw new Error("编码后的文件超过 20 MB。");
   return output;
 }
 export class DocumentStore {
@@ -86,8 +85,7 @@ export class DocumentStore {
     const resolved = await realpath(file);
     if (!markdown.test(resolved)) throw new Error("请选择 Markdown 文件。");
     const metadata = await stat(resolved);
-    if (!metadata.isFile() || metadata.size > 20 * 1024 * 1024)
-      throw new Error("文件超过首版支持的 20 MB。");
+    if (!metadata.isFile()) throw new Error("请选择普通 Markdown 文件。");
     const bytes = await readFile(resolved);
     const existing = [...this.records.values()].find(record => record.path === resolved);
     if (existing && !reload) return { ...existing };
@@ -135,8 +133,7 @@ export class DocumentStore {
     return record;
   }
   async save(id, text, destination, force = false, options = {}) {
-    if (typeof text !== "string" || Buffer.byteLength(text) > 20 * 1024 * 1024)
-      throw new Error("文件内容无效或超过 20 MB。");
+    if (typeof text !== "string") throw new Error("文件内容无效。");
     const prior = this.queues.get(id) ?? Promise.resolve();
     const operation = prior
       .catch(() => {})
@@ -306,8 +303,7 @@ export class DocumentStore {
     const documents = session.documents.slice(0, 100).map((document) => {
       const record = this.require(document.id);
       if (
-        typeof document.content !== "string" ||
-        Buffer.byteLength(document.content) > 20 * 1024 * 1024
+        typeof document.content !== "string"
       )
         throw new Error("草稿内容无效。");
       return {

@@ -88,6 +88,7 @@ final class DocumentStore {
   var activeId: String?
   var closedRecords = [String: DocumentRecord]()
   private var closedOrder = [String]()
+  // Asset/conversion budget only. Markdown open/save/recovery has no fixed byte cap.
   static let maxBytes = 20 * 1024 * 1024
   init(_ directory: URL) { dataDirectory = directory }
   func require(_ id: String) throws -> DocumentRecord {
@@ -114,11 +115,9 @@ final class DocumentStore {
       throw NativeFailure("此编码无法无损保存部分字符，请改用 UTF-8。原文件未修改。", "ENCODING_LOSS")
     }
     let prefix: [UInt8] = bom ? ["utf-8": [0xef, 0xbb, 0xbf], "utf-16le": [0xff, 0xfe], "utf-16be": [0xfe, 0xff]][encoding] ?? [] : []
-    guard bytes.count + prefix.count <= maxBytes else { throw NativeFailure("编码后的文件超过 20 MB。") }
     return Data(prefix) + bytes
   }
   func decode(_ data: Data, encoding requested: String? = nil) throws -> (String, Bool, String) {
-    guard data.count <= Self.maxBytes else { throw NativeFailure("文件超过支持的 20 MB。") }
     let marker: (String, Int)? = data.starts(with: [0xef, 0xbb, 0xbf]) ? ("utf-8", 3) : data.starts(with: [0xff, 0xfe]) ? ("utf-16le", 2) : data.starts(with: [0xfe, 0xff]) ? ("utf-16be", 2) : nil
     let encoding = requested ?? marker?.0 ?? "utf-8"
     let bom = marker?.0 == encoding
@@ -136,8 +135,7 @@ final class DocumentStore {
       throw NativeFailure("请选择 Markdown 文件。")
     }
     let values = try resolved.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
-    guard values.isRegularFile == true, (values.fileSize ?? Self.maxBytes + 1) <= Self.maxBytes
-    else { throw NativeFailure("文件内容无效或超过 20 MB。") }
+    guard values.isRegularFile == true else { throw NativeFailure("请选择普通 Markdown 文件。") }
     let bytes = try Data(contentsOf: resolved)
     let (text, bom, detected) = try decode(bytes, encoding: encoding)
     let record = DocumentRecord(
@@ -149,8 +147,7 @@ final class DocumentStore {
     return record
   }
   func draft(_ record: DocumentRecord) throws -> DocumentRecord {
-    guard record.path == nil, records[record.id]?.path == nil,
-      record.content.utf8.count <= Self.maxBytes
+    guard record.path == nil, records[record.id]?.path == nil
     else { throw NativeFailure("草稿格式无效。") }
     records[record.id] = record
     return record
@@ -165,7 +162,6 @@ final class DocumentStore {
     -> DocumentRecord
   {
     var record = try require(id)
-    guard text.utf8.count <= Self.maxBytes else { throw NativeFailure("内容超过支持的 20 MB。") }
     guard let target = destination ?? record.path.map({ URL(fileURLWithPath: $0) }) else {
       throw NativeFailure("请先为草稿选择保存位置。")
     }
@@ -279,13 +275,8 @@ final class DocumentStore {
   func persist(_ incoming: SessionRecord) throws {
     guard incoming.documents.count <= 100 else { throw NativeFailure("打开的文档超过 100 份。") }
     var documents = [DocumentRecord]()
-    var bytes = 0
     for item in incoming.documents {
       var owned = try require(item.id)
-      bytes += item.content.utf8.count
-      guard item.content.utf8.count <= Self.maxBytes, bytes <= 100 * 1024 * 1024 else {
-        throw NativeFailure("恢复数据过大。")
-      }
       owned.content = item.content
       owned.conflict = item.conflict
       records[item.id] = owned
@@ -317,7 +308,6 @@ final class DocumentStore {
       }
       var documents = [DocumentRecord]()
       for var record in session.documents {
-        guard record.content.utf8.count <= Self.maxBytes else { throw NativeFailure("恢复文档过大。") }
         records[record.id] = record
         if record.path != nil, let changed = try check(record.id) {
           if record.content == record.savedContent, let text = changed["content"] as? String,

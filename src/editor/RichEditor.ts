@@ -1,3 +1,5 @@
+import { LargeTableView } from "./LargeTableView.ts";
+import { positionIndex, shiftPositions } from "./sourcePositions.ts";
 import { BlockViewport, blockSpacer } from "./blockViewport.ts";
 import { codeSelectionCommand, selectionActions, wordRange } from "./selectionCommands.ts";
 import emojiNames from "markdown-it-emoji/lib/data/full.mjs";
@@ -76,6 +78,8 @@ export class RichEditor {
   };
   private scrollFrame = 0;
   private fenceBehavior = new Compartment();
+  private codePreviews = new Map<string, {element: HTMLElement; raw: string; view: EditorView}>();
+  private tableViews = new Map<string, LargeTableView>();
   private fenceOptions() { return [EditorState.readOnly.of(this.readOnly), EditorView.editable.of(!this.readOnly), indentUnit.of(" ".repeat(this.tabSize)), ...(this.autoPair ? [closeBrackets(), keymap.of(closeBracketsKeymap)] : [])]; }
   readonly root: HTMLElement;
   readonly model: MarkdownDocument;
@@ -149,6 +153,8 @@ export class RichEditor {
     cancelAnimationFrame(this.viewportFrame); this.resizeObserver?.disconnect();
     this.root.parentElement?.removeEventListener("scroll",this.scrollViewport);
     this.fence?.view.destroy();
+    for (const preview of this.codePreviews.values()) preview.view.destroy();
+    for (const table of this.tableViews.values()) table.destroy();
     this.tableToolbar.remove(); this.emojiPopup.remove();
     document.removeEventListener("selectionchange", this.selectionChange);
     document.removeEventListener("pointerup", this.pointerUp);
@@ -287,7 +293,7 @@ export class RichEditor {
       `[data-leaf="${leaf.id}"]`,
     );
     if (!element) return null;
-    let local = leaf.positions.findIndex((p) => p >= position);
+    let local = positionIndex(leaf.positions, position);
     if (local < 0) local = leaf.raw.length;
     const texts = this.textNodes(element);
     for (const text of texts) {
@@ -329,9 +335,32 @@ export class RichEditor {
       if(virtual&&index>cursor)desired.push(blockSpacer(this.viewport.offset(index)-this.viewport.offset(cursor)));
       cursor=index+1;
       const previous = existing.get(node.id), cached = this.blocks.get(node.id);
+      if (this.fence?.id === node.id && previous) {
+        const leaves = cached?.leaves || [this.fence.leaf];
+        for (const leaf of leaves) fresh.set(leaf.id, leaf);
+        desired.push(previous); next.set(node.id, {node, element: previous, leaves, environment}); continue;
+      }
+      if (node.kind === "table_open" && (node.source.length > 50_000 || node.source.split("\n", 202).length > 200)) {
+        let table = this.tableViews.get(node.id);
+        if (!table) {
+          table = new LargeTableView(node, this.documentId, this.model.environment, (view, restore) => {
+            const block = this.blocks.get(node.id); if (block?.element !== view.element) return;
+            const selection = {...this.model.selection};
+            for (const leaf of block.leaves) this.leaves.delete(leaf.id);
+            block.leaves = [...view.leaves.values()];
+            for (const leaf of block.leaves) this.leaves.set(leaf.id, leaf);
+            if (restore && !this.mutating) this.restore(selection, false);
+            void renderMath(view.element).then(view.measure).catch(() => {});
+          }, () => this.composing);
+          this.tableViews.set(node.id, table);
+        }
+        table.update(node, this.model.environment, this.model.selection, this.readOnly);
+        const leaves = [...table.leaves.values()]; for (const leaf of leaves) fresh.set(leaf.id, leaf);
+        desired.push(table.element); next.set(node.id, {node, element: table.element, leaves, environment}); continue;
+      }
       if (cached && previous === cached.element && this.fence?.id !== node.id && cached.node.source === node.source && cached.node.kind === node.kind && cached.environment === environment) {
         const delta = node.from - cached.node.from;
-        const leaves = delta ? cached.leaves.map(leaf => ({ ...leaf, positions: leaf.positions.map(position => position + delta) })) : cached.leaves;
+        const leaves = delta ? cached.leaves.map(leaf => ({ ...leaf, positions: shiftPositions(leaf.positions, delta) })) : cached.leaves;
         for (const leaf of leaves) fresh.set(leaf.id, leaf);
         if (delta) for (const checkbox of previous.querySelectorAll<HTMLElement>("[data-task]")) checkbox.dataset.task = String(Number(checkbox.dataset.task) + delta);
         if (previous.dataset.line !== String(node.line)) previous.dataset.line = String(node.line);
@@ -352,6 +381,8 @@ export class RichEditor {
       if (this.root.children[i] !== desired[i]) this.root.insertBefore(desired[i], this.root.children[i] || null);
     const retained = new Set(desired);
     for (const element of [...this.root.children]) if (!retained.has(element as HTMLElement)) element.remove();
+    for (const [id, table] of this.tableViews) if (!next.has(id)) { table.destroy(); this.tableViews.delete(id); }
+    this.syncCodePreviews();
     if (restore && !this.fence) this.restore();
     this.mutating = false;
     const measure=()=>{
@@ -374,14 +405,23 @@ export class RichEditor {
     this.reportCursor();
   }
   private reportCursor() {
-    const node=this.model.nodeAt(this.model.selection.head),from=node?.from||0;
-    const before=this.model.text.slice(from,this.model.selection.head),at=before.lastIndexOf("\n");
-    this.callbacks.cursor((node?.line||1)+(before.match(/\n/g)?.length||0),before.length-at);
+    const node = this.model.nodeAt(this.model.selection.head), from = node?.from || 0;
+    if (this.fence) {
+      const head = this.fence.view.state.selection.main.head, line = this.fence.view.state.doc.lineAt(head);
+      this.callbacks.cursor((node?.line || 1) + (this.fence.leaf.fenceLine || 0) + line.number, head - line.from + 1);
+    } else if (node && this.tableViews.has(node.id)) {
+      const index = this.tableViews.get(node.id)!.index, row = index.rowAt(this.model.selection.head - from);
+      this.callbacks.cursor(node.line + row, this.model.selection.head - from - index.offsets[row] + 1);
+    } else {
+      const before = this.model.text.slice(from, this.model.selection.head), at = before.lastIndexOf("\n");
+      this.callbacks.cursor((node?.line || 1) + (before.match(/\n/g)?.length || 0), before.length - at);
+    }
     this.updateWritingMode(); this.updateEmoji();
   }
   setOptions(options: { spellcheck: boolean; tabSize: number; typewriter: boolean; autoPair?: boolean; emoji?: boolean; readOnly?: boolean }) {
     this.readOnly = options.readOnly ?? false;
     this.root.contentEditable = String(!this.readOnly);
+    for (const table of this.tableViews.values()) table.setReadOnly(this.readOnly);
     this.root.setAttribute("aria-readonly", String(this.readOnly));
     this.tableToolbar.inert = this.readOnly;
     for (const checkbox of this.root.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')) checkbox.disabled = this.readOnly;
@@ -891,11 +931,17 @@ export class RichEditor {
       }
     }
     const fence = target.closest<HTMLElement>("[data-fence]");
-    if (fence && !target.closest(".cm-editor")) this.activateFence(fence);
+    if (fence && (!target.closest(".cm-editor") || target.closest(".code-preview"))) {
+      const preview = this.codePreviews.get(fence.dataset.fence!), leaf = this.leaves.get(fence.dataset.fence!);
+      const position = preview?.view.posAtCoords({x: event.clientX, y: event.clientY});
+      if (leaf && position != null) this.model.selection = {anchor: leaf.positions[position], head: leaf.positions[position]};
+      this.activateFence(fence);
+    }
     const object = target.closest<HTMLElement>('.md-inline[data-mark="math"],.md-inline[data-mark="sub"],.md-inline[data-mark="sup"],.md-inline[data-mark="emoji"],.md-inline[data-mark="image"]');
     if (object && target.closest(".md-view")) { const leaf = this.leaves.get(object.closest<HTMLElement>("[data-leaf]")!.dataset.leaf!)!; const at = leaf.positions[Number(object.dataset.inlineFrom)] + (object.dataset.mark === "image" ? 2 : 1); this.model.selection = { anchor: at, head: at }; this.restore(); }
   };
   private updateEmoji() {
+    if (this.fence) { this.emojiPopup.hidden = true; return; }
     const selection = this.model.selection, match = /(?:^|[\s(]):([a-zA-Z0-9_+-]{1,30})$/.exec(this.model.text.slice(0, selection.head));
     const node = this.model.nodeAt(selection.head);
     if (!this.emojiEnabled || this.composing || this.fence || selection.anchor !== selection.head || !match || ["fence", "frontmatter", "html_preview", "html_block"].includes(node?.kind || "") || !this.root.contains(window.getSelection()?.anchorNode || null) || this.emojiDismissed === `${selection.head}:${match[1]}`) { this.emojiPopup.hidden = true; return; }
@@ -1081,6 +1127,22 @@ export class RichEditor {
     } else this.insert("\t");
   }
   private tableNext(back: boolean, nextRow = false) {
+    const selection = this.bookmark(), node = this.model.nodeAt(selection.head), large = node && this.tableViews.get(node.id);
+    if (node && large) {
+      const row = large.index.rowAt(selection.head - node.from), cells = large.index.cells(row);
+      const column = Math.max(0, cells.findIndex(cell => selection.head - node.from - large.index.offsets[row] <= cell.end));
+      const current = (row ? row - 1 : 0) * large.index.width + column;
+      const next = current + (back ? -1 : nextRow ? large.index.width : 1);
+      if (next < 0) return;
+      if (next >= (large.index.length - 1) * large.index.width) {
+        this.tableAction("row"); const updated = this.tableViews.get(node.id), current = this.model.nodeAt(this.model.selection.head);
+        if (updated && current) { const row = updated.index.length - 1, cell = updated.index.cells(row)[next % updated.index.width]; if (cell) { const point = current.from + updated.index.offsets[row] + cell.start; this.select({anchor: point, head: point}); } }
+        return;
+      }
+      const target = Math.floor(next / large.index.width), sourceRow = target ? target + 1 : 0;
+      const cell = large.index.cells(sourceRow)[next % large.index.width]; if (!cell) return;
+      this.select({anchor: node.from + large.index.offsets[sourceRow] + cell.start, head: node.from + large.index.offsets[sourceRow] + cell.start}); return;
+    }
     const cell = window
         .getSelection()
         ?.anchorNode?.parentElement?.closest("td,th"),
@@ -1115,10 +1177,42 @@ export class RichEditor {
       this.restore();
     }
   }
+  private largeTableAction(action: string, node: DocumentNode, selection: SelectionBookmark) {
+    const view = this.tableViews.get(node.id);
+    if (!view || !["row", "rowBefore", "removeRow", "moveRowUp", "moveRowDown", "left", "center", "right"].includes(action)) return false;
+    const index = view.index, row = index.rowAt(selection.head - node.from), cells = index.cells(row);
+    const column = Math.max(0, cells.findIndex(cell => selection.head - node.from - index.offsets[row] <= cell.end));
+    let from = 0, to = 0, insert = "", head = selection.head;
+    if (action === "row" || action === "rowBefore") {
+      const target = Math.max(2, row + (action === "row" ? 1 : 0));
+      const line = `| ${Array(index.width).fill("").join(" | ")} |`;
+      from = to = target < index.length ? index.offsets[target] : node.source.length;
+      insert = target < index.length ? line + "\n" : "\n" + line;
+      head = node.from + from + (target < index.length ? 0 : 1) + tableRowCells(line)[Math.min(column, index.width - 1)].start;
+    } else if (action === "removeRow") {
+      if (row < 2) return true;
+      if (row + 1 < index.length) { from = index.offsets[row]; to = index.offsets[row + 1]; head = node.from + from + (index.cells(row + 1)[column]?.start || 0); }
+      else { from = index.offsets[row] - 1; to = node.source.length; const target = row > 2 ? row - 1 : 0; head = node.from + index.offsets[target] + (index.cells(target)[column]?.start || 0); }
+    } else if (["left", "center", "right"].includes(action)) {
+      const values = index.cells(1).map(cell => cell.raw); values[column] = action === "left" ? ":---" : action === "right" ? "---:" : ":---:";
+      from = index.offsets[1]; to = index.end(1); insert = `| ${values.join(" | ")} |`; head += insert.length - (to - from);
+    } else {
+      const other = row + (action === "moveRowUp" ? -1 : 1);
+      if (row < 2 || other < 2 || other >= index.length) return true;
+      const low = Math.min(row, other), high = Math.max(row, other);
+      from = index.offsets[low]; to = index.end(high); insert = index.line(high) + "\n" + index.line(low);
+      const start = row === high ? from : from + index.line(high).length + 1;
+      head = node.from + start + selection.head - node.from - index.offsets[row];
+    }
+    this.model.selection = selection;
+    if (this.model.replace(node.from + from, node.from + to, insert, "table", {anchor: head, head})) this.publish();
+    return true;
+  }
   tableAction(action: string) {
     const selection = this.bookmark();
     const node = this.model.nodeAt(selection.head);
     if (!node || node.kind !== "table_open") return;
+    if (this.largeTableAction(action, node, selection)) return;
     const lines = node.source.split("\n"),
       rows = lines.map((line) => tableRowCells(line).map((cell) => cell.raw));
     const currentCell = window
@@ -1456,6 +1550,15 @@ export class RichEditor {
     this.blocks.delete(id);
     this.render(false);
   }
+  private syncCodePreviews() {
+    for (const [id, preview] of this.codePreviews) if (!this.root.contains(preview.element) || preview.element.classList.contains("fence-editing")) { preview.view.destroy(); this.codePreviews.delete(id); }
+    for (const element of this.root.querySelectorAll<HTMLElement>(".large-code:not(.fence-editing)")) {
+      const id = element.dataset.fence!, leaf = this.leaves.get(id); if (!leaf || this.codePreviews.has(id)) continue;
+      const view = new EditorView({parent: element.querySelector(".fence-body")!, state: EditorState.create({doc: leaf.raw,
+        extensions: [EditorState.readOnly.of(true), EditorView.editable.of(false), EditorView.editorAttributes.of({class: "code-preview"})]})});
+      this.codePreviews.set(id, {element, raw: leaf.raw, view});
+    }
+  }
   private activateFence(element: HTMLElement) {
     if (this.fence && this.fence.leaf.id === element.dataset.fence) return;
     const key = element.dataset.fence!;
@@ -1465,6 +1568,8 @@ export class RichEditor {
     const leaf = this.leaves.get(element.dataset.fence!)!,
       body = element.querySelector<HTMLElement>(".fence-body")!;
     if (!leaf || !body) return;
+    const preview = this.codePreviews.get(key);
+    if (preview) { preview.view.destroy(); this.codePreviews.delete(key); }
     body.replaceChildren();
     element.classList.add("fence-editing");
     const view = new EditorView({
@@ -1472,18 +1577,18 @@ export class RichEditor {
       state: EditorState.create({
         doc: leaf.raw,
         selection: {
-          anchor: Math.max(0, leaf.positions.findLastIndex(position => position <= this.model.selection.anchor)),
-          head: Math.max(0, leaf.positions.findLastIndex(position => position <= this.model.selection.head)),
+          anchor: positionIndex(leaf.positions, this.model.selection.anchor, true),
+          head: positionIndex(leaf.positions, this.model.selection.head, true),
         },
         extensions: [
           this.fenceBehavior.of(this.fenceOptions()),
-          fenceLanguage(
+          leaf.raw.length > 100_000 ? [] : fenceLanguage(
             element.classList.contains("md-math")
               ? "math"
               : element.querySelector(".fence-language")?.textContent || "",
           ),
           drawSelection(),
-          EditorView.lineWrapping,
+          leaf.raw.length > 100_000 ? [] : EditorView.lineWrapping,
           keymap.of([
             {
               key: "Mod-z",
@@ -1514,6 +1619,18 @@ export class RichEditor {
             if (!update.docChanged) return;
             const current = this.model.nodes.find((n) => n.id === leaf.nodeId);
             if (!current) return;
+            if (leaf.fenceLine === 0 && /^(`{3,}|~{3,})/.test(current.source)) {
+              const range = fenceRange(current), start = current.from + range.start;
+              let from = Infinity, to = 0, first = 0, last = 0;
+              update.changes.iterChangedRanges((a, b, c, d) => { if (a < from) { from = a; first = c; } to = Math.max(to, b); last = Math.max(last, d); });
+              let insert = update.state.sliceDoc(first, last);
+              if (to === update.startState.doc.length && range.closingOnNewLine && update.state.doc.length && update.state.sliceDoc(update.state.doc.length - 1) !== "\n" && range.end - range.start <= update.startState.doc.length) insert += "\n";
+              this.model.selection = {anchor: start + update.startState.selection.main.anchor, head: start + update.startState.selection.main.head};
+              this.model.replace(start + from, start + to, insert,
+                this.composing || update.transactions.some(transaction => transaction.isUserEvent("input.type.compose")) ? "composition" : "typing",
+                {anchor: start + update.state.selection.main.anchor, head: start + update.state.selection.main.head});
+              this.callbacks.change(); this.reportCursor(); return;
+            }
             const range = fenceRange(current),
               body =
                 leaf.fenceLine !== undefined
