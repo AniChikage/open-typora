@@ -311,7 +311,13 @@ export class RichEditor {
     const anchor = this.domPoint(selection.anchor),
       head = this.domPoint(selection.head);
     if (!anchor || !head) return;
-    if (focus) this.root.focus({ preventScroll: true });
+    if (focus) {
+      const parent = anchor.node.nodeType === Node.ELEMENT_NODE ? anchor.node as HTMLElement : anchor.node.parentElement;
+      const host = parent?.closest<HTMLElement>('[contenteditable="true"]');
+      // Large tables are editable islands inside a non-editable row viewport.
+      // Empty cells do not automatically focus that island when selection moves.
+      (host && this.root.contains(host) ? host : this.root).focus({ preventScroll: true });
+    }
     window
       .getSelection()
       ?.setBaseAndExtent(anchor.node, anchor.offset, head.node, head.offset);
@@ -319,6 +325,7 @@ export class RichEditor {
   }
   render(restore = true) {
     if (this.composing) return;
+    const preserveSelection = !restore && this.root.contains(window.getSelection()?.anchorNode || null);
     this.mutating = true;
     const fresh = new Map<string, Leaf>(), desired: HTMLElement[] = [], next = new Map<string, { node: DocumentNode; element: HTMLElement; leaves: Leaf[]; environment: string }>();
     const existing = new Map([...this.root.children].map(element => [(element as HTMLElement).dataset.cid, element as HTMLElement]));
@@ -383,7 +390,7 @@ export class RichEditor {
     for (const element of [...this.root.children]) if (!retained.has(element as HTMLElement)) element.remove();
     for (const [id, table] of this.tableViews) if (!next.has(id)) { table.destroy(); this.tableViews.delete(id); }
     this.syncCodePreviews();
-    if (restore && !this.fence) this.restore();
+    if (!this.fence && (restore || preserveSelection)) this.restore(this.model.selection, restore);
     this.mutating = false;
     const measure=()=>{
       if(!virtual)return;

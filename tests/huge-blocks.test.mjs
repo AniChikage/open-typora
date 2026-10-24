@@ -77,3 +77,22 @@ test('occluded table windows still mount scrolled rows when animation frames are
   assert.ok(view.element.textContent.includes('TAIL'));assert.ok(view.element.querySelectorAll('td').length<150);
  }finally{view.destroy();view.element.remove();globalThis.requestAnimationFrame=previousFrame;globalThis.cancelAnimationFrame=previousCancel;}
 });
+
+test('table viewport changes retain the caret in an unchanged row',async()=>{
+ const {LargeTableView}=await import('../src/editor/LargeTableView.ts');
+ const previousFrame=globalThis.requestAnimationFrame,previousCancel=globalThis.cancelAnimationFrame;
+ globalThis.requestAnimationFrame=()=>71;globalThis.cancelAnimationFrame=()=>{};
+ const source='| Key | Value |\n|---|---|\n'+Array.from({length:1000},(_,i)=>`| row-${i} | value |`).join('\n');
+ const node={id:'retained-table',from:0,to:source.length,source,kind:'table_open',line:1},environment={};
+ const view=new LargeTableView(node,'fixture',environment,()=>{},()=>false);
+ try{
+  Object.defineProperties(view.element,{clientHeight:{value:480},scrollHeight:{value:40000}});document.body.append(view.element);
+  const point=view.index.offsets[500]+view.index.cells(500)[0].start;
+  view.update(node,environment,{anchor:point,head:point},false);
+  const text=view.element.querySelector('tr[data-source-row="500"] td span').firstChild;
+  window.getSelection().setBaseAndExtent(text,2,text,2);
+  view.element.scrollTop-=240;view.element.dispatchEvent(new dom.window.Event('scroll'));
+  await new Promise(resolve=>setTimeout(resolve,100));
+  assert.equal(window.getSelection().anchorNode,text);assert.equal(window.getSelection().anchorOffset,2);assert.ok(text.isConnected);
+ }finally{window.getSelection().removeAllRanges();view.destroy();view.element.remove();globalThis.requestAnimationFrame=previousFrame;globalThis.cancelAnimationFrame=previousCancel;}
+});

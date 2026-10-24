@@ -34,7 +34,11 @@ try{
  const cellStart=Date.now();await page.keyboard.insertText('中文');await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));timings.tableEditMs=Date.now()-cellStart;
  await saved(tableFile,table.replace('LAST-TABLE-CELL','LAST-TABLE-CELL中文'));console.log('PROBE: giant table Unicode saved');await page.keyboard.press(`${mod}+z`);await saved(tableFile,table);
  await pointCell(large.getByText('LAST-TABLE-CELL',{exact:true}));await cdp.send('Input.imeSetComposition',{text:'zhongguo',selectionStart:8,selectionEnd:8});await cdp.send('Input.insertText',{text:'中国'});await saved(tableFile,table.replace('LAST-TABLE-CELL','LAST-TABLE-CELL中国'));console.log('PROBE: giant table composition saved');await page.keyboard.press(`${mod}+z`);await saved(tableFile,table);
- await large.getByText('LAST-TABLE-CELL',{exact:true}).click();await page.keyboard.press('Tab');await page.keyboard.insertText('ADDED-ROW');await command('save');await expect.poll(()=>readFile(tableFile,'utf8'),{timeout:60000}).toContain('ADDED-ROW');
+ const appendStarted=Date.now();await large.getByText('LAST-TABLE-CELL',{exact:true}).click();await page.keyboard.press('Tab');
+ await expect.poll(()=>page.evaluate(()=>Number(getSelection()?.anchorNode?.parentElement?.closest('tr[data-source-row]')?.dataset.sourceRow)),{timeout:10000}).toBe(rows+2);
+ await page.keyboard.insertText('ADDED-ROW');await command('save');
+ const appended=table.replace('\n\n# After table', '\n| ADDED-ROW |  |  |  |  |  |\n\n# After table');await saved(tableFile,appended);
+ timings.tableAppendMs=Date.now()-appendStarted;assert.ok(timings.tableAppendMs<15000,`Appending a table row took ${timings.tableAppendMs} ms`);console.log('PROBE: giant table row appended',timings.tableAppendMs);
  await page.keyboard.press(`${mod}+z`);await page.keyboard.press(`${mod}+z`);await saved(tableFile,table);await page.screenshot({path:path.join(qa,'giant-table.png')});
  checks.push('80,000-row table mounts bounded cells, reaches its final row, preserves Chinese composition, adds a logical row with Tab and undoes to exact original source.');
  await page.getByRole('tab',{name:'Giant code.md',exact:true}).click();editable=await editCode();await page.keyboard.insertText('RECOVER-ME');

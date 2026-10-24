@@ -464,6 +464,14 @@ try {
   pointText('NATIVE-TABLE-END','NATIVE-TABLE-END'.length);input('insertText','中国');await wait(()=>root()?.textContent.includes('NATIVE-TABLE-END中国'));check(true,'native giant table Chinese edit committed');
   window.__openTypora.command({action:'undo'});await wait(()=>!root()?.textContent.includes('NATIVE-TABLE-END中国'));check(true,'native giant table edit undone');
   check(root().querySelectorAll('.md-large-table td').length<300,'20,000-row native table reaches its tail, edits Chinese and undoes with bounded cell DOM');
+  pointText('NATIVE-TABLE-END','NATIVE-TABLE-END'.length);root().dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',code:'Tab',bubbles:true,cancelable:true}));
+  await new Promise(resolve=>setTimeout(resolve,150));
+  const tableAnchor=getSelection()?.anchorNode,tableAnchorElement=tableAnchor?.nodeType===Node.ELEMENT_NODE?tableAnchor:tableAnchor?.parentElement;
+  check(tableAnchorElement?.closest('tr[data-source-row]')?.dataset.sourceRow==='20002','native Tab-created empty row retains its caret through virtual viewport refresh');
+  input('insertText','NATIVE-ADDED');await wait(()=>root()?.textContent.includes('NATIVE-ADDED'));
+  window.__openTypora.command({action:'undo'});await wait(()=>!root()?.textContent.includes('NATIVE-ADDED'));
+  window.__openTypora.command({action:'undo'});await wait(()=>!root()?.querySelector('tr[data-source-row="20002"]'));
+  check(true,'native large-table appended cell edits and both structural undo steps preserve the table');
   window.__openTypora.command({action:'opened',document:saved.value});await wait(()=>document.querySelector('.document-title')?.textContent===saved.value.name && root()?.textContent.includes('粗测新体'));
   pointText("粗测新体", 2);
   input("insertText", "保留");

@@ -134,8 +134,10 @@ export class LargeTableView {
     if (cursor < this.heights.count) body.push(this.spacer((total - this.heights.offset(cursor)) / scale));
     const restore = this.element.contains(window.getSelection()?.anchorNode || null);
     if (this.head.firstElementChild !== header) this.head.replaceChildren(header);
-    for (let index = 0; index < body.length; index++) if (this.body.children[index] !== body[index]) this.body.insertBefore(body[index], this.body.children[index] || null);
+    // Remove obsolete spacers first. Moving retained rows to get around those
+    // spacers detaches their selection, including a caret in a new empty cell.
     const retained = new Set(body); for (const row of [...this.body.children]) if (!retained.has(row as HTMLElement)) row.remove();
+    for (let index = 0; index < body.length; index++) if (this.body.children[index] !== body[index]) this.body.insertBefore(body[index], this.body.children[index] || null);
     for (const row of this.rows.keys()) if (row !== 0 && !desired.has(row - 2)) this.rows.delete(row);
     this.leaves = leaves; this.changed(this, restore);
     if (atBottom) this.element.scrollTop = this.element.scrollHeight;
