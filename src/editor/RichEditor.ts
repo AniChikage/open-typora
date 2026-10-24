@@ -350,7 +350,7 @@ export class RichEditor {
             block.leaves = [...view.leaves.values()];
             for (const leaf of block.leaves) this.leaves.set(leaf.id, leaf);
             if (restore && !this.mutating) this.restore(selection, false);
-            void renderMath(view.element).then(view.measure).catch(() => {});
+            void renderMath(this.root).then(view.measure).catch(() => {});
           }, () => this.composing);
           this.tableViews.set(node.id, table);
         }
