@@ -15,7 +15,7 @@ SHA-256 checksums are included. macOS is locally signed, not notarized; Windows 
 ## Changes
 
 - **Large rendered documents:** files above 300,000 characters keep live editing enabled. Only visible blocks and selection endpoints mount, and ordinary edits reparse their affected block range. Tests edit and save 5/10 MiB files exactly, navigate to offscreen headings and round-trip source mode. Code blocks retain their identity through Chinese marked text, candidate commit and undo. Distant reference definitions remain available when updating headings and footnotes.
-- **Complete Windows previews:** removes the old 1 MiB truncation. The read-only preview loads the complete source and renders visible blocks. Standard file/Shell Item initialization preserves the document directory in Everything; anonymous stream initialization is no longer advertised.
+- **Complete Windows previews:** removes the old 1 MiB truncation. The read-only preview loads the complete source and renders visible blocks. Jumping to the end remains anchored when text wraps in narrow panes or images finish loading. Standard file/Shell Item initialization preserves the document directory in Everything; anonymous stream initialization is no longer advertised.
 - **Relative preview images:** resolves folder and parent-relative images with Chinese/space filenames and URL encoding. The native handler serves image bytes from the selected document's path. Remote resources, plugins and document scripts remain blocked; WebView2's normal isolation remains enabled.
 - Existing themes, print controls, local files, tabs, split panes and recovery remain available.
 

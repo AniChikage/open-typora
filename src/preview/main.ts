@@ -27,6 +27,7 @@ function schedule() { if(frame)return;frame=requestAnimationFrame(()=>{frame=0;v
 async function renderWindow() {
   if(!model)return;
   const current=revision;
+  const atBottom=virtual&&window.scrollY>0&&window.scrollY+window.innerHeight>=document.documentElement.scrollHeight-4;
   if(virtual) {
     viewport.setNodes(model.nodes);
     const indices=viewport.visible(window.scrollY-root.offsetTop,window.innerHeight),desired:HTMLElement[]=[],next=new Map<string,HTMLElement>();let cursor=0;
@@ -44,6 +45,9 @@ async function renderWindow() {
   let changed=false;
   for(const [id,element] of blocks) changed=viewport.measure(id,element.getBoundingClientRect().height)||changed;
   if(changed&&virtual)schedule();
+  // A narrow pane can grow after measuring wrapped blocks or decoding images.
+  // Keep a deliberate jump to the end anchored until its layout settles.
+  if(atBottom)window.scrollTo(0,document.documentElement.scrollHeight);
   root.dataset.ready='true';
 }
 export async function showPreview(value:{source:string;name?:string;base?:string}) {
