@@ -165,7 +165,7 @@ More editor and desktop suites, test isolation, and build details are in [CONTRI
 
 ## Current limitations
 
-- Documents are limited to 20 MB. Files over 300,000 characters open in source mode.
+- Documents are limited to 20 MiB. Large files retain rendered editing with viewport virtualization; source mode remains available.
 - Legacy encodings without a BOM require an explicit encoding choice.
 - Rich editing and source editing have separate undo histories; changes made in source mode join the rich history as one transaction when returning.
 - Format conversion can change layout or unsupported document structures. Some RTF image formats are rejected explicitly. Keep the original file when importing.

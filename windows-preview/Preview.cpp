@@ -9,6 +9,7 @@
 #include <vector>
 #include <algorithm>
 #include <climits>
+#include <new>
 #include "WebView2.h"
 using Microsoft::WRL::ComPtr;
 using Microsoft::WRL::Callback;
@@ -125,7 +126,7 @@ public:
  IFACEMETHODIMP SetRect(const RECT* bounds)override{if(!bounds)return E_POINTER;rect=*bounds;resize();return S_OK;}
  IFACEMETHODIMP DoPreview()override{
   if(window||!parent||(!stream&&filename.empty()))return E_UNEXPECTED;
-  HRESULT result=read();if(FAILED(result))return result;
+  HRESULT result;try{result=read();}catch(const std::bad_alloc&){return E_OUTOFMEMORY;}if(FAILED(result))return result;
   window=CreateWindowExW(0,L"STATIC",L"Loading Markdown preview...",WS_CHILD|WS_VISIBLE|WS_CLIPCHILDREN,0,0,1,1,parent,nullptr,module,nullptr);if(!window)return HRESULT_FROM_WIN32(GetLastError());resize();
   PWSTR low=nullptr;result=SHGetKnownFolderPath(FOLDERID_LocalAppDataLow,KF_FLAG_CREATE,nullptr,&low);if(FAILED(result))return result;
   std::wstring userData=std::wstring(low)+L"\\OpenTyporaPreview";CoTaskMemFree(low);SHCreateDirectoryExW(nullptr,userData.c_str(),nullptr);
