@@ -1,3 +1,4 @@
+import { headingSlug } from "./markdownExtensions.ts";
 import { parseBlocks } from "./markdown.ts";
 export interface SelectionBookmark {
   anchor: number;
@@ -179,7 +180,9 @@ export class MarkdownDocument {
         const oldEndLine=finish<old.length?old[finish].line:Infinity;
         const before=(this.environment.headings as Array<{line:number}>).filter(item=>item.line<startLine);
         const after=(this.environment.headings as Array<{line:number}>).filter(item=>item.line>=oldEndLine).map(item=>({...item,line:item.line+lineDelta}));
-        this.environment={...this.environment,headings:[...before,...((env as Record<string,unknown>).headings as unknown[]||[]).filter((item:any)=>item.line>=startLine&&item.line<oldEndLine+lineDelta),...after]};
+        const headings=[...before,...((env as Record<string,unknown>).headings as Array<{line:number;text:string;id:string}>||[]).filter(item=>item.line>=startLine&&item.line<oldEndLine+lineDelta),...after] as Array<{line:number;text:string;id:string}>;
+        const used=new Map<string,number>();
+        this.environment={...this.environment,headings:headings.map(heading=>{const base=headingSlug(heading.text),count=used.get(base)||0;used.set(base,count+1);return {...heading,id:base+(count?`-${count}`:"")};})};
       }
       this.ensureCaretNode();this.rebuildRoot();
       return true;

@@ -97,7 +97,7 @@ export function parseBlocks(
   const lines = source.split("\n");
   const blocks: Block[] = [];
   let covered = 0;
-  if (lines[0] === "---") {
+  if (lines[0] === "---" && !environment.lineOffset) {
     const end = lines
       .slice(1)
       .findIndex((line) => line === "---" || line === "...");

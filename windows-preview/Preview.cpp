@@ -81,7 +81,6 @@ class Preview final:public IPreviewHandler,public IInitializeWithItem,public IIn
   ComPtr<ICoreWebView2Settings> settings;web->get_Settings(&settings);settings->put_AreDefaultContextMenusEnabled(FALSE);settings->put_AreDevToolsEnabled(FALSE);settings->put_IsStatusBarEnabled(FALSE);
   ComPtr<ICoreWebView2_3> mapping;if(FAILED(web.As(&mapping)))return E_NOINTERFACE;
   HRESULT result=mapping->SetVirtualHostNameToFolderMapping(L"app.opentypora.local",(directory()+L"\\dist").c_str(),COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_DENY_CORS);if(FAILED(result))return result;
-  if(!filename.empty()) { const auto slash=filename.find_last_of(L"\\/"); if(slash!=std::wstring::npos)mapping->SetVirtualHostNameToFolderMapping(L"document.opentypora.local",filename.substr(0,slash).c_str(),COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_DENY_CORS); }
   web->AddWebResourceRequestedFilter(L"*",COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
   web->add_WebResourceRequested(Callback<ICoreWebView2WebResourceRequestedEventHandler>([this](ICoreWebView2*,ICoreWebView2WebResourceRequestedEventArgs* args)->HRESULT{
    ComPtr<ICoreWebView2WebResourceRequest> request;args->get_Request(&request);LPWSTR uri=nullptr;request->get_Uri(&uri);std::wstring address=uri?uri:L"";CoTaskMemFree(uri);
@@ -103,6 +102,7 @@ class Preview final:public IPreviewHandler,public IInitializeWithItem,public IIn
       }
       ComPtr<ICoreWebView2WebResourceResponse> response;environment->CreateWebResourceResponse(image.Get(),SUCCEEDED(found)?200:404,SUCCEEDED(found)?L"OK":L"Not found",(L"Content-Type: "+type+L"\r\nCache-Control: no-store").c_str(),&response);args->put_Response(response.Get());return S_OK;
     }
+    ComPtr<ICoreWebView2WebResourceResponse> blocked;environment->CreateWebResourceResponse(nullptr,403,L"Blocked",L"",&blocked);args->put_Response(blocked.Get());return S_OK;
    }
    if(!localImage&&address.rfind(L"https://app.opentypora.local/",0)!=0&&address.rfind(L"data:",0)!=0){ComPtr<ICoreWebView2WebResourceResponse> blocked;environment->CreateWebResourceResponse(nullptr,403,L"Blocked",L"",&blocked);args->put_Response(blocked.Get());}return S_OK;
   }).Get(),&resourcesToken);

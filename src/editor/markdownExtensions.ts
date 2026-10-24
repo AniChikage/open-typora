@@ -35,6 +35,7 @@ export function configureDocumentSyntax(md: MarkdownIt) {
     }
   });
   md.block.ruler.before("hr", "frontmatter", (state, startLine, endLine, silent) => {
+    if ((state.env as SyntaxEnvironment).lineOffset) return false;
     if (startLine !== 0 || state.src.slice(state.bMarks[0], state.eMarks[0]) !== "---") return false;
     let end = 1;
     for (; end < endLine; end++) if (/^(?:---|\.\.\.)$/.test(state.src.slice(state.bMarks[end], state.eMarks[end]))) break;

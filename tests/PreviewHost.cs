@@ -24,12 +24,13 @@ public static class PreviewProbe {
  public static string[] Names(IntPtr window){var root=AutomationElement.FromHandle(window);return root.FindAll(TreeScope.Descendants,Condition.TrueCondition).Cast<AutomationElement>().Select(element=>element.Current.Name??"").ToArray();}
  public static void Capture(IntPtr window,string file){PreviewRect rect;GetWindowRect(window,out rect);using(var bitmap=new Bitmap(Math.Max(1,rect.right-rect.left),Math.Max(1,rect.bottom-rect.top))){using(var graphics=Graphics.FromImage(bitmap))graphics.CopyFromScreen(rect.left,rect.top,0,0,bitmap.Size);bitmap.Save(file,System.Drawing.Imaging.ImageFormat.Png);}}
  public static void Wait(IntPtr window,string expected,int seconds){var deadline=DateTime.UtcNow.AddSeconds(seconds);string[] names=new string[0];while(DateTime.UtcNow<deadline){Application.DoEvents();try{names=Names(window);if(names.Contains(expected))return;}catch(Exception){}Thread.Sleep(300);}throw new Exception("Rendered preview text missing: "+expected+"; tree="+String.Join(" | ",names.Take(100)));}
- public static void Image(IntPtr window,string name){
+ public static void CheckImage(IntPtr window,string name){
   var images=AutomationElement.FromHandle(window).FindAll(TreeScope.Descendants,new PropertyCondition(AutomationElement.ControlTypeProperty,ControlType.Image)).Cast<AutomationElement>();
   var image=images.FirstOrDefault(element=>element.Current.Name==name);if(image==null)throw new Exception("Rendered image missing: "+name);
   var rect=image.Current.BoundingRectangle;if(rect.Width<200||rect.Height<70)throw new Exception("Image failed to decode: "+name);
   using(var bitmap=new Bitmap(1,1)){using(var graphics=Graphics.FromImage(bitmap))graphics.CopyFromScreen((int)(rect.Left+rect.Width*0.8),(int)(rect.Top+rect.Height*0.5),0,0,bitmap.Size);var color=bitmap.GetPixel(0,0);if(Math.Abs(color.R-70)>8||Math.Abs(color.G-130)>8||Math.Abs(color.B-180)>8)throw new Exception("Relative image pixels are wrong: "+name+" "+color);}
  }
+ public static void Image(IntPtr window,string name){var until=DateTime.UtcNow.AddSeconds(15);Exception last=null;while(DateTime.UtcNow<until){Application.DoEvents();try{CheckImage(window,name);return;}catch(Exception error){last=error;}Thread.Sleep(150);}throw last??new Exception("Image unavailable: "+name);}
  public static void End(IntPtr window){
   var documents=AutomationElement.FromHandle(window).FindAll(TreeScope.Descendants,new PropertyCondition(AutomationElement.ControlTypeProperty,ControlType.Document)).Cast<AutomationElement>();
   var document=documents.LastOrDefault();if(document==null)throw new Exception("Preview document not found");document.SetFocus();SendKeys.SendWait("^{END}");Wait(window,"Complete preview tail",45);

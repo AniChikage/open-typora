@@ -15,7 +15,7 @@ function images(element:HTMLElement) {
   for(const image of element.querySelectorAll<HTMLImageElement>('img')) {
     const address=image.getAttribute('src')||'';
     if(!address.startsWith('open-typora-asset:'))continue;
-    let relative='';try{relative=decodeURIComponent(new URL(address).pathname.split('/').slice(2).join('/'));}catch{/* invalid path */}
+    let relative='';try{relative=decodeURIComponent(decodeURIComponent(new URL(address).pathname.split('/').slice(2).join('/')));}catch{/* invalid path */}
     if(base==='https://document.opentypora.local/'&&relative&&!/^[\\/]|^[a-z][a-z\d+.-]*:/i.test(relative)) image.src=base+'?path='+encodeURIComponent(relative);
     else image.replaceWith(document.createTextNode((image.alt||'本地图片')+'（缺少文档路径）'));
   }

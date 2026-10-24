@@ -25,10 +25,10 @@ try {
   $documents=Join-Path $qa 'documents 中文';New-Item -ItemType Directory -Force $documents | Out-Null
   $first = Join-Path $documents '中文 preview one.md'; $second = Join-Path $qa 'preview two.markdown'
   Add-Type -AssemblyName System.Drawing
-  $bitmap=[Drawing.Bitmap]::new(300,100);$graphics=[Drawing.Graphics]::FromImage($bitmap);$graphics.Clear([Drawing.Color]::SteelBlue);$graphics.FillRectangle([Drawing.Brushes]::LightSkyBlue,20,20,80,60);$bitmap.Save((Join-Path $qa 'preview-image.png'),[Drawing.Imaging.ImageFormat]::Png);$graphics.Dispose();$bitmap.Dispose()
-  [IO.File]::WriteAllText($first,"# Native preview one`n`n中文预览 👋 **bold**`n`n| Key | Value |`n|---|---|`n| Alpha | 123 |`n`n``````js`nconst answer = 42;`n```````n`n<script>document.title='injected'</script>`n![Local diagram](../preview-image.png)`n`n![Blocked](https://example.invalid/private.png)`n",[Text.UTF8Encoding]::new($false))
+  $bitmap=[Drawing.Bitmap]::new(300,100);$graphics=[Drawing.Graphics]::FromImage($bitmap);$graphics.Clear([Drawing.Color]::SteelBlue);$graphics.FillRectangle([Drawing.Brushes]::LightSkyBlue,20,20,80,60);$bitmap.Save((Join-Path $qa '预览 图片.png'),[Drawing.Imaging.ImageFormat]::Png);$graphics.Dispose();$bitmap.Dispose()
+  [IO.File]::WriteAllText($first,"# Native preview one`n`n中文预览 👋 **bold**`n`n| Key | Value |`n|---|---|`n| Alpha | 123 |`n`n``````js`nconst answer = 42;`n```````n`n<script>document.title='injected'</script>`n![Local diagram](../预览 图片.png)`n`n![Blocked](https://example.invalid/private.png)`n",[Text.UTF8Encoding]::new($false))
   $filler="`nFull preview paragraph 中文. **Rich Markdown** remains available beyond the old limit.`n`n" * 80000
-  [IO.File]::AppendAllText($first,$filler+"`n# Complete preview tail`n`n![Tail diagram](../preview-image.png)`n",[Text.UTF8Encoding]::new($false))
+  [IO.File]::AppendAllText($first,$filler+"`n# Complete preview tail`n`n![Tail diagram](../预览 图片.png)`n",[Text.UTF8Encoding]::new($false))
   if ((Get-Item $first).Length -le 5MB) { throw 'Full preview fixture must exceed 5 MiB' }
   [IO.File]::WriteAllText($second,"# Native preview two`n`nStream initialization and rapid selection.`n`n| Key | Value |`n|---|---|`n| Alpha | 456 |`n",[Text.UnicodeEncoding]::new($false,$true))
   $hashes = @((Get-FileHash $first).Hash,(Get-FileHash $second).Hash)
