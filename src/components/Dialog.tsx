@@ -5,7 +5,8 @@ export function Dialog({ title, close, children }: { title: string; close(): voi
   closing.current = close;
   useLayoutEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
-    const first = [...root.current!.querySelectorAll<HTMLElement>('input:not([type="checkbox"]),textarea,select,button,summary')].find(control => control.getClientRects().length > 0 && !control.matches(":disabled"));
+    const controls = [...root.current!.querySelectorAll<HTMLElement>('input:not([type="checkbox"]),textarea,select,button,summary')].filter(control => control.getClientRects().length > 0 && !control.matches(":disabled"));
+    const first = controls.find(control => control.matches("input,textarea,select")) || controls[0];
     first?.focus();
     return () => { if (previous?.isConnected) previous.focus({ preventScroll: true }); };
   }, []);

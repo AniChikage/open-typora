@@ -41,6 +41,9 @@ try{
  timings.tableAppendMs=Date.now()-appendStarted;assert.ok(timings.tableAppendMs<15000,`Appending a table row took ${timings.tableAppendMs} ms`);console.log('PROBE: giant table row appended',timings.tableAppendMs);
  await page.keyboard.press(`${mod}+z`);await page.keyboard.press(`${mod}+z`);await saved(tableFile,table);await page.screenshot({path:path.join(qa,'giant-table.png')});
  checks.push('80,000-row table mounts bounded cells, reaches its final row, preserves Chinese composition, adds a logical row with Tab and undoes to exact original source.');
+ await command('quick-open');const dialog=page.getByRole('dialog',{name:'快速打开',exact:true}),query=dialog.getByRole('combobox',{name:'搜索文档'});await expect(query).toBeFocused();
+ await large.evaluate(element=>{element.scrollTop-=360;element.dispatchEvent(new Event('scroll'));});await page.waitForTimeout(150);await expect(query).toBeFocused();
+ await page.keyboard.press('Escape');await expect(dialog).toBeHidden();checks.push('A passive giant-table viewport refresh retains quick-open input focus and Escape closes its dialog.');
  await page.getByRole('tab',{name:'Giant code.md',exact:true}).click();editable=await editCode();await page.keyboard.insertText('RECOVER-ME');
  await expect.poll(async()=>{try{return JSON.parse(await readFile(path.join(profile,'session.json'),'utf8')).documents.find(record=>record.path===codeFile)?.content.includes('RECOVER-ME');}catch{return false;}},{timeout:60000,intervals:[500,1000]}).toBe(true);
  await app.close();app=null;await launch();await page.getByRole('tab',{name:'Giant code.md',exact:true}).click();await saved(codeFile,code.replace('HUGE-CODE-END','HUGE-CODE-ENDRECOVER-ME'));

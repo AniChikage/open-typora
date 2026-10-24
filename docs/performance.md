@@ -23,7 +23,7 @@ Small documents use full Markdown parsing. Large rendered documents reparse the 
 
 ## Large rendered documents in 0.15.0
 
-Documents above 300,000 UTF-16 code units keep rendered editing enabled. The editor mounts visible blocks plus the caret/selection endpoints, keeps measured space for offscreen content and parses only the affected block range where its surrounding syntax remains stable. Headings, inline formatting, paragraphs, lists, tables and local code retain the existing editing interactions. Source mode remains available; its large-file configuration omits syntax highlighting and bracket matching. The fixed 20 MiB Markdown limit was removed in 0.16.1; see the large-block validation below.
+Documents above 300,000 UTF-16 code units keep rendered editing enabled. The editor mounts visible blocks plus the caret/selection endpoints, keeps measured space for offscreen content and parses only the affected block range where its surrounding syntax remains stable. Headings, inline formatting, paragraphs, lists, tables and local code retain the existing editing interactions. Source mode remains available; its large-file configuration omits syntax highlighting and bracket matching. The fixed 20 MiB Markdown limit was removed in 0.16.2; see the large-block validation below.
 
 - Rendered block identities survive incremental edits, including local code IME updates and final candidate commits. Cross-viewport Markdown selection uses document positions rather than copying only mounted text.
 - Source edits apply the changed range instead of replacing the entire document on every input event.
@@ -39,7 +39,7 @@ Unit tests also retain 100 separate small undo steps in a roughly 7 MiB Unicode/
 
 A separate Node/V8 heap regression uses a 5 MiB ASCII document and 100 independent 100-character replacements. After explicit garbage collection, retained-heap growth fell from about 500 MiB with source-backed substrings to about 5 MiB after detaching history deltas. The same check passes with Node 26.7.0 and 26.12.1. This isolates the document model; it is not the complete application's memory usage. The test also undoes all 100 changes exactly and runs in a fresh process with a conservative 32 MiB growth limit.
 
-## Large blocks and file sizes in 0.16.1
+## Large blocks and file sizes in 0.16.2
 
 Markdown open, encoded save, draft registration and recovery no longer reject files at 20 MiB. They still load source in memory; available RAM, runtime string/IPC limits and storage determine practical sizes. This is not a disk-backed unlimited-size editor. Converted imports and media retain separate budgets.
 

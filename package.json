@@ -1,6 +1,6 @@
 {
   "name": "open-typora",
-  "version": "0.16.1",
+  "version": "0.16.2",
   "description": "A local Markdown writing space with live rendering and lossless source editing.",
   "private": true,
   "type": "module",

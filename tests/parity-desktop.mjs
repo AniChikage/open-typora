@@ -119,7 +119,7 @@ try {
   checks.push('Source/live round trip and portable HTML preserve both rendered diagrams');
   if(process.platform !== 'darwin') {
     await root.click(); await page.keyboard.press('Control+p');
-    await expect(page.getByRole('dialog',{name:'快速打开',exact:true})).toBeVisible(); await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog',{name:'快速打开',exact:true}).getByRole('combobox',{name:'搜索文档'})).toBeFocused(); await page.keyboard.press('Escape'); await expect(page.getByRole('dialog',{name:'快速打开',exact:true})).toBeHidden();
     await page.keyboard.press('Control+Shift+1');
     await expect(page.getByRole('button',{name:'Editing parity',exact:true})).toBeVisible();
     checks.push('PC Ctrl+P quick open and Ctrl+Shift+1 outline use the documented platform bindings');

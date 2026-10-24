@@ -308,6 +308,8 @@ export class RichEditor {
   }
   restore(selection = this.model.selection, focus = true) {
     if (this.root.closest<HTMLElement>(".document-editor")?.dataset.active === "false") return;
+    // Selection APIs can focus an editing host even without an explicit focus().
+    if (!focus && !this.root.contains(document.activeElement)) return;
     const anchor = this.domPoint(selection.anchor),
       head = this.domPoint(selection.head);
     if (!anchor || !head) return;
@@ -325,7 +327,7 @@ export class RichEditor {
   }
   render(restore = true) {
     if (this.composing) return;
-    const preserveSelection = !restore && this.root.contains(window.getSelection()?.anchorNode || null);
+    const preserveSelection = !restore && this.root.contains(document.activeElement) && this.root.contains(window.getSelection()?.anchorNode || null);
     this.mutating = true;
     const fresh = new Map<string, Leaf>(), desired: HTMLElement[] = [], next = new Map<string, { node: DocumentNode; element: HTMLElement; leaves: Leaf[]; environment: string }>();
     const existing = new Map([...this.root.children].map(element => [(element as HTMLElement).dataset.cid, element as HTMLElement]));
