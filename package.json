@@ -34,7 +34,8 @@
     "test:workspace": "node tests/workspace-desktop.mjs",
     "bench:editor": "node scripts/benchmark-editor.mjs",
     "test:indentation": "node tests/indentation-desktop.mjs",
-    "test:next": "node tests/next-desktop.mjs"
+    "test:next": "node tests/next-desktop.mjs",
+    "test:preview": "node tests/preview-desktop.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "6.20.3",

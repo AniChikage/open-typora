@@ -172,7 +172,11 @@ export class MarkdownDocument {
       if (!stable && finish < old.length) { finish = Math.min(old.length, finish + Math.max(8,finish-begin)); continue; }
       const candidates = new Map<string,DocumentNode[]>();
       for(const node of old.slice(begin,finish)) { const key=node.kind+"\0"+node.source;const entries=candidates.get(key)||[];entries.push(node);candidates.set(key,entries); }
-      for(const node of parsed) node.id=candidates.get(node.kind+"\0"+node.source)?.shift()?.id || `node-${++sequence}`;
+      const previous=old.slice(begin,finish),used=new Set<string>();
+      // Reserve exact identities first, then preserve the edited block's identity.
+      // Local code editors keep this ID across every IME update and final commit.
+      for(const node of parsed) {node.id=candidates.get(node.kind+"\0"+node.source)?.shift()?.id||"";if(node.id)used.add(node.id);}
+      for(const [index,node] of parsed.entries())if(!node.id){let same=previous[index];if(!same||same.kind!==node.kind||used.has(same.id))same=previous.find(item=>item.kind===node.kind&&!used.has(item.id))!;node.id=same?.id||`node-${++sequence}`;used.add(node.id);}
       this.nodes = [...old.slice(0,begin),...parsed,...old.slice(finish).map(node=>({...node,from:node.from+delta,to:node.to+delta,line:node.line+lineDelta}))];
       if (finish===old.length && (!this.nodes.length || /\n$/.test(this.text))) this.nodes.push({id:`node-${++sequence}`,from:this.text.length,to:this.text.length,source:"",kind:"empty",line:startLine+offsets.length-1});
       // Existing headings keep their IDs; updated headings are supplied by the fragment parser.

@@ -6,7 +6,7 @@ import os from 'node:os';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
 const directory=await realpath(await mkdtemp(path.join(os.tmpdir(),'open-typora-next-'))),profile=path.join(directory,'profile'),qa=process.env.OPEN_TYPORA_QA_DIR||path.join(directory,'evidence');await mkdir(profile);await mkdir(qa,{recursive:true});
-const five='# Five megabyte document\n\n'+('Paragraph. 中文 👋 **Markdown** and source. 0123456789\n\n').repeat(100000)+'\n# Ending heading\n',ten='# Ten megabyte document\n\n'+('ASCII paragraph with stable content and lines. 0123456789\n\n').repeat(190000),small='# Theme fixture\n\nParagraph one. 中文正文。\n\n## Second chapter\n\nKEEP-A\n\n<!-- pagebreak -->\n\nKEEP-B\n';
+const five='# Five megabyte document\n\n'+('Paragraph. 中文 👋 **Markdown** and source. 0123456789\n\n').repeat(50000)+'# Middle checkpoint\n\n输入区：\n\n- 列表：\n\n| Column | Value |\n|---|---|\n| 单元格： | data |\n\n```js\n代码：end\n```\n\n'+('Paragraph. 中文 👋 **Markdown** and source. 0123456789\n\n').repeat(50000)+'\n# Ending heading\n',ten='# Ten megabyte document\n\n'+('ASCII paragraph with stable content and lines. 0123456789\n\n').repeat(190000),small='# Theme fixture\n\nParagraph one. 中文正文。\n\n## Second chapter\n\nKEEP-A\n\n<!-- pagebreak -->\n\nKEEP-B\n';
 assert.ok(Buffer.byteLength(five)>5*1024*1024);assert.ok(Buffer.byteLength(ten)>10*1024*1024);
 const table='# Table print fixture\n\n| Header-Key | Header-Value |\n|---|---|\n'+Array.from({length:200},(_,i)=>`| Row-${String(i).padStart(3,'0')} | Complete value ${i} |`).join('\n');
 const records=[];for(const [index,content] of [five,ten,small,table].entries()){const name=['Five.md','Ten.md','Theme.md','Table.md'][index],file=path.join(directory,name);await writeFile(file,content);records.push({id:'next-'+index,path:file,name,content,savedContent:content,diskHash:createHash('sha256').update(content).digest('hex'),lineEnding:'\n',encoding:'utf-8',bom:false});}
@@ -24,6 +24,22 @@ try{
  await command('save');await expect.poll(()=>readFile(records[0].path,'utf8'),{timeout:20000}).toBe('# '+'中'.repeat(12)+five.slice(2));
  await page.keyboard.press(`${mod}+z`);await command('save');await expect.poll(()=>readFile(records[0].path,'utf8'),{timeout:20000}).toBe(five);await page.keyboard.press(`${mod}+Shift+z`);await command('save');await expect.poll(()=>readFile(records[0].path,'utf8'),{timeout:20000}).toBe('# '+'中'.repeat(12)+five.slice(2));
  await page.getByRole('button',{name:'切换侧栏内容',exact:true}).click();await page.getByRole('menuitemradio',{name:'大纲',exact:true}).click();await expect(page.getByRole('button',{name:'Ending heading',exact:false})).toBeVisible({timeout:20000});await page.getByRole('button',{name:'Ending heading',exact:false}).click();await expect(source.locator('h1').filter({hasText:'Ending heading'})).toBeVisible();await page.keyboard.insertText('末尾');await page.keyboard.press(`${mod}+z`);await command('save');await expect.poll(()=>readFile(records[0].path,'utf8'),{timeout:20000}).toBe('# '+'中'.repeat(12)+five.slice(2));await command('source');await expect(page.locator('.document-editor[data-document-id="next-0"] .source-surface .cm-content')).toBeVisible();await command('source');await expect(source).toBeVisible();await page.screenshot({path:path.join(qa,'large-rich-document.png')});
+ await page.getByRole('button',{name:'Middle checkpoint',exact:true}).click();
+ await expect(source.getByRole('heading',{name:'Middle checkpoint',exact:true})).toBeVisible();
+ const baseline='# '+'中'.repeat(12)+five.slice(2),cdp=await page.context().newCDPSession(page);
+ const point=async label=>source.evaluate((root,label)=>{const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let text;while(text=walker.nextNode()){if(!text.parentElement.closest('.md-meta,.md-view,.md-ui')&&text.data.includes(label)){root.focus();getSelection().collapse(text,text.data.indexOf(label)+label.length);document.dispatchEvent(new Event('selectionchange'));return;}}throw Error('Missing '+label);},label);
+ for(const label of ['输入区：','列表：','单元格：']) {
+  await point(label);await cdp.send('Input.imeSetComposition',{text:'zhong',selectionStart:5,selectionEnd:5});await cdp.send('Input.insertText',{text:'中国'});await command('save');
+  await expect.poll(()=>readFile(records[0].path,'utf8'),{timeout:20000}).toBe(baseline.replace(label,label+'中国'));
+  await page.keyboard.press(`${mod}+z`);await command('save');await expect.poll(()=>readFile(records[0].path,'utf8'),{timeout:20000}).toBe(baseline);
+ }
+ await source.locator('.fence-body').click();const code=source.locator('.fence-editing .cm-content');await expect(code).toBeVisible();
+ await code.press('Home');for(let i=0;i<3;i++)await code.press('ArrowRight');
+ await cdp.send('Input.imeSetComposition',{text:'zhong',selectionStart:5,selectionEnd:5});await cdp.send('Input.insertText',{text:'中国'});await command('save');
+ await expect.poll(()=>readFile(records[0].path,'utf8'),{timeout:20000}).toBe(baseline.replace('代码：end','代码：中国end'));
+ await code.press(`${mod}+z`);await command('save');await expect.poll(()=>readFile(records[0].path,'utf8'),{timeout:20000}).toBe(baseline);
+ await page.screenshot({path:path.join(qa,'large-rich-mixed-editing.png')});
+ checks.push('Chinese Chromium composition in unmounted middle-document paragraphs, lists, table cells and local code commits and undoes exactly once.');
  await page.getByRole('tab',{name:'Ten.md',exact:true}).click();await expect(page.locator('.document-editor[data-document-id="next-1"] .rich-document')).toBeVisible();await page.locator('.document-editor[data-document-id="next-1"] .rich-document').focus();await page.keyboard.press(process.platform==='darwin'?'Meta+ArrowDown':'Control+End');await page.keyboard.insertText('TAIL-10MB');await command('save');await expect.poll(()=>readFile(records[1].path,'utf8'),{timeout:20000}).toBe(ten+'TAIL-10MB');
  await writeFile(path.join(qa,'large-document-measurements.json'),JSON.stringify({bytes:[Buffer.byteLength(five),Buffer.byteLength(ten)],timings},null,2));console.log(JSON.stringify(timings));
  checks.push('5 MB UTF-8/Chinese rich editing stays virtualized, edits/undo/redo/save correctly, and analyzes outline off-thread; 10 MB file edits and saves exactly.');

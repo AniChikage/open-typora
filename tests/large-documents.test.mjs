@@ -62,10 +62,18 @@ test('large rich documents reparse affected blocks and retain exact structure th
  const original=('# Heading\n\nParagraph **bold** 中文 text.\n\n- one\n- two\n\n').repeat(6500);
  const model=new MarkdownDocument(original);model.enableRichParsing();
  assert.ok(model.nodes.length>15000);assert.equal(model.serialize(),model.text);
- const same=()=>{const expected=new MarkdownDocument(model.text);expected.selection={...model.selection};expected.enableRichParsing();assert.deepEqual(model.nodes.map(({from,to,kind,source,line})=>({from,to,kind,source,line})),expected.nodes.map(({from,to,kind,source,line})=>({from,to,kind,source,line})));assert.equal(model.serialize(),model.text);};
+ const same=()=>{const expected=new MarkdownDocument(model.text);expected.selection={...model.selection};expected.enableRichParsing();assert.deepEqual(model.nodes.map(({from,to,kind,source,line})=>({from,to,kind,source,line})),expected.nodes.map(({from,to,kind,source,line})=>({from,to,kind,source,line})));assert.equal(model.serialize(),model.text);assert.deepEqual(model.environment.headings,expected.environment.headings);};
  for(const insert of ['你好','\n\n## New heading\n\n','```js\n','\n```\n','\n[reference]: https://example.com\n']) {
   const at=Math.floor(model.text.length/2);model.closeGroup();model.replace(at,at+3,insert);same();assert.ok(model.undo());same();assert.ok(model.redo());same();
  }
  model.beginComposition();model.replace(25,25,'zhong','composition');model.replace(25,30,'中国','composition');model.endComposition();same();assert.ok(model.undo());same();
  model.beginSourceSession();model.replace(0,2,'##');model.endSourceSession();same();
+});
+
+test('large local code block keeps its identity through marked text and candidate commit',()=>{
+ const prefix=('Paragraph **bold**.\n\n').repeat(20000),original=prefix+'```js\n代码：end\n```\n',model=new MarkdownDocument(original);model.enableRichParsing();
+ const node=model.nodes.find(node=>node.kind==='fence'),id=node.id,at=node.from+6+3;
+ model.beginComposition();model.replace(at,at,'zhong','composition');assert.equal(model.nodes.find(node=>node.kind==='fence').id,id);
+ model.replace(at,at+5,'中国','composition');model.endComposition();assert.equal(model.nodes.find(node=>node.kind==='fence').id,id);assert.equal(model.text,original.replace('代码：end','代码：中国end'));
+ assert.ok(model.undo());assert.equal(model.text,original);
 });

@@ -1,6 +1,6 @@
 # Typora 功能对齐清单
 
-当前交付版本：**0.14.3，macOS arm64 / Windows x64 / Linux x64**。基准为本机 Typora 1.14.10 的菜单、实际交互和官方公开文档。功能存在、自动化通过与完整等价是不同结论；未验证的组合不写成已对齐。
+当前交付版本：**0.15.0，macOS arm64 / Windows x64 / Linux x64**。基准为本机 Typora 1.14.10 的菜单、实际交互和官方公开文档。功能存在、自动化通过与完整等价是不同结论；未验证的组合不写成已对齐。
 
 公开依据：[Markdown](https://support.typora.io/Markdown-Reference/)、[文件管理](https://support.typora.io/File-Management/)、[图片](https://support.typora.io/Images/)、[导出](https://support.typora.io/Export/)、[HTML](https://support.typora.io/HTML/)、[快捷键](https://support.typora.io/Shortcut-Keys/)。REA 的静态证据及覆盖边界见 [research.md](research.md)。
 
@@ -36,12 +36,14 @@
 | 内置主题与 CSS 安装 | 已实现并回归 | 六套原创主题；按主题保存字体／行距／宽度／间距／颜色、实时 CSS 和打印 CSS，支持主题 CSS 导出；本地 CSS 导入及内嵌字体／图片，适配常用选择器和颜色变量；第三方主题仍是部分兼容 |
 | 可视化背景图片 | 已实现，已验收本机 WebKit | PNG/JPEG/WebP 本地选择及副本保存，不透明度、模糊、填满/完整/平铺、五种位置、重置和清除；正文/源码模式共用，个人背景不带入导出。限制 8 MB / 4000 万像素；Windows 安装后验收随发布运行 |
 | 第三方插件兼容 | 部分兼容，已有实际运行 | 六款固定版本 obgnail/typora_plugin 原版源码（增加列表折叠）；单文件与文件夹 CommonJS 安装、相对 JS/JSON/CSS 引用及模块缓存、配置、生命周期、动态命令、事件解绑/单次/有序监听、动态快捷键、定时器与异步失败清理和卸载；0.12.0 在等待异步 destroy 前立即释放样式、事件和只读锁，已停用实例的兼容 API 写入/重新加锁/注册事件与定时器均失效，旧实例清理不再解除新实例的锁；原生 WebKit 已验收安装模块动态导入、可撤销文档修改及只读保护。未兼容完整插件包、Node/Electron、npm 依赖及所有 Typora 私有接口；详见 [plugins.md](plugins.md) |
-| Windows 系统 Markdown 预览 | 已实现，需启用 | 原生 x64 COM 处理器，支持文件／只读流，UTF-8／带 BOM 的 UTF-16／GB18030 回退；使用 WebView2 在 Everything／资源管理器预览，无编辑桥接、插件或远程图片；最多读取前 1 MiB，启用前保存原处理器，关闭／卸载恢复；[设置与验收范围](windows-preview.md) |
+| Windows 系统 Markdown 预览 | 已实现，需启用 | 原生 x64 COM 处理器，支持文件／Shell Item 初始化，UTF-8／带 BOM 的 UTF-16／GB18030 回退；使用 WebView2 在 Everything／资源管理器预览，无编辑桥接、插件或远程图片；完整读取文件并按可视块渲染，支持中文／空格及父目录相对图片；超过 5 MiB 样本验证末尾与实际图片像素，启用前保存原处理器，关闭／卸载恢复；[设置与验收范围](windows-preview.md) |
 | 安装更新与旧版本清理 | 已实现并回归 | M 图标保留；验证新包后替换安装版并删除临时回滚包；只保留当前版本归档。用户文档/草稿不属于版本清理对象 |
 | Windows、其他平台与签名 | 部分交付 | Windows x64 提供 NSIS EXE / ZIP，由 Windows runner 安装后验证编辑、保存、PDF、图片、恢复、单实例与文件关联；Windows 10/11 实体候选交互尚未人工验收。Linux x64 新增 DEB / AppImage，Ubuntu 22.04 runner 验证 DEB 安装/卸载与恢复数据保留、两个包内应用的编辑、PDF、插件、背景和第二实例打开文件；AppImage 使用解包运行验收，FUSE 挂载及不同桌面环境未人工验收。Windows/Linux ARM / Intel Mac 未交付；Windows 无代码签名证书，macOS 未公证 |
 
-剩余项为其他输入法及列表/表格/局部代码的完整候选组合、未覆盖的跨应用剪贴板/复杂跨块编辑、第三方主题与图形扩展，以及 Windows 实体输入法，Intel Mac / ARM 等其他平台发布。复杂转换覆盖已列样本和目标格式，无法代表任意格式无损往返。**0.14.3 仍不能标为 Typora 全功能完全等价**；外部图床真实上传仍需独立配置与验收。
+剩余项为其他输入法及列表/表格/局部代码的完整候选组合、未覆盖的跨应用剪贴板/复杂跨块编辑、第三方主题与图形扩展，以及 Windows 实体输入法，Intel Mac / ARM 等其他平台发布。复杂转换覆盖已列样本和目标格式，无法代表任意格式无损往返。**0.15.0 仍不能标为 Typora 全功能完全等价**；外部图床真实上传仍需独立配置与验收。
 
-0.13.4 修复：缩进命令覆盖完整源码和局部代码编辑器，保留列表行为与独立撤销；Linux DEB 使用无空格安装路径，并增加前一公开 DEB 升级、GIO 与 KDE MIME 关联启动回归用例。初始 CI 验收环境为 Ubuntu 22.04 与 KDE 启动组件；之后 0.13.4 DEB 已在完整 Kubuntu 26.04 / Plasma 6.6.4 / Wayland 中完成 Dolphin 打开及 18 项键盘回归，见[版本化验收记录](verification.md)。这轮完整桌面检查尚未对 0.14.3 重跑，AppImage/FUSE 仍不在该验收范围内。
+0.13.4 修复：缩进命令覆盖完整源码和局部代码编辑器，保留列表行为与独立撤销；Linux DEB 使用无空格安装路径，并增加前一公开 DEB 升级、GIO 与 KDE MIME 关联启动回归用例。初始 CI 验收环境为 Ubuntu 22.04 与 KDE 启动组件；之后 0.13.4 DEB 已在完整 Kubuntu 26.04 / Plasma 6.6.4 / Wayland 中完成 Dolphin 打开及 18 项键盘回归，见[版本化验收记录](verification.md)。这轮完整桌面检查尚未对 0.15.0 重跑，AppImage/FUSE 仍不在该验收范围内。
 
 0.14.3 重点补充大文件源码性能、主题实时定制、可控打印分页和 Windows 系统预览。大文件保持源码模式；系统预览为只读且有 1 MiB 上限，不加载插件。FUSE 实际挂载仍未验收；完整 Kubuntu 26.04 桌面记录对应 0.13.4 DEB，不作为 0.14.3 的桌面验收结果。
+
+0.15.0 继续补充大文件所见即所得编辑：可视块挂载、局部增量解析、保留代码块标识和中文组合提交，5/10 MiB 样本验证编辑与精确保存。Everything 取消 1 MiB 截断，改用文件／Shell Item 初始化保留图片目录，验证全文末尾及中文、空格、父目录相对图片。系统预览仍只读且不运行插件。
