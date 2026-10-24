@@ -161,7 +161,10 @@ export class MarkdownDocument {
       const end = finish < old.length ? old[finish].from + delta : this.text.length;
       const source = this.text.slice(start, end), offsets = [0];
       for (let i=0;i<source.length;i++) if(source[i] === "\n") offsets.push(i+1);
-      const env = {...this.environment, fragment:false, lineOffset:startLine-1};
+      const oldSource=old.slice(begin,finish).map(node=>node.source).join("\n");
+      const refs=(text:string)=>(text.match(/\[\^[^\]\n]+\](?!:)/g)||[]).join("\0");
+      if(refs(source)!==refs(oldSource)||/(?:^|\n) {0,3}\[[^\]\n]+\]:/.test(source))return false;
+      const env = {...this.environment, footnoteNumbers:{...(this.environment.footnoteNumbers as Record<string,number>||{})},fragment:true, lineOffset:startLine-1};
       const parsed = parseBlocks(source,env).map(block => ({
         id:"",from:start+offsets[block.fromLine-1],to:start+(offsets[block.toLine] ?? source.length+1)-1,
         source:block.source,kind:block.kind,line:startLine+block.fromLine-1,
@@ -184,7 +187,7 @@ export class MarkdownDocument {
         const oldEndLine=finish<old.length?old[finish].line:Infinity;
         const before=(this.environment.headings as Array<{line:number}>).filter(item=>item.line<startLine);
         const after=(this.environment.headings as Array<{line:number}>).filter(item=>item.line>=oldEndLine).map(item=>({...item,line:item.line+lineDelta}));
-        const headings=[...before,...((env as Record<string,unknown>).headings as Array<{line:number;text:string;id:string}>||[]).filter(item=>item.line>=startLine&&item.line<oldEndLine+lineDelta),...after] as Array<{line:number;text:string;id:string}>;
+        const headings=[...before,...((env as Record<string,unknown>).fragmentHeadings as Array<{line:number;text:string;id:string}>||[]).filter(item=>item.line>=startLine&&item.line<oldEndLine+lineDelta),...after] as Array<{line:number;text:string;id:string}>;
         const used=new Map<string,number>();
         this.environment={...this.environment,headings:headings.map(heading=>{const base=headingSlug(heading.text),count=used.get(base)||0;used.set(base,count+1);return {...heading,id:base+(count?`-${count}`:"")};})};
       }

@@ -3,7 +3,7 @@ import type { MarkdownIt } from "markdown-it";
 export interface DocumentHeading { line: number; level: number; text: string; id: string }
 export interface FootnoteDefinition { id: string; text: string; line: number }
 interface SyntaxEnvironment {
-  fragment?: boolean; lineOffset?: number; headings?: DocumentHeading[];
+  fragment?: boolean; lineOffset?: number; headings?: DocumentHeading[]; fragmentHeadings?: DocumentHeading[];
   footnoteDefinitions?: Record<string, FootnoteDefinition>; footnoteNumbers?: Record<string, number>;
 }
 export function headingSlug(text: string) {
@@ -117,6 +117,7 @@ export function configureDocumentSyntax(md: MarkdownIt) {
       token.attrSet("id", id); headings.push({ line, text, id, level: Number(token.tag.slice(1)) });
     }
     if (!state.env.fragment) state.env.headings = headings;
+    else state.env.fragmentHeadings = headings;
   });
   md.inline.ruler.before("emphasis", "html_embed", (state, silent) => {
     const raw = state.src.slice(state.pos), match = /^(?:<img\b[^>]*>|<(span|a|ruby|abbr|small|b|i|strong|em|code|samp|time|label)\b[^>]*>[\s\S]*?<\/\1>)/i.exec(raw);

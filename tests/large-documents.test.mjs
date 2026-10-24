@@ -77,3 +77,10 @@ test('large local code block keeps its identity through marked text and candidat
  model.replace(at,at+5,'中国','composition');model.endComposition();assert.equal(model.nodes.find(node=>node.kind==='fence').id,id);assert.equal(model.text,original.replace('代码：end','代码：中国end'));
  assert.ok(model.undo());assert.equal(model.text,original);
 });
+
+test('incremental large headings preserve distant footnotes and renumber inserted references',()=>{
+ const padding=('Paragraph.\n\n').repeat(30000),source=padding+'# Heading[^n]\n\nBody[^n]\n\n'+padding+'[^n]: Existing note\n[^other]: Another note\n',model=new MarkdownDocument(source);model.enableRichParsing();
+ const at=model.text.indexOf('Heading');model.replace(at,at+7,'Changed');
+ const equal=()=>{const expected=new MarkdownDocument(model.text);expected.selection={...model.selection};expected.enableRichParsing();assert.deepEqual(model.environment.headings,expected.environment.headings);assert.deepEqual(model.environment.footnoteNumbers,expected.environment.footnoteNumbers);assert.equal(model.serialize(),model.text);};
+ equal();model.closeGroup();model.replace(0,0,'New[^other]\n\n');equal();assert.ok(model.undo());equal();
+});
