@@ -37,6 +37,8 @@ public static class PreviewProbe {
  }
  [STAThread]public static int Main(string[] args){
   try{
+   var evidence=args[0]=="everything"?args[2]:args[0];
+   var watchdog=new Thread(()=>{Thread.Sleep(150000);try{var bounds=Screen.PrimaryScreen.Bounds;using(var bitmap=new Bitmap(bounds.Width,bounds.Height)){using(var graphics=Graphics.FromImage(bitmap))graphics.CopyFromScreen(bounds.Left,bounds.Top,0,0,bitmap.Size);bitmap.Save(Path.Combine(evidence,"preview-watchdog.png"),System.Drawing.Imaging.ImageFormat.Png);}}catch(Exception){}Console.Error.WriteLine("FAIL: preview probe exceeded 150 seconds; captured desktop for diagnosis");Environment.Exit(2);});watchdog.IsBackground=true;watchdog.Start();
    if(args[0]=="everything"){
     var executable=args[1];var directory=args[2];var first=args[3];var second=args[4];
     var ini=Path.Combine(directory,"Everything.ini");var list=Path.Combine(directory,"Markdown.efu");
@@ -46,8 +48,8 @@ public static class PreviewProbe {
     try{
      var deadline=DateTime.UtcNow.AddSeconds(30);IntPtr window=IntPtr.Zero;
      while(DateTime.UtcNow<deadline){process.Refresh();window=process.MainWindowHandle;if(window!=IntPtr.Zero)break;Thread.Sleep(300);}if(window==IntPtr.Zero)throw new Exception("Everything window not found");
-     SetForegroundWindow(window);Wait(window,"Native preview one",75);Wait(window,"Local diagram",30);Image(window,"Local diagram");Capture(window,Path.Combine(directory,"everything-first.png"));
-     End(window);Image(window,"Tail diagram");Capture(window,Path.Combine(directory,"everything-full-tail.png"));
+     Console.WriteLine("PROBE: actual Everything window opened");SetForegroundWindow(window);Wait(window,"Native preview one",75);Wait(window,"Local diagram",30);Image(window,"Local diagram");Capture(window,Path.Combine(directory,"everything-first.png"));
+     Console.WriteLine("PROBE: Everything local image passed, scroll to full tail");End(window);Image(window,"Tail diagram");Capture(window,Path.Combine(directory,"everything-full-tail.png"));
      var select=Process.Start(new ProcessStartInfo(executable,"-instance OpenTyporaQA -select \""+second+"\""){UseShellExecute=false});select.WaitForExit(10000);
      Wait(window,"Native preview two",60);Capture(window,Path.Combine(directory,"everything-second.png"));
      File.WriteAllLines(Path.Combine(directory,"everything-accessibility.txt"),Names(window));Console.WriteLine("PASS: actual Everything 1.4 preview pane rendered both selected Markdown files through the registered handler.");
@@ -58,18 +60,18 @@ public static class PreviewProbe {
    Application.EnableVisualStyles();var form=new Form{Text="Open Typora native preview acceptance",Width=1050,Height=800,StartPosition=FormStartPosition.CenterScreen};
    object instance=null;IPreview preview=null;IStream stream=null;int phase=0;var started=DateTime.UtcNow;
    var timer=new System.Windows.Forms.Timer{Interval=350};Exception failure=null;
-   Action initialize=()=>{var bounds=new PreviewRect(form.ClientSize.Width,form.ClientSize.Height);Marshal.ThrowExceptionForHR(preview.SetWindow(form.Handle,ref bounds));if(phase==0)Marshal.ThrowExceptionForHR(((IFileInit)instance).Initialize(files[phase],0));else{object item;var iid=new Guid("43826d1e-e718-42ee-bc55-a1e261c37bfe");Marshal.ThrowExceptionForHR(SHCreateItemFromParsingName(files[phase],IntPtr.Zero,ref iid,out item));try{Marshal.ThrowExceptionForHR(((IItemInit)instance).Initialize(item,0));}finally{Marshal.ReleaseComObject(item);}}Marshal.ThrowExceptionForHR(preview.DoPreview());started=DateTime.UtcNow;};
+   Action initialize=()=>{Console.WriteLine("PROBE: initialize native phase "+phase);var bounds=new PreviewRect(form.ClientSize.Width,form.ClientSize.Height);Marshal.ThrowExceptionForHR(preview.SetWindow(form.Handle,ref bounds));if(phase==0)Marshal.ThrowExceptionForHR(((IFileInit)instance).Initialize(files[phase],0));else{object item;var iid=new Guid("43826d1e-e718-42ee-bc55-a1e261c37bfe");Marshal.ThrowExceptionForHR(SHCreateItemFromParsingName(files[phase],IntPtr.Zero,ref iid,out item));try{Marshal.ThrowExceptionForHR(((IItemInit)instance).Initialize(item,0));}finally{Marshal.ReleaseComObject(item);}}Marshal.ThrowExceptionForHR(preview.DoPreview());started=DateTime.UtcNow;};
    form.Shown+=(sender,eventArgs)=>{try{instance=Activator.CreateInstance(Type.GetTypeFromCLSID(new Guid("726747EB-6A31-4BF2-898F-11620814C1F2")));preview=(IPreview)instance;initialize();timer.Start();}catch(Exception error){failure=error;form.Close();}};
    form.Resize+=(sender,eventArgs)=>{if(preview!=null){var bounds=new PreviewRect(form.ClientSize.Width,form.ClientSize.Height);preview.SetRect(ref bounds);}};
-   timer.Tick+=(sender,eventArgs)=>{try{
+   timer.Tick+=(sender,eventArgs)=>{timer.Stop();try{
     var names=Names(form.Handle);if(!names.Contains(expected[phase])){if((DateTime.UtcNow-started).TotalSeconds>75)throw new Exception("Native COM preview did not render: "+String.Join(" | ",names.Take(80)));return;}
     if(!names.Contains("Alpha"))throw new Exception("Markdown table cell missing from rendered accessibility tree");
-    if(phase==0){Image(form.Handle,"Local diagram");End(form.Handle);Image(form.Handle,"Tail diagram");Capture(form.Handle,Path.Combine(output,"native-full-tail.png"));}
+    if(phase==0){Console.WriteLine("PROBE: native heading rendered, check local image");Image(form.Handle,"Local diagram");Console.WriteLine("PROBE: native image pixels passed, scroll to full tail");End(form.Handle);Console.WriteLine("PROBE: native full tail rendered, check tail image");Image(form.Handle,"Tail diagram");Capture(form.Handle,Path.Combine(output,"native-full-tail.png"));}
     Capture(form.Handle,Path.Combine(output,phase==0?"native-file.png":"native-item.png"));File.WriteAllLines(Path.Combine(output,"native-tree-"+phase+".txt"),names);
     Marshal.ThrowExceptionForHR(preview.SetFocus());IntPtr focus;Marshal.ThrowExceptionForHR(preview.QueryFocus(out focus));if(focus==IntPtr.Zero)throw new Exception("Preview focus was not set");
     preview.Unload();if(stream!=null){Marshal.ReleaseComObject(stream);stream=null;}
     if(phase++==0){form.Width=820;initialize();}else{timer.Stop();form.Close();}
-   }catch(Exception error){failure=error;timer.Stop();Capture(form.Handle,Path.Combine(output,"native-failure.png"));form.Close();}};
+   }catch(Exception error){failure=error;timer.Stop();Capture(form.Handle,Path.Combine(output,"native-failure.png"));form.Close();}finally{if(!form.IsDisposed&&!form.Disposing&&form.Visible)timer.Start();}};
    Application.Run(form);timer.Dispose();if(preview!=null)preview.Unload();if(instance!=null)Marshal.FinalReleaseComObject(instance);if(failure!=null)throw failure;
    Console.WriteLine("PASS: registered native COM file/item initialization, rich Markdown rendering, resize, focus and unload.");return 0;
   }catch(Exception error){Console.Error.WriteLine(error);return 1;}

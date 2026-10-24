@@ -10,7 +10,7 @@ const wait = async (predicate) => {
     if (predicate()) return;
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
-  throw new Error("Condition not reached");
+  throw new Error("Condition not reached; document="+document.querySelector(".document-title")?.textContent+"; rendered="+document.querySelector(".document-editor:not([hidden]) .rich-document")?.textContent?.slice(0,160));
 };
 const check = (condition, label) => {
   if (!condition) throw new Error(label);
@@ -192,7 +192,7 @@ try {
   await sourceMode(false);
   const repeatedSource='# 重复输入\n\n同\n\n同\n', repeatedRecord={id:'repeat-ime',path:null,name:'Repeated-IME.md',content:repeatedSource,savedContent:repeatedSource,diskHash:null,lineEnding:'\n'};
   const repeatedRegistration=await window.desktop.registerDraft(repeatedRecord);if(!repeatedRegistration.ok)throw Error(repeatedRegistration.error);
-  window.__openTypora.command({action:'opened',document:repeatedRecord});await wait(()=>document.querySelector('.document-title')?.textContent==='Repeated-IME.md'&&root()?.querySelectorAll(':scope > p').length===2);
+  window.__openTypora.command({action:'opened',document:repeatedRecord});await wait(()=>document.querySelector('.document-title')?.textContent==='Repeated-IME.md'&&[...(root()?.querySelectorAll(':scope > p')||[])].filter(element=>element.textContent==='同').length===2);
   for(const candidate of ['同','同同','中文😀']) {
     const [first,second]=root().querySelectorAll(':scope > p');root().focus();getSelection().setBaseAndExtent(first.firstChild,0,second.firstChild,1);
     first.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true}));first.textContent=candidate;second.remove();getSelection().collapse(first.firstChild,candidate.length);

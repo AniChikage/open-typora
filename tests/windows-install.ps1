@@ -4,9 +4,9 @@ $installer = Join-Path $PWD "release/windows/Open-Typora-$version-windows-x64-Se
 $destination = Join-Path $env:RUNNER_TEMP 'OpenTyporaInstalled'
 $env:OPEN_TYPORA_QA_DIR = Join-Path $env:RUNNER_TEMP 'open-typora-windows-qa'
 New-Item -ItemType Directory -Force $env:OPEN_TYPORA_QA_DIR | Out-Null
-$previous = Join-Path $env:RUNNER_TEMP 'Open-Typora-0.13.4-Setup.exe'
-curl.exe --fail --location --silent --show-error --retry 3 --connect-timeout 30 --max-time 180 'https://github.com/AniChikage/open-typora/releases/download/v0.13.4/Open-Typora-0.13.4-windows-x64-Setup.exe' --output $previous
-if ($LASTEXITCODE -ne 0 -or (Get-FileHash $previous -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'a0834529fce968d8586fe8676be42368f9c9b6e909c6aca2c023b96fa9c34f27') { throw 'Previous public installer download verification failed' }
+$previous = Join-Path $env:RUNNER_TEMP 'Open-Typora-0.14.3-Setup.exe'
+curl.exe --fail --location --silent --show-error --retry 3 --connect-timeout 30 --max-time 180 'https://github.com/AniChikage/open-typora/releases/download/v0.14.3/Open-Typora-0.14.3-windows-x64-Setup.exe' --output $previous
+if ($LASTEXITCODE -ne 0 -or (Get-FileHash $previous -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'cc3ebea38d4ad8e8f374290353eda50cf53397216cbbfa61a2c4b718bb64e2ec') { throw 'Previous public installer download verification failed' }
 $prior = Start-Process -FilePath $previous -ArgumentList @('/S', "/D=$destination") -Wait -PassThru
 if ($prior.ExitCode -ne 0) { throw 'Previous-version installation failed' }
 $process = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$destination") -Wait -PassThru
@@ -60,5 +60,5 @@ if (Test-Path (Join-Path $destination 'resources/markdown-preview/MarkdownPrevie
 if ((Get-Item $previewMapping).GetValue('') -ne $previousPreview) { throw 'Uninstall did not restore the previous preview handler' }
 if (Test-Path 'HKCU:\Software\Classes\CLSID\{726747EB-6A31-4BF2-898F-11620814C1F2}') { throw 'Uninstall retained preview component registration' }
 if ((Get-FileHash $sessionFile -Algorithm SHA256).Hash -ne $sessionHash) { throw 'Uninstall changed document recovery data' }
-@{ upgradeFrom = '0.13.4'; install = 'passed'; installedRegression = 'passed'; fileAssociation = 'passed'; uninstall = 'passed'; recoveryPreserved = $true } | ConvertTo-Json | Set-Content (Join-Path $env:OPEN_TYPORA_QA_DIR 'installer-results.json')
+@{ upgradeFrom = '0.14.3'; install = 'passed'; installedRegression = 'passed'; fileAssociation = 'passed'; uninstall = 'passed'; recoveryPreserved = $true } | ConvertTo-Json | Set-Content (Join-Path $env:OPEN_TYPORA_QA_DIR 'installer-results.json')
 Write-Output 'PASS: NSIS install, installed application tests, Markdown association and uninstall with retained recovery data'
