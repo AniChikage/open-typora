@@ -943,3 +943,16 @@ test("large-table deletion preserves whole emoji and combining graphemes at dist
     f.editor.undo();assert.equal(f.model.text,source);f.close();
   }
 });
+
+
+test("rapid navigation splits undo groups even when selectionchange is coalesced",()=>{
+  for(const prefix of ["", "| Key | Value |\n|---|---|\n"+("| padding | stable value |\n").repeat(13000)]){
+    const source=prefix+(prefix?"| final | AB |\n":"AB\n"),f=fixture(source),at=source.lastIndexOf("AB")+1;
+    f.editor.select({anchor:at,head:at});input(f.root,"insertText","👨‍👩‍👧‍👦");const withEmoji=f.model.text;
+    // No selectionchange is dispatched between these native navigation keys.
+    for(const key of ["ArrowLeft","ArrowRight"]) f.root.dispatchEvent(new window.KeyboardEvent("keydown",{key,bubbles:true,cancelable:true}));
+    input(f.root,"deleteContentBackward");assert.equal(f.model.text,source);
+    f.editor.undo();assert.equal(f.model.text,withEmoji);f.editor.redo();assert.equal(f.model.text,source);
+    f.editor.undo();f.editor.undo();assert.equal(f.model.text,source);f.close();
+  }
+});

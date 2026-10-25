@@ -74,7 +74,11 @@ public static class PreviewProbe {
    form.Shown+=(sender,eventArgs)=>{try{instance=Activator.CreateInstance(Type.GetTypeFromCLSID(new Guid("726747EB-6A31-4BF2-898F-11620814C1F2")));preview=(IPreview)instance;initialize();timer.Start();}catch(Exception error){failure=error;form.Close();}};
    form.Resize+=(sender,eventArgs)=>{if(preview!=null){var bounds=new PreviewRect(form.ClientSize.Width,form.ClientSize.Height);preview.SetRect(ref bounds);}};
    timer.Tick+=(sender,eventArgs)=>{timer.Stop();try{
-    var names=Names(form.Handle);if(!names.Contains(expected[phase])){if((DateTime.UtcNow-started).TotalSeconds>75)throw new Exception("Native COM preview did not render: "+String.Join(" | ",names.Take(80)));return;}
+    string[] names;
+    // WebView replaces its UIA subtree during file/item reinitialization.
+    // Reacquire it on the next tick, within the existing render deadline.
+    try{names=Names(form.Handle);}catch(ElementNotAvailableException){names=new string[0];}
+    if(!names.Contains(expected[phase])){if((DateTime.UtcNow-started).TotalSeconds>75)throw new Exception("Native COM preview did not render: "+String.Join(" | ",names.Take(80)));return;}
     if(!names.Contains("Alpha"))throw new Exception("Markdown table cell missing from rendered accessibility tree");
     if(phase==0){Console.WriteLine("PROBE: native heading rendered, check local image");Image(form.Handle,"Local diagram");Console.WriteLine("PROBE: native image pixels passed, scroll to full tail");End(form.Handle);Console.WriteLine("PROBE: native full tail rendered, check tail image");Image(form.Handle,"Tail diagram");Capture(form.Handle,Path.Combine(output,"native-full-tail.png"));}
     Capture(form.Handle,Path.Combine(output,phase==0?"native-file.png":"native-item.png"));File.WriteAllLines(Path.Combine(output,"native-tree-"+phase+".txt"),names);

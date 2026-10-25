@@ -968,12 +968,11 @@ export class RichEditor {
     if (this.model.replace(this.emojiFrom, this.model.selection.head, `:${name}:`, "emoji")) this.publish();
   }
   private keydown = (event: KeyboardEvent) => {
-    if (
-      this.composing ||
-      imeKey(event) ||
-      (event.target as HTMLElement).closest(".cm-editor")
-    )
-      return;
+    if (this.composing || imeKey(event)) return;
+    // Browsers may coalesce selectionchange for a quick Left/Right round trip.
+    // Navigation ends the undo group even when the final caret is unchanged.
+    if (navigationKeys.has(event.key)) this.model.closeGroup();
+    if ((event.target as HTMLElement).closest(".cm-editor")) return;
     if (!this.emojiPopup.hidden && ["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(event.key)) {
       event.preventDefault(); event.stopPropagation();
       if (event.key === "Escape") { this.emojiDismissed = `${this.model.selection.head}:${this.model.text.slice(this.emojiFrom + 1, this.model.selection.head)}`; this.emojiPopup.hidden = true; }
@@ -1625,6 +1624,7 @@ export class RichEditor {
             ...defaultKeymap,
           ]),
           EditorView.updateListener.of((update) => {
+            if (update.selectionSet && !update.docChanged && !this.composing && !update.view.composing) this.model.closeGroup();
             if (!update.docChanged) return;
             const current = this.model.nodes.find((n) => n.id === leaf.nodeId);
             if (!current) return;
@@ -1702,6 +1702,7 @@ function precedingSlashes(text: string, position: number) {
   while (position > count && text[position - count - 1] === "\\") count++;
   return count;
 }
+const navigationKeys = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"]);
 const graphemes = new Intl.Segmenter(undefined, {granularity: "grapheme"});
 function previousGrapheme(text: string, position: number) {
   return position > 0 ? graphemes.segment(text).containing(position - 1)?.index ?? 0 : 0;

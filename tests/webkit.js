@@ -476,6 +476,14 @@ try {
   await new Promise(resolve=>setTimeout(resolve,1600));const giantTableState=await window.desktop.testRecovery();if(!giantTableState.ok)throw new Error(giantTableState.error);
   check(giantTableState.value.documents.find(record=>record.id===giantTableRecord.id)?.content===giantTableSource.replace('NATIVE-TABLE-END','NATIVE-TABLE-EN'),'native giant table Backspace persists only the exact changed character');
   window.__openTypora.command({action:'undo'});await wait(()=>root()?.textContent.includes('NATIVE-TABLE-END'));
+  pointText('NATIVE-TABLE-END','NATIVE-TABLE-END'.length);input('insertText','👨‍👩‍👧‍👦');
+  for(const key of ['ArrowLeft','ArrowRight'])root().dispatchEvent(new KeyboardEvent('keydown',{key,bubbles:true,cancelable:true}));
+  input('deleteContentBackward');await wait(()=>!root()?.textContent.includes('👨‍👩‍👧‍👦'));
+  window.__openTypora.command({action:'undo'});await wait(()=>root()?.textContent.includes('NATIVE-TABLE-END👨‍👩‍👧‍👦'));
+  window.__openTypora.command({action:'undo'});await wait(()=>!root()?.textContent.includes('👨‍👩‍👧‍👦'));
+  check(true,'native rapid navigation and Backspace retain independent emoji deletion and insertion undo groups');
+  await new Promise(resolve=>setTimeout(resolve,1600));const navigationState=await window.desktop.testRecovery();if(!navigationState.ok)throw new Error(navigationState.error);
+  check(navigationState.value.documents.find(record=>record.id===giantTableRecord.id)?.content===giantTableSource,'native rapid navigation undo restores exact full-table recovery bytes');
   check(root().querySelectorAll('.md-large-table td').length<300,'20,000-row native table reaches its tail, edits Chinese and undoes with bounded cell DOM');
   pointText('NATIVE-TABLE-END','NATIVE-TABLE-END'.length);root().dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',code:'Tab',bubbles:true,cancelable:true}));
   await new Promise(resolve=>setTimeout(resolve,150));
