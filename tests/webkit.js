@@ -456,6 +456,15 @@ try {
   check(giantCodeSource.length>32*1024*1024 && root().querySelectorAll('.large-code .cm-line').length<200,'32+ MiB native code renders a bounded read-only CodeMirror viewport');
   root().querySelector('.large-code .code-preview .cm-content').click();await wait(()=>root()?.querySelector('.large-code.fence-editing .cm-content[contenteditable="true"]'));
   check(root().querySelectorAll('.large-code .cm-line').length<200,'native giant code activates its editable viewport without mounting the full block');
+  const giantCodeInput=root().querySelector('.large-code.fence-editing .cm-content'),firstCodeLine=giantCodeInput.querySelector('.cm-line').firstChild;
+  giantCodeInput.focus();getSelection().setBaseAndExtent(firstCodeLine,5,firstCodeLine,5);
+  document.execCommand('insertText',false,'\nconst extra = `value`;\n');await wait(()=>root()?.textContent.includes('const extra = `value`;'));
+  await new Promise(resolve=>setTimeout(resolve,1600));
+  let giantState=await window.desktop.testRecovery();if(!giantState.ok)throw new Error(giantState.error);
+  check(giantState.value.documents.find(record=>record.id===giantCodeRecord.id)?.content===giantCodeSource.replace('const value','const\nconst extra = `value`;\n value'),'native giant code newline and punctuation persist with every surrounding byte intact');
+  window.__openTypora.command({action:'undo'});await wait(()=>!root()?.textContent.includes('const extra = `value`;'));
+  await new Promise(resolve=>setTimeout(resolve,1600));giantState=await window.desktop.testRecovery();if(!giantState.ok)throw new Error(giantState.error);
+  check(giantState.value.documents.find(record=>record.id===giantCodeRecord.id)?.content===giantCodeSource,'native giant code newline edit undoes to exact original recovery bytes');
   const giantTableSource='| Key | Value |\n|---|---|\n'+Array.from({length:20000},(_,i)=>'| Row-'+i+' | '+(i===19999?'NATIVE-TABLE-END':'Native table value')+' |').join('\n')+'\n';
   const giantTableRecord={id:'native-giant-table-qa',name:'Native-Giant-Table.md',path:null,content:giantTableSource,savedContent:'',diskHash:null,lineEnding:'\n',encoding:'utf-8',bom:false};
   const registeredTable=await window.desktop.registerDraft(giantTableRecord);if(!registeredTable.ok)throw new Error(registeredTable.error);
@@ -463,6 +472,10 @@ try {
   const tableViewport=root().querySelector('.md-large-table');await wait(()=>tableViewport.clientHeight>0&&tableViewport.scrollHeight>10000);check(true,'native giant table viewport laid out: '+tableViewport.clientHeight+'/'+tableViewport.scrollHeight);tableViewport.scrollTop=tableViewport.scrollHeight;tableViewport.dispatchEvent(new Event('scroll'));await wait(()=>root()?.textContent.includes('NATIVE-TABLE-END'));check(true,'native giant table final row mounted: '+tableViewport.scrollTop+'/'+tableViewport.scrollHeight);
   pointText('NATIVE-TABLE-END','NATIVE-TABLE-END'.length);input('insertText','中国');await wait(()=>root()?.textContent.includes('NATIVE-TABLE-END中国'));check(true,'native giant table Chinese edit committed');
   window.__openTypora.command({action:'undo'});await wait(()=>!root()?.textContent.includes('NATIVE-TABLE-END中国'));check(true,'native giant table edit undone');
+  pointText('NATIVE-TABLE-END','NATIVE-TABLE-END'.length);input('deleteContentBackward');await wait(()=>root()?.textContent.includes('NATIVE-TABLE-EN')&&!root()?.textContent.includes('NATIVE-TABLE-END'));
+  await new Promise(resolve=>setTimeout(resolve,1600));const giantTableState=await window.desktop.testRecovery();if(!giantTableState.ok)throw new Error(giantTableState.error);
+  check(giantTableState.value.documents.find(record=>record.id===giantTableRecord.id)?.content===giantTableSource.replace('NATIVE-TABLE-END','NATIVE-TABLE-EN'),'native giant table Backspace persists only the exact changed character');
+  window.__openTypora.command({action:'undo'});await wait(()=>root()?.textContent.includes('NATIVE-TABLE-END'));
   check(root().querySelectorAll('.md-large-table td').length<300,'20,000-row native table reaches its tail, edits Chinese and undoes with bounded cell DOM');
   pointText('NATIVE-TABLE-END','NATIVE-TABLE-END'.length);root().dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',code:'Tab',bubbles:true,cancelable:true}));
   await new Promise(resolve=>setTimeout(resolve,150));

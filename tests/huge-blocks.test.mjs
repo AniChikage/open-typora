@@ -96,3 +96,83 @@ test('table viewport changes retain the caret in an unchanged row',async()=>{
   assert.equal(window.getSelection().anchorNode,text);assert.equal(window.getSelection().anchorOffset,2);assert.ok(text.isConnected);
  }finally{window.getSelection().removeAllRanges();view.destroy();view.element.remove();globalThis.requestAnimationFrame=previousFrame;globalThis.cancelAnimationFrame=previousCancel;}
 });
+
+
+test('incremental table offsets agree with a fresh index after arbitrary Unicode and line edits',()=>{
+ let source='| Key | Value |\n|---|---|\n'+Array.from({length:500},(_,i)=>`| row-${i} | 中文 👩🏽‍💻 ${i} |`).join('\n')+'\n';
+ let index=new TableIndex(source),seed=711;
+ const random=limit=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed%limit;};
+ const values=['中国','\n','| A | B |\n','', '👨‍👩‍👧‍👦', '\n\n'];
+ for(let step=0;step<300;step++){
+  const from=random(source.length+1),to=Math.min(source.length,from+random(35)),insert=values[random(values.length)];
+  source=source.slice(0,from)+insert+source.slice(to);
+  index=new TableIndex(source,index,{from,to,insert});
+  const full=new TableIndex(source);
+  assert.deepEqual(index.offsets,full.offsets,`line offsets after edit ${step}`);
+  assert.equal(index.width,full.width);assert.deepEqual(index.align,full.align);
+  const row=random(index.length);assert.equal(index.line(row),full.line(row));assert.deepEqual(index.cells(row),full.cells(row));
+ }
+});
+
+test('large fence newline and punctuation edits preserve block boundaries and heading lines',()=>{
+ const source='# Before\n\n```js\n'+('const a = 1;\n').repeat(30000)+'```x\nremaining code\n```\n\n# After\n';
+ const fields=nodes=>nodes.filter(n=>n.kind!=='empty').map(({kind,from,to,line,source})=>({kind,from,to,line,source}));
+ const cases=[
+  [source.indexOf('const a',source.length/2)+5,0,'\nconst extra = `value`;\n'],
+  [source.indexOf('```x')+3,1,''],
+  [source.indexOf('remaining code'),0,'```\n'],
+  [source.lastIndexOf('\n```'),1,''],
+ ];
+ for(const [at,remove,insert] of cases){
+  const doc=new MarkdownDocument(source);doc.enableRichParsing();doc.replace(at,at+remove,insert);
+  const full=new MarkdownDocument(doc.text);full.enableRichParsing();
+  assert.deepEqual(fields(doc.nodes),fields(full.nodes));assert.deepEqual(doc.environment.headings,full.environment.headings);assert.equal(doc.serialize(),doc.text);
+  assert.ok(doc.undo());assert.equal(doc.text,source);assert.ok(doc.redo());assert.deepEqual(fields(doc.nodes),fields(full.nodes));
+ }
+ const doc=new MarkdownDocument(source);doc.enableRichParsing();const at=source.indexOf('const a',source.length/2)+5;
+ doc.replace(at,at,'\n');assert.equal(doc.nodes.find(n=>n.kind==='fence').edit?.insert,'\n');
+});
+
+test('local table row insertion, movement and deletion agree with full parsing and undo',()=>{
+ const source='| Key | Value |\n|---|---|\n'+Array.from({length:16000},(_,i)=>`| row-${i} | stable value ${i} |`).join('\n')+'\n\n# After\n';
+ const doc=new MarkdownDocument(source);doc.enableRichParsing();const index=new TableIndex(doc.nodes[0].source),row=8000;
+ for(const [from,to,insert] of [
+  [index.offsets[row],index.offsets[row],'| 新行 | 中文 |\n'],
+  [index.offsets[row],index.offsets[row+1],''],
+  [index.offsets[row],index.end(row+1),index.line(row+1)+'\n'+index.line(row)],
+  [index.source.length,index.source.length,'\n| 新尾行 | 最后 |'],
+ ]){
+  doc.closeGroup();doc.replace(from,to,insert);assert.ok(doc.nodes[0].edit);
+  const full=new MarkdownDocument(doc.text);full.enableRichParsing();
+  const fields=nodes=>nodes.filter(n=>n.kind!=='empty').map(({kind,from,to,line,source})=>({kind,from,to,line,source}));
+  assert.deepEqual(fields(doc.nodes),fields(full.nodes));assert.deepEqual(doc.environment.headings,full.environment.headings);
+  assert.ok(doc.undo());assert.equal(doc.text,source);
+ }
+});
+
+test('retained table rows survive cell edits with shifted source maps and no stale cells',async()=>{
+ const {LargeTableView}=await import('../src/editor/LargeTableView.ts');
+ const previousFrame=globalThis.requestAnimationFrame,previousCancel=globalThis.cancelAnimationFrame;
+ globalThis.requestAnimationFrame=()=>71;globalThis.cancelAnimationFrame=()=>{};
+ const source='| Key | Value |\n|---|---|\n'+Array.from({length:16000},(_,i)=>`| row-${i} | stable value ${i} |`).join('\n');
+ const model=new MarkdownDocument(source);model.enableRichParsing();
+ const view=new LargeTableView(model.nodes[0],'fixture',model.environment,()=>{},()=>false);
+ try{
+  Object.defineProperties(view.element,{clientHeight:{value:480},scrollHeight:{value:640000}});document.body.append(view.element);
+  const at=source.indexOf('stable value 8000')+7;model.selection={anchor:at,head:at};view.update(model.nodes[0],model.environment,model.selection,false);
+  const before=view.element.querySelector('tr[data-source-row="8001"]'),after=view.element.querySelector('tr[data-source-row="8003"]');
+  model.replace(at,at,'中国');view.update(model.nodes[0],model.environment,model.selection,false);
+  assert.equal(view.element.querySelector('tr[data-source-row="8001"]'),before);assert.equal(view.element.querySelector('tr[data-source-row="8003"]'),after);
+  assert.ok(view.element.querySelector('tr[data-source-row="8002"]').textContent.includes('中国'));
+  const leaf=[...view.leaves.values()].find(leaf=>leaf.raw==='stable value 8001');
+  assert.equal(leaf.positions[0],model.text.indexOf('stable value 8001'));
+  model.undo();view.update(model.nodes[0],model.environment,model.selection,false);
+  assert.ok(!view.element.textContent.includes('中国'));assert.equal([...view.leaves.values()].find(leaf=>leaf.raw==='stable value 8001').positions[0],source.indexOf('stable value 8001'));
+ }finally{view.destroy();view.element.remove();globalThis.requestAnimationFrame=previousFrame;globalThis.cancelAnimationFrame=previousCancel;}
+});
+
+test('repeated compact position shifts remain flat and retain UTF-16 endpoints',()=>{
+ let positions=contiguousPositions(25,40*1024*1024);
+ for(let i=0;i<25000;i++)positions=shiftPositions(positions,i%2?2:-1);
+ assert.equal(positions[0],12525);assert.equal(positions[positions.length-1],12525+40*1024*1024);assert.equal(Object.keys(positions).length,0);
+});

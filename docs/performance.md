@@ -53,3 +53,24 @@ Markdown open, encoded save, draft registration and recovery no longer reject fi
 After the caret fix, one local 80,000-row append/type/save sample completed in 277 ms.
 
 One local Apple Silicon Electron sample opened the code viewport in 606 ms and the table in 89 ms. Six code-input samples were 38–537 ms (median 43 ms); the cell edit sample was 34 ms. These include a background-work spike, are small automation samples and are not physical-IME latency or hardware-independent guarantees. Large initial parses, complex individual cells, unusual nested syntax, plugins and simultaneous large tabs can still be expensive.
+
+
+## Local block edits in 0.16.3
+
+Code-block edits validate the affected lines and the original closing boundary. Ordinary newlines, indentation and punctuation keep the existing block index; edits that expose or remove a closing fence fall back to parsing. Following block and heading line numbers include the inserted/removed newline count. Table body changes use the same conservative approach for regular pipe rows; header syntax, irregular rows and footnote context retain the general parser.
+
+The table viewport updates its line index from the edited span, shifts remaining numeric offsets and reuses unchanged visible row elements. It updates their compact source positions and recreates changed rows. Cached row/cell text is detached from the old source string. Repeated compact position shifts accumulate one offset instead of nesting mapper calls; the unit regression checks 25,000 shifts.
+
+Unicode Backspace/Delete use the segment containing the caret instead of collecting every preceding grapheme. Table escape checks walk only the adjacent backslashes, and emoji completion inspects a bounded suffix. Family emoji, flags, skin-tone sequences and combining accents remain atomic.
+
+A paired local Apple Silicon Electron run used the same 80,000-row / 7,417,850-byte UTF-8 fixture, isolated profiles and 1,300 × 900 viewport. Input measurements include the event and two animation frames; row operations include the save assertion:
+
+| Operation | 0.16.2 | 0.16.3 |
+| --- | ---: | ---: |
+| Tail cell Backspace | 451 ms | 35 ms |
+| Tail cell Chinese insertion | 51 ms | 27 ms |
+| Append row, type and save | 268 ms | 169 ms |
+
+The 0.16.3 run also measured 21 ms for middle-row family-emoji Backspace, 143 ms for middle-row insertion/type/save and 59 ms for Enter plus a backtick-containing line in the 36,260,060-byte code file. Saved content and undo were checked against the entire expected file, including all unaffected rows and fence bytes. The suite still checks composition, bounded DOM, dialog focus and dirty large-file restart recovery. Installed Windows/Linux CI reports separate measurements.
+
+A separate Node component benchmark used a 37,400,034-byte code document and four edit/undo samples per operation. Model-only newline replacements changed from 331–395 ms to 5–20 ms; backtick replacements changed from 311–347 ms to 5–6 ms. These exclude layout, paint, platform IMEs, persistence and React. The desktop timings above are small local samples, not speed guarantees or physical-IME latency. Initial parsing, very wide tables, column-wide changes, complex cells, plugins and concurrent large tabs still need their own cost budgets.

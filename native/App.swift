@@ -185,6 +185,13 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       let args = request["args"] as? [Any]
     else { return }
     #if WEBTEST
+      if name == "testRecovery" {
+        do {
+          let session = try JSONSerialization.jsonObject(with: Data(contentsOf: store.dataDirectory.appendingPathComponent("session.json")))
+          reply(id, ["ok": true, "value": session])
+        } catch { reply(id, ["ok": false, "error": error.localizedDescription]) }
+        return
+      }
       if ["registerDraft", "save", "persist", "exportConverted"].contains(name) { print("BRIDGE:", name) }
       if name == "progress" {
         print("TEST:", args.first ?? "")

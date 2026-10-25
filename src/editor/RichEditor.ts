@@ -555,7 +555,7 @@ export class RichEditor {
         if (from === to) {
           const marker = [...this.root.querySelectorAll<HTMLElement>(".md-cell-break")].find(element => this.point(element, 0) + (element.textContent?.length || 0) === from);
           if (marker) { from -= marker.textContent!.length; insert = ""; kind = "structure"; break; }
-          if (this.leafElement(window.getSelection()?.anchorNode)?.closest("td,th") && /(?<!\\)(?:\\\\)*\\\|$/.test(this.model.text.slice(0, from))) {
+          if (this.leafElement(window.getSelection()?.anchorNode)?.closest("td,th") && this.model.text[from - 1] === "|" && precedingSlashes(this.model.text, from - 1) % 2 === 1) {
             from -= 2; insert = ""; kind = "structure"; break;
           }
           const pairs: Record<string, string> = { "(": ")", "[": "]", "{": "}", '"': '"', "'": "'" };
@@ -951,7 +951,7 @@ export class RichEditor {
   };
   private updateEmoji() {
     if (this.fence) { this.emojiPopup.hidden = true; return; }
-    const selection = this.model.selection, match = /(?:^|[\s(]):([a-zA-Z0-9_+-]{1,30})$/.exec(this.model.text.slice(0, selection.head));
+    const selection = this.model.selection, match = /(?:^|[\s(]):([a-zA-Z0-9_+-]{1,30})$/.exec(this.model.text.slice(Math.max(0, selection.head - 34), selection.head));
     const node = this.model.nodeAt(selection.head);
     if (!this.emojiEnabled || this.composing || this.fence || selection.anchor !== selection.head || !match || ["fence", "frontmatter", "html_preview", "html_block"].includes(node?.kind || "") || !this.root.contains(window.getSelection()?.anchorNode || null) || this.emojiDismissed === `${selection.head}:${match[1]}`) { this.emojiPopup.hidden = true; return; }
     const names = Object.keys(emojiNames).filter(name => name.startsWith(match[1].toLowerCase())).slice(0, 10);
@@ -1009,7 +1009,7 @@ export class RichEditor {
     if (!element?.closest("td,th")) return text;
     // A literal pipe in a rendered cell must not become a Markdown column.
     // Preserve existing source escapes supplied by clipboard/plugin commands.
-    let slashes = /\\*$/.exec(this.model.text.slice(0, from))?.[0].length || 0, output = "";
+    let slashes = precedingSlashes(this.model.text, from), output = "";
     for (const character of text.replace(/\r\n?/g, "\n")) {
       if (character === "\n") { output += "<br>"; slashes = 0; continue; }
       if (character === "|" && slashes % 2 === 0) output += "\\";
@@ -1697,18 +1697,16 @@ export class RichEditor {
     });
   }
 }
+function precedingSlashes(text: string, position: number) {
+  let count = 0;
+  while (position > count && text[position - count - 1] === "\\") count++;
+  return count;
+}
+const graphemes = new Intl.Segmenter(undefined, {granularity: "grapheme"});
 function previousGrapheme(text: string, position: number) {
-  const segments = [
-    ...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(
-      text.slice(0, position),
-    ),
-  ];
-  return segments.at(-1)?.index || 0;
+  return position > 0 ? graphemes.segment(text).containing(position - 1)?.index ?? 0 : 0;
 }
 function nextGrapheme(text: string, position: number) {
-  const segment = new Intl.Segmenter(undefined, { granularity: "grapheme" })
-    .segment(text.slice(position))
-    [Symbol.iterator]()
-    .next().value;
-  return position + (segment?.segment.length || 0);
+  const segment = graphemes.segment(text).containing(position);
+  return segment ? segment.index + segment.segment.length : position;
 }

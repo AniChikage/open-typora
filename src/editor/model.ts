@@ -1,3 +1,7 @@
+import { fenceRange } from "./fenceRange.ts";
+import { compactPipeRow, tableRowCells } from "./tableData.ts";
+import { detachedSpan } from "./sourcePositions.ts";
+import type { SourceEdit } from "./sourcePositions.ts";
 import { headingSlug } from "./markdownExtensions.ts";
 import { parseBlocks } from "./markdown.ts";
 export interface SelectionBookmark {
@@ -11,6 +15,8 @@ export interface DocumentNode {
   source: string;
   kind: string;
   line: number;
+  revision?: number;
+  edit?: SourceEdit & { previousRevision: number };
 }
 export interface DocumentRoot {
   children: DocumentNode[];
@@ -29,18 +35,7 @@ interface Command {
   time: number;
 }
 let sequence = 0;
-// Build strings from UTF-16 units so history never retains a source substring.
-// Primitive structuredClone may return the original backing storage on newer V8.
-function detachedSpan(value: string): string {
-  if (!value.length) return "";
-  const chunks: string[] = [];
-  for (let from = 0; from < value.length; from += 8192) {
-    const end = Math.min(value.length, from + 8192), units = new Uint16Array(end - from);
-    for (let index = from; index < end; index++) units[index - from] = value.charCodeAt(index);
-    chunks.push(String.fromCharCode(...units));
-  }
-  return chunks.length === 1 ? chunks[0] : chunks.join("");
-}
+
 export class MarkdownDocument {
   text: string;
   nodes: DocumentNode[] = [];
@@ -144,23 +139,53 @@ export class MarkdownDocument {
   }
   private incremental(edit: {from:number;to:number;insert:string;removed:string}) {
     const old = this.nodes;
-    if (!old.length || /(?:^|\n) {0,3}\[[^\]\n]+\]:/.test(edit.insert + "\n" + edit.removed)) return false;
+    if (!old.length) return false;
     let first = 0, last = old.length - 1;
     // Find affected blocks without walking the document's text or inline tokens.
     while (first < last) { const middle = (first + last) >>> 1; if (old[middle].to < edit.from) first = middle + 1; else last = middle; }
     const affected = old[first];
-    if (affected && edit.from >= affected.from && edit.to <= affected.to && !/[\n`~|]/.test(edit.insert + edit.removed)) {
-      const open = affected.kind === "fence" && /^ {0,3}(`{3,}|~{3,})[^\n]*\n/.exec(affected.source);
-      const lineStart = this.text.lastIndexOf("\n", Math.max(0, edit.from - 1)) + 1, lineEnd = this.text.indexOf("\n", edit.from);
-      const tableBody = affected.kind === "table_open" && edit.from > affected.from + affected.source.indexOf("\n", affected.source.indexOf("\n") + 1) && !this.text.slice(lineStart, lineEnd < 0 ? this.text.length : lineEnd).includes("[^");
-      const closing = open && new RegExp(`(?:^|\\n) {0,3}${open[1][0]}{${open[1].length},}[ \\t]*$`).exec(affected.source);
-      const fencedBody = open && closing && edit.from >= affected.from + open[0].length && edit.to <= affected.from + closing.index;
-      if (fencedBody || tableBody) {
-        const delta = edit.insert.length - edit.removed.length;
-        this.nodes = old.map((node, index) => index === first ? {...node, to: node.to + delta, source: this.text.slice(node.from, node.to + delta)} : index > first ? {...node, from: node.from + delta, to: node.to + delta} : node);
+    if (affected && edit.from >= affected.from && edit.to <= affected.to) {
+      const from = edit.from - affected.from, to = edit.to - affected.from;
+      const delta = edit.insert.length - edit.removed.length;
+      const lineDelta = (edit.insert.match(/\n/g)?.length || 0) - (edit.removed.match(/\n/g)?.length || 0);
+      let stable = false;
+      if (affected.kind === "fence") {
+        const opening = /^ {0,3}(`{3,}|~{3,})[^\n]*\n/.exec(affected.source);
+        const range = opening && fenceRange(affected);
+        if (opening && range && from >= range.start && to <= range.end) {
+          const closingStart = affected.from + range.end + delta;
+          const start = this.text.lastIndexOf("\n", edit.from - 1) + 1;
+          const next = this.text.indexOf("\n", edit.from + edit.insert.length);
+          const end = Math.min(next < 0 ? this.text.length : next, range.closingOnNewLine ? closingStart - 1 : this.text.length);
+          const closing = new RegExp(`(?:^|\\n) {0,3}${opening[1][0]}{${opening[1].length},}[ \\t]*(?=\\n|$)`);
+          // Inspect the changed lines, including a closing fence exposed by deleting
+          // ordinary text. The previous fast path missed that syntax change.
+          stable = (!range.closingOnNewLine || this.text[closingStart - 1] === "\n") &&
+            !closing.test(this.text.slice(start, Math.max(start, end)));
+        }
+      } else if (affected.kind === "table_open") {
+        const headerEnd = affected.source.indexOf("\n"), delimiterEnd = affected.source.indexOf("\n", headerEnd + 1);
+        if (delimiterEnd >= 0 && from > delimiterEnd) {
+          const start = affected.source.lastIndexOf("\n", from - 1) + 1;
+          const next = affected.source.indexOf("\n", to), end = next < 0 ? affected.source.length : next;
+          const before = affected.source.slice(start, end);
+          const after = affected.source.slice(start, from) + edit.insert + affected.source.slice(to, end);
+          const width = tableRowCells(affected.source.slice(0, headerEnd)).length;
+          stable = before.split("\n").every(row => compactPipeRow(row, width)) && after.split("\n").every(row => compactPipeRow(row, width));
+        }
+      }
+      if (stable) {
+        this.nodes = old.map((node, index) => index === first ? {
+          ...node, to: node.to + delta, source: this.text.slice(node.from, node.to + delta),
+          revision: (node.revision || 0) + 1, edit: {from, to, insert: edit.insert, previousRevision: node.revision || 0},
+        } : index > first ? {...node, from: node.from + delta, to: node.to + delta, line: node.line + lineDelta} : node);
+        if (lineDelta && Array.isArray(this.environment.headings)) this.environment = {
+          ...this.environment, headings: (this.environment.headings as Array<{line: number}>).map(heading => heading.line > affected.line ? {...heading, line: heading.line + lineDelta} : heading),
+        };
         this.ensureCaretNode(); this.rebuildRoot(); return true;
       }
     }
+    if (/(?:^|\n) {0,3}\[[^\]\n]+\]:/.test(edit.insert + "\n" + edit.removed)) return false;
     const begin = Math.max(0, first - 2);
     let finish = first;
     while (finish < old.length && old[finish].from <= edit.to) finish++;

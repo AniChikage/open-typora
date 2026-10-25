@@ -931,3 +931,15 @@ test("middle empty-paragraph composition undo refreshes the rich DOM after sourc
   assert.equal(new Set(f.model.nodes.map(node=>node.id)).size,f.model.nodes.length);
   assert.ok(!f.root.textContent.includes('你好'));f.editor.redo();assert.ok(f.root.textContent.includes('你好'));f.editor.undo();f.editor.undo();assert.equal(f.model.text,original);f.close();
 });
+
+
+test("large-table deletion preserves whole emoji and combining graphemes at distant carets",()=>{
+  const prefix="| Key | Value |\n|---|---|\n"+("| padding | long stable value |\n").repeat(12000);
+  for(const glyph of ["👨‍👩‍👧‍👦","🇨🇳","e\u0301","👩🏽‍💻"]){
+    const source=prefix+"| final | A"+glyph+"B |\n",f=fixture(source),at=source.lastIndexOf("B |");
+    f.editor.select({anchor:at,head:at});input(f.root,"deleteContentBackward");assert.equal(f.model.text,source.replace("A"+glyph+"B","AB"));
+    f.editor.undo();assert.equal(f.model.text,source);
+    f.editor.select({anchor:at-glyph.length,head:at-glyph.length});input(f.root,"deleteContentForward");assert.equal(f.model.text,source.replace("A"+glyph+"B","AB"));
+    f.editor.undo();assert.equal(f.model.text,source);f.close();
+  }
+});

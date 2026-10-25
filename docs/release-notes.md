@@ -1,4 +1,4 @@
-Open Typora 0.16.2 improves giant code/table editing and removes the old 20 MiB Markdown limit.
+Open Typora 0.16.3 improves editing responsiveness in giant code blocks and large tables, and fixes a code-fence parsing bug.
 
 This is an independent, unofficial project, unaffiliated with Typora. If you can afford it, please [buy Typora](https://store.typora.io/) and support its official developers.
 
@@ -6,23 +6,21 @@ This is an independent, unofficial project, unaffiliated with Typora. If you can
 
 | Platform | Recommended | Alternative |
 | --- | --- | --- |
-| macOS 14+, Apple Silicon | `Open-Typora-0.16.2-arm64.dmg` | macOS ZIP |
-| Windows 10/11, x64 | `Open-Typora-0.16.2-windows-x64-Setup.exe` | Windows ZIP |
-| Linux x64 | `Open-Typora-0.16.2-linux-x64.deb` | AppImage |
+| macOS 14+, Apple Silicon | `Open-Typora-0.16.3-arm64.dmg` | macOS ZIP |
+| Windows 10/11, x64 | `Open-Typora-0.16.3-windows-x64-Setup.exe` | Windows ZIP |
+| Linux x64 | `Open-Typora-0.16.3-linux-x64.deb` | AppImage |
 
 SHA-256 checksums are included. macOS is locally signed, not notarized; Windows is unsigned.
 
 ## Changes
 
-- **Giant code blocks:** compact source-position maps replace per-character arrays. Code bodies above 100,000 characters use bounded CodeMirror viewports before and during editing, with exact source offsets and delta updates. Cursor tracking no longer scans the whole block. Large blocks omit syntax highlighting and soft wrapping.
-- **Large tables:** visible rows mount in an inner viewport with a sticky header. Unchanged rows retain their DOM, the tail stays anchored while heights settle, and Tab uses logical rows across the viewport. Adding/removing/moving rows updates a local source range. Regular top-level pipe tables avoid indexing every inline cell token.
-- **Dialog focus:** passive editor redraws keep focus in quick open and other dialogs; selection restoration no longer takes focus from another control.
-- **Table caret stability:** viewport refreshes retain the selected row and focus the correct editing host. Tab-created empty cells keep their caret; typing no longer lands before the table and triggers a full paragraph render. Acceptance checks the exact appended row and its latency.
-- **Larger Markdown files:** removes the fixed 20 MiB rejection from open, encoding/save, drafts and recovery on macOS and Electron. The full source remains in memory; there is no unlimited-size guarantee.
-- Existing plugins, themes, lossless Markdown, source mode, tabs, split panes, printing and complete Windows previews remain available.
+- **Giant code editing:** ordinary newlines and punctuation now validate the affected lines instead of reparsing the entire block. Block positions and following heading lines stay correct. Removing ordinary text that exposes a closing fence correctly updates the document's structure.
+- **Large table editing:** row indexes update from the changed source range. Unchanged visible rows keep their DOM and receive shifted source maps, reducing work during typing and local row operations.
+- **Faster deletion:** Backspace and Delete locate the current Unicode grapheme directly, preserving family emoji, flags and combining characters without allocating an array for the whole document prefix. Table escape checks and emoji completion inspect nearby text.
+- **Long editing sessions:** compact position shifts combine their offsets rather than growing a chain of callbacks. Retained table rows detach small text spans so they do not hold older giant source strings alive.
 
 ## Validation and limits
 
-Desktop acceptance opens a 36,260,060-byte code file and an 80,000-row table, verifies bounded rendered DOM, Chinese Chromium composition, single undo, exact saved bytes and large-file recovery after restart. Native tests cover 32 MiB open/save/recovery, UTF-16 output over 64 MiB and WebKit giant-block rendering. Installed Windows/Linux suites also retain the existing editing, plugin, conversion, PDF, upgrade and uninstall regressions. Actual Everything 1.4 previews remain a separate Windows acceptance gate.
+Acceptance uses an actual 36,260,060-byte UTF-8 code file and an 80,000-row table. It checks Enter and backtick-containing code, Chinese composition, middle/tail Backspace, complete emoji deletion, local row insertion, exact saved bytes, undo and recovery after restart. Unit tests compare incremental indexes and block boundaries with fresh parsing, and verify retained row identity and 25,000 position shifts. Native WebKit separately checks giant-block editing and persisted recovery content. Installed Windows/Linux suites retain plugin, encoding, conversion, PDF, upgrade and uninstall checks; native Everything 1.4 preview has its own gate.
 
-Available memory, runtime string/IPC limits, initial parsing and concurrent large tabs still bound file sizes. Complex cells, footnote-bearing/irregular tables and nested syntax may need full parsing and remain slower. Converted imports and media retain their separate budgets. Chromium event tests do not substitute for every physical IME. Linux acceptance uses Ubuntu 22.04 and the extracted AppImage payload; real FUSE mounting and this version on a complete Kubuntu 26.04 desktop remain unverified. See [performance](https://github.com/AniChikage/open-typora/blob/main/docs/performance.md) and the [feature checklist](https://github.com/AniChikage/open-typora/blob/main/docs/feature-parity.md).
+Files still load in memory. Large code blocks omit syntax highlighting and soft wrapping. Complex/footnote-bearing tables, initial parsing, column-wide changes, plugins and concurrent large tabs can remain expensive. Automated composition tests do not replace every physical IME. Linux CI uses Ubuntu 22.04 and an extracted AppImage payload; this version has not been manually accepted on a full Kubuntu 26.04 desktop or through real FUSE mounting. See [performance](https://github.com/AniChikage/open-typora/blob/main/docs/performance.md) and the [feature checklist](https://github.com/AniChikage/open-typora/blob/main/docs/feature-parity.md).

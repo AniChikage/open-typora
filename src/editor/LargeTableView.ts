@@ -2,7 +2,7 @@ import type { DocumentNode, SelectionBookmark } from "./model.ts";
 import { TableIndex, RowHeights } from "./tableData.ts";
 import { tokenInlineHtml } from "./richRender.ts";
 import type { Leaf } from "./richRender.ts";
-import { contiguousPositions } from "./sourcePositions.ts";
+import { contiguousPositions, shiftPositions, detachedSpan } from "./sourcePositions.ts";
 
 export class LargeTableView {
   readonly element = document.createElement("div");
@@ -15,7 +15,7 @@ export class LargeTableView {
   private frame = 0;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private key = "";
-  private rows = new Map<number, {row: HTMLTableRowElement; leaves: Map<string, Leaf>}>();
+  private rows = new Map<number, {row: HTMLTableRowElement; leaves: Map<string, Leaf>; source: string; from: number}>();
   private lastHead = -1;
   private width = 0;
   private observer: ResizeObserver | null = null;
@@ -57,11 +57,13 @@ export class LargeTableView {
   };
   update(node: DocumentNode, environment: Record<string, unknown>, selection: SelectionBookmark, readOnly: boolean) {
     if (node.source !== this.node.source) {
-      const index = new TableIndex(node.source);
-      if (index.length !== this.index.length) this.heights = new RowHeights(Math.max(0, index.length - 2));
-      this.index = index; this.key = ""; this.rows.clear();
+      const edit = node.edit?.previousRevision === (this.node.revision || 0) ? node.edit : undefined;
+      const index = new TableIndex(node.source, edit ? this.index : undefined, edit);
+      if (index.length !== this.index.length) { this.heights = new RowHeights(Math.max(0, index.length - 2)); this.rows.clear(); }
+      this.index = index; this.key = "";
     }
-    if (node.from !== this.node.from || environment !== this.environment) { this.key = ""; this.rows.clear(); }
+    if (environment !== this.environment) { this.key = ""; this.rows.clear(); }
+    if (node.from !== this.node.from) this.key = "";
     this.node = node; this.environment = environment; this.selection = {...selection};
     this.element.dataset.cid = this.table.dataset.cid = node.id;
     this.element.dataset.kind = node.kind; this.element.dataset.line = String(node.line);
@@ -80,8 +82,14 @@ export class LargeTableView {
     this.render();
   }
   private row(sourceRow: number, leaves: Map<string, Leaf>) {
-    const cached = this.rows.get(sourceRow);
-    if (cached) { for (const [id, leaf] of cached.leaves) leaves.set(id, leaf); return cached.row; }
+    const cached = this.rows.get(sourceRow), source = this.index.line(sourceRow);
+    const from = this.node.from + this.index.offsets[sourceRow];
+    if (cached?.source === source) {
+      const delta = from - cached.from;
+      if (delta) { cached.leaves = new Map([...cached.leaves].map(([id, leaf]) => [id, {...leaf, positions: shiftPositions(leaf.positions, delta)}])); cached.from = from; }
+      for (const [id, leaf] of cached.leaves) leaves.set(id, leaf);
+      return cached.row;
+    }
     const local = new Map<string, Leaf>();
     const row = document.createElement("tr"); row.dataset.sourceRow = String(sourceRow);
     row.setAttribute("aria-rowindex", String(sourceRow || 1));
@@ -93,10 +101,10 @@ export class LargeTableView {
       span.className = "md-line"; span.dataset.leaf = id;
       span.innerHTML = tokenInlineHtml(cell.raw, this.documentId, this.environment) || "<br />";
       td.style.textAlign = this.index.align[column] || "left"; td.append(span); row.append(td);
-      local.set(id, {id, nodeId: this.node.id, raw: cell.raw,
+      local.set(id, {id, nodeId: this.node.id, raw: detachedSpan(cell.raw),
         positions: contiguousPositions(this.node.from + this.index.offsets[sourceRow] + cell.start, cell.raw.length)});
     }
-    this.rows.set(sourceRow, {row, leaves: local}); for (const [id, leaf] of local) leaves.set(id, leaf);
+    this.rows.set(sourceRow, {row, leaves: local, source: detachedSpan(source), from}); for (const [id, leaf] of local) leaves.set(id, leaf);
     return row;
   }
   private spacer(height: number) {
