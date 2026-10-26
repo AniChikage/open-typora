@@ -13,10 +13,11 @@ await writeFile(file,original);
 const pluginFile=path.join(data,"IME-probe.js");
 await writeFile(pluginFile,`class Probe extends BasePlugin {
   process() {
-    window.imeProbe={loads:0,edits:0};
+    window.imeProbe={loads:0,edits:0,attempts:0};
     this.utils.eventHub.on('fileContentLoaded',()=>window.imeProbe.loads++);
     this.utils.eventHub.on('fileEdited',()=>window.imeProbe.edits++);
     this.utils.entities.eWrite.addEventListener('compositionstart',()=>setTimeout(()=>{
+      window.imeProbe.attempts++;
       this.utils.insertText('UNWANTED'); this.utils.editCurrentFile(text=>'UNWANTED'+text);
     },10));
   }
@@ -54,12 +55,22 @@ try {
     await page.keyboard.press(`${mod}+z`); await saved(original); await page.keyboard.press(`${mod}+Shift+z`); await saved(edited); await page.keyboard.press(`${mod}+z`); await saved(original);
     checks.push(label+' browser IME composition, candidate replacement, commit, single undo/redo and plugin-write protection');
   }
-  await point('输入区：'); await mark('quxiao'); await mark(''); await saved(original);
+  const beforeCancel=await page.evaluate(()=>window.imeProbe.attempts);
+  await point('输入区：'); await mark('quxiao');
+  // Let the delayed write run while composition is active. Cancelling first
+  // would legitimately allow it to mutate the following test's document.
+  await expect.poll(()=>page.evaluate(()=>window.imeProbe.attempts)).toBeGreaterThan(beforeCancel);
+  await expect(root).not.toContainText('UNWANTED'); assert.equal(await readFile(file,'utf8'),original);
+  await mark(''); await saved(original);
   checks.push('Cancelling marked text leaves the document unchanged');
   await root.locator('.fence-body').click();
   const code=root.locator('.fence-editing .cm-content'); await expect(code).toBeVisible();
   await code.press(mod==='Meta'?'Meta+ArrowLeft':'Home'); await code.press('ArrowRight'); await code.press('ArrowRight'); await code.press('ArrowRight');
-  await mark('zhong'); await mark('zhongwen'); await page.waitForTimeout(50); await cdp.send('Input.insertText',{text:'中文'});
+  const beforeCode=await page.evaluate(()=>window.imeProbe.attempts);
+  await mark('zhong'); await mark('zhongwen');
+  await expect.poll(()=>page.evaluate(()=>window.imeProbe.attempts)).toBeGreaterThan(beforeCode);
+  await expect(root).not.toContainText('UNWANTED'); assert.equal(await readFile(file,'utf8'),original);
+  await cdp.send('Input.insertText',{text:'中文'});
   await saved(original.replace('代码：end','代码：中文end')); await page.keyboard.press(`${mod}+z`); await saved(original);
   checks.push('Local CodeMirror composition updates form one undo transaction');
   await root.getByRole('heading',{name:'IME acceptance',exact:true}).click(); await page.getByRole('button',{name:'源码',exact:true}).click();
