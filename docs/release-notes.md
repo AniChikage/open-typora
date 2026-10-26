@@ -1,4 +1,4 @@
-Open Typora 0.17.0 adds context menus for document tabs, text and tables, with safe grouped closing and precise editing targets.
+Open Typora 0.17.1 adds context menus for document tabs, text and tables, with safe grouped closing and precise editing targets.
 
 This is an independent, unofficial project, unaffiliated with Typora. If you can afford it, please [buy Typora](https://store.typora.io/) and support its official developers.
 
@@ -6,9 +6,9 @@ This is an independent, unofficial project, unaffiliated with Typora. If you can
 
 | Platform | Recommended | Alternative |
 | --- | --- | --- |
-| macOS 14+, Apple Silicon | `Open-Typora-0.17.0-arm64.dmg` | macOS ZIP |
-| Windows 10/11, x64 | `Open-Typora-0.17.0-windows-x64-Setup.exe` | Windows ZIP |
-| Linux x64 | `Open-Typora-0.17.0-linux-x64.deb` | AppImage |
+| macOS 14+, Apple Silicon | `Open-Typora-0.17.1-arm64.dmg` | macOS ZIP |
+| Windows 10/11, x64 | `Open-Typora-0.17.1-windows-x64-Setup.exe` | Windows ZIP |
+| Linux x64 | `Open-Typora-0.17.1-linux-x64.deb` | AppImage |
 
 SHA-256 checksums are included. macOS is locally signed, not notarized; Windows is unsigned.
 
@@ -19,6 +19,7 @@ SHA-256 checksums are included. macOS is locally signed, not notarized; Windows 
 - **Text context menu:** cut, copy, paste, paste as plain text, copy Markdown, select all, undo/redo, find, formatting, paragraph and insert commands, and source/live mode. Desktop paste uses the existing system editing path, retaining HTML, image and table handling.
 - **Table context menu:** insert, delete and move rows/columns; set alignment, format the source or remove the table. Operations resolve the clicked cell's source position, including virtualized tables and inactive split panes. Header-row deletion and out-of-range movement are disabled.
 - **Keyboard and themes:** Shift+F10 opens menus; arrow keys navigate items and submenus; Escape restores focus and the selection. Menus follow the current light/dark theme, scroll in short windows and keep submenus within the viewport. Read-only mode disables changes; active composition cannot be interrupted by opening a context menu.
+- **Windows paths:** renamed tabs display the file name rather than the full Windows path. Folder changes and removal checks handle drive letters, backslash separators and UNC paths while retaining POSIX case sensitivity.
 
 Requested in [Issue #3](https://github.com/AniChikage/open-typora/issues/3). The implementation is part of the editor; no extra plugin is required.
 

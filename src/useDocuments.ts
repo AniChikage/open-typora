@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { host } from "./host";
 import { normalizeWorkspace, activateWorkspace, reorderDocuments } from "./workspace";
 import type { WorkspaceLayout } from "./workspace";
+import { documentFileName, pathContains } from "./filePaths";
 import type { DocumentRecord, FileEntry, FolderResult, PathChange, RecentEntry, FileOperation } from "./types";
 export function useDocuments(canPrepare: () => boolean = () => true) {
   const prepareEditor = useRef(canPrepare); prepareEditor.current = canPrepare;
@@ -337,7 +338,7 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
       closing.current = true; fileOperationPrepared.current = true; setFileOperationBusy(true);
       await Promise.allSettled([...inFlight.current.values()]);
       for (const record of current.current.documents) {
-        if (!change.removedPath || !record.path || !(record.path === change.removedPath || record.path.startsWith(change.removedPath + "/")) || record.content === record.savedContent) continue;
+        if (!change.removedPath || !record.path || !pathContains(record.path, change.removedPath) || record.content === record.savedContent) continue;
         const answer = await host.confirmClose(record.name);
         if (answer === "cancel") return false;
         if (answer === "save") {
@@ -349,9 +350,9 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
       await host.persist(current.current); return true;
     }
     if (phase === "commit") {
-      const records = current.current.documents.filter(record => !change.removedPath || !record.path || !(record.path === change.removedPath || record.path.startsWith(change.removedPath + "/"))).map(record => {
-        if (change.fromPath && change.toPath && record.path && (record.path === change.fromPath || record.path.startsWith(change.fromPath + "/"))) {
-          const path = change.toPath + record.path.slice(change.fromPath.length); return { ...record, path, name: path.split("/").at(-1)! };
+      const records = current.current.documents.filter(record => !change.removedPath || !record.path || !pathContains(record.path, change.removedPath)).map(record => {
+        if (change.fromPath && change.toPath && record.path && pathContains(record.path, change.fromPath)) {
+          const path = change.toPath + record.path.slice(change.fromPath.length); return { ...record, path, name: documentFileName(path) };
         }
         return record;
       });
