@@ -17,7 +17,7 @@ const file=path.join(data,'FUSE 中文 #% &.md'),original='# Real FUSE acceptanc
 await writeFile(path.join(profile,'session.json'),JSON.stringify({version:1,activeId:'real-fuse',documents:[{id:'real-fuse',name:path.basename(file),path:file,content:original,savedContent:original,lineEnding:'\n',encoding:'utf-8',bom:false}]}));
 const env={...process.env,OPEN_TYPORA_DATA_DIR:profile};for(const name of ['ELECTRON_RUN_AS_NODE','OPEN_TYPORA_DEV_URL','APPIMAGE_EXTRACT_AND_RUN','APPDIR','APPIMAGE'])delete env[name];
 const mountInfo=target=>JSON.parse(execFileSync('findmnt',['--json','--target',target,'--output','TARGET,FSTYPE,SOURCE,OPTIONS'],{encoding:'utf8'})).filesystems[0];
-const errors=[],checks=[];let app,page,mounter,mountPath,runtimeMount;let mountOut='',mountErr='';
+const errors=[],checks=[];let app,page,mounter,mountPath,runtimeMount,running;let mountOut='',mountErr='';
 try{
  mounter=spawn(image,['--appimage-mount'],{env,stdio:['ignore','pipe','pipe']});mounter.stdout.on('data',chunk=>mountOut+=chunk);mounter.stderr.on('data',chunk=>mountErr+=chunk);
  await expect.poll(()=>mountOut.trim().split('\n').find(line=>line.startsWith('/')),{timeout:30000}).toBeTruthy();mountPath=mountOut.trim().split('\n').find(line=>line.startsWith('/'));
@@ -25,9 +25,9 @@ try{
  checks.push('The ordinary-user AppImage runtime creates an actual FUSE filesystem, not an extracted directory.');
  const closed=once(mounter,'close');mounter.kill('SIGINT');await closed;mounter=null;await expect.poll(()=>stat(mountPath).then(()=>true,()=>false)).toBe(false);
  checks.push('The explicit FUSE mount unmounts after the runtime receives its normal interrupt.');
- app=await electron.launch({executablePath:image,args:[],env,timeout:60000});page=await app.firstWindow();page.on('pageerror',error=>errors.push(error.message));await page.setViewportSize({width:1300,height:900});
+ app=await electron.launch({executablePath:image,args:[],env,chromiumSandbox:true,timeout:60000});page=await app.firstWindow();page.on('pageerror',error=>errors.push(error.message));await page.setViewportSize({width:1300,height:900});
  await expect(page.getByRole('heading',{name:'Real FUSE acceptance',exact:true})).toBeVisible({timeout:20000});assert.match(await page.title(),/FUSE 中文 #% &\.md — Open Typora/);
- const running=await app.evaluate(({app,BrowserWindow})=>({executable:app.getPath('exe'),noSandbox:app.commandLine.hasSwitch('no-sandbox'),rendererSandbox:BrowserWindow.getAllWindows()[0].webContents.getLastWebPreferences().sandbox,rendererPID:BrowserWindow.getAllWindows()[0].webContents.getOSProcessId()}));
+ running=await app.evaluate(({app,BrowserWindow})=>({executable:app.getPath('exe'),argv:process.argv,noSandbox:app.commandLine.hasSwitch('no-sandbox'),rendererSandbox:BrowserWindow.getAllWindows()[0].webContents.getLastWebPreferences().sandbox,rendererPID:BrowserWindow.getAllWindows()[0].webContents.getOSProcessId()}));
  runtimeMount=mountInfo(running.executable);assert.match(runtimeMount.fstype,/^fuse(?:\.|$)/);assert.ok(running.executable.startsWith(runtimeMount.target+'/'));assert.equal(running.noSandbox,false);assert.equal(running.rendererSandbox,true);
  const rendererStatus=await readFile('/proc/'+running.rendererPID+'/status','utf8');assert.match(rendererStatus,/^NoNewPrivs:\s+1$/m);assert.match(rendererStatus,/^Seccomp:\s+2$/m);
  checks.push('Launching the AppImage normally runs the editor from its FUSE mount with Chromium renderer sandboxing enabled.');
@@ -38,5 +38,5 @@ try{
  await app.close();app=null;await expect.poll(()=>stat(runtimeMount.target).then(()=>true,()=>false),{timeout:15000}).toBe(false);
  checks.push('Normal editor exit releases its runtime FUSE mount.');
  await writeFile(path.join(qa,'real-fuse-results.json'),JSON.stringify({uid:process.getuid(),distro:await readFile('/etc/os-release','utf8'),kernel:os.release(),appImage:image,sha256:createHash('sha256').update(await readFile(image)).digest('hex'),manualMount:manual,runtimeMount,running,rendererStatus:rendererStatus.split('\n').filter(line=>/^(Name|NoNewPrivs|Seccomp|NSpid):/.test(line)),checks,errors,fuseMountTested:true,extracted:false,sandboxDisabled:false},null,2));for(const check of checks)console.log('PASS: '+check);
-}catch(error){await page?.screenshot({path:path.join(qa,'real-fuse-failure.png')}).catch(()=>{});await writeFile(path.join(qa,'real-fuse-failure.json'),JSON.stringify({error:String(error),checks,errors,mountOut,mountErr,mountPath,runtimeMount},null,2));console.error('REAL-FUSE-FAILURE',JSON.stringify({error:String(error),checks,mountOut,mountErr}));throw error;}
+}catch(error){await page?.screenshot({path:path.join(qa,'real-fuse-failure.png')}).catch(()=>{});await writeFile(path.join(qa,'real-fuse-failure.json'),JSON.stringify({error:String(error),checks,errors,mountOut,mountErr,mountPath,runtimeMount,running},null,2));console.error('REAL-FUSE-FAILURE',JSON.stringify({error:String(error),checks,mountOut,mountErr,running}));throw error;}
 finally{if(app){await app.evaluate(({app})=>app.exit(0)).catch(()=>{});await app.close().catch(()=>{});}if(mounter){mounter.kill('SIGINT');await once(mounter,'close').catch(()=>{});}}
