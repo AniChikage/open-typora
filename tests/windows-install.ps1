@@ -25,6 +25,8 @@ if ($LASTEXITCODE -ne 0) { throw 'Large document, theme and print acceptance fai
 if ($LASTEXITCODE -ne 0) { throw 'Native and actual Everything preview acceptance failed' }
 node tests/desktop.mts
 $desktopExit = $LASTEXITCODE
+node tests/alignment-desktop.mts
+$alignmentExit = $LASTEXITCODE
 node tests/electron-shell.mts
 $shellExit = $LASTEXITCODE
 node tests/parity-desktop.mts
@@ -43,6 +45,7 @@ if ($indentationExit -ne 0) { throw 'Installed indentation shortcut regression f
 if ($workspaceExit -ne 0) { throw 'Installed tabs and split-pane regression failed' }
 if ($packageExit -ne 0) { throw 'Installed plugin package regression failed' }
 if ($imeExit -ne 0) { throw 'Installed composition and plugin regression failed' }
+if ($alignmentExit -ne 0) { throw 'Installed image and editing alignment regression failed' }
 if ($desktopExit -ne 0) { throw 'Installed desktop regression failed' }
 if ($shellExit -ne 0) { throw 'Windows shell and plugin regression failed' }
 if ($compatibilityExit -ne 0) { throw 'Installed image and office-format regression failed' }

@@ -13,7 +13,7 @@ const run = (command: string,args: string[],options={}) => execFileSync(command,
 const exercise = async (executable: string,kind: string) => {
   const evidence = path.join(qa,kind); await mkdir(evidence,{recursive:true});
   const env: Record<string, string> = {...process.env, OPEN_TYPORA_EXECUTABLE:executable, OPEN_TYPORA_QA_DIR:evidence};
-  for (const file of ["context-menu-desktop.mts","community-plugins-desktop.mts","desktop.mts","electron-shell.mts","parity-desktop.mts","indentation-desktop.mts","workspace-desktop.mts","next-desktop.mts","huge-blocks-desktop.mts","compatibility-desktop.mts","ime-desktop.mts","plugin-package-desktop.mts"]) run(process.execPath,[`tests/${file}`],{env});
+  for (const file of ["context-menu-desktop.mts","community-plugins-desktop.mts","desktop.mts","alignment-desktop.mts","electron-shell.mts","parity-desktop.mts","indentation-desktop.mts","workspace-desktop.mts","next-desktop.mts","huge-blocks-desktop.mts","compatibility-desktop.mts","ime-desktop.mts","plugin-package-desktop.mts"]) run(process.execPath,[`tests/${file}`],{env});
   const {dataDir} = JSON.parse(await readFile(path.join(evidence,"desktop-results.json"),"utf8"));
   const session = path.join(dataDir,"session.json");
   return {session,hash:createHash("sha256").update(await readFile(session)).digest("hex")};
