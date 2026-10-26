@@ -1,9 +1,5 @@
-export interface WorkspaceLayout {
-  primaryId: string;
-  secondaryId: string;
-  direction: "columns" | "rows";
-  ratio: number;
-}
+import type { WorkspaceLayout } from "../shared/contracts.js";
+export type { WorkspaceLayout } from "../shared/contracts.js";
 export function normalizeWorkspace(value: unknown, ids: string[], activeId: string): WorkspaceLayout | null {
   if (!value || typeof value !== "object" || ids.length < 2) return null;
   const layout = value as WorkspaceLayout;

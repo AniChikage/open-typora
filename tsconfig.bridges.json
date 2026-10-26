@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "strict": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "moduleDetection": "legacy",
+    "rootDir": ".",
+    "outDir": "build/runtime",
+    "noEmitOnError": true,
+    "types": []
+  },
+  "include": [
+    "native/bridge.ts",
+    "browser/pagination.ts",
+    "tests/webkit.ts",
+    "shared/contracts.d.ts",
+    "tests/browser-globals.d.ts"
+  ]
+}

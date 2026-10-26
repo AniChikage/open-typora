@@ -1,4 +1,4 @@
-# 编辑架构（0.13.4）
+# 编辑架构（0.18.0）
 
 macOS 的发布包使用 Swift/AppKit + WKWebView。Windows/Linux 发布包使用 Electron/Chromium，并保留为跨平台开发与回归测试宿主；macOS 的 `package:mac` 与 `install:app` 仍使用原生宿主。Windows 使用系统标题栏、Ctrl 快捷键与单实例文件打开，`package:win` 生成 NSIS 安装包与 ZIP。
 
@@ -47,6 +47,12 @@ New/Open 在当前窗口中新建或打开页签，New Window 创建独立 macOS
 原生标签组用每窗口的 `tab-group` 标识恢复。关闭文档先完成保存/取消/不保存决策和会话提交；重新打开已保存文件重新读取磁盘内容。跨文件 Markdown 链接在已打开文件夹范围内解析，带标题锚点的打开动作在目标窗口就绪后执行。未创建的目标文档由原生对话框提供创建操作。
 
 HTML 导出在请求时生成独立正文，等待公式和图表，通过本地资源桥嵌入字体及已授权图片。普通输入不持续生成导出 DOM。源码和局部代码编辑器的自动配对与缩进设置通过配置 compartment 更新。
+
+## TypeScript 与发布产物
+
+自有界面和编辑内核使用 `.ts` / `.tsx`；Electron 文件层、共享 Node 模块、构建脚本及 Node/桌面回归使用 `.mts`。预加载使用 `.cts`，编译后仍为沙箱支持的 `preload.cjs`；WKWebView 桥和打印分页代码输出普通浏览器脚本。Swift、Windows 原生预览组件和上游插件保留各自的原始语言。
+
+`shared/contracts.d.ts` 定义文档、编码、恢复、宿主方法及 IPC 响应协议，前端、Electron 和 WebKit 桥共用类型。`npm run typecheck` 严格检查生产代码、工具和测试；Node 26 仅为脚本运行擦除类型，不替代编译检查。`build/runtime/` 和 `build/public/` 均为生成目录，打包入口只使用编译产物。第三方 JavaScript 插件继续由现有兼容层加载。
 
 ## 验证入口与边界
 

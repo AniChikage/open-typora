@@ -25,6 +25,8 @@ npm ci
 npm run dev:app
 ```
 
+All first-party JavaScript has TypeScript source: `.ts`/`.tsx` for the renderer and browser bridges, `.mts` for Node ES modules, and `.cts` for Electron's sandboxed CommonJS preload. `npm run typecheck` checks production code, tooling, and tests with `strict: true`. `npm run build:runtime` compiles desktop/bridge files to ignored `build/runtime/`; package scripts copy those outputs, never TypeScript source. Node 26 strips types when running `.mts` development scripts and tests; the separate typecheck remains required. Original third-party plugins and interoperability fixtures remain JavaScript.
+
 The development command launches Vite and an Electron host. `npm run dev` runs a browser preview whose Save action downloads a file; it does not exercise the native filesystem bridge.
 
 ## Make a change
@@ -38,6 +40,7 @@ The development command launches Vite and an Electron host. `npm run dev` runs a
 Core checks:
 
 ```sh
+npm run typecheck
 npm test
 npm run build
 ```
@@ -66,7 +69,7 @@ npm run package:mac
 This creates `release/native/Open Typora.app` and a ZIP archive. Run `npm run package:release` to additionally create a drag-to-install DMG and `SHA256SUMS.txt`; the DMG wraps the same native application. To install it locally, quit the running application and run:
 
 ```sh
-node scripts/install.mjs
+node scripts/install.mts
 ```
 
 Use `npm run package:preview` for a separate preview application and data directory when checking a change without touching your normal session. Native builds are locally signed, not Apple-notarized.
@@ -95,4 +98,4 @@ Do not commit generated bundles, test output, credentials, personal documents, o
 
 Set the package version, commit the change, and push a matching `v<version>` tag. The [release workflow](.github/workflows/release.yml) builds on Apple Silicon macOS, Windows x64 and Ubuntu 22.04 x64 runners. All three builds and required tests must pass before publication. Windows is installed and uninstalled; Linux tests the installed DEB and extracted AppImage payload, including recovery preservation on uninstall. The publisher verifies combined checksums before publishing DMG, EXE, two ZIPs, DEB, AppImage and `SHA256SUMS.txt`. Published assets are never overwritten by a rerun.
 
-Main and `codex/**` branch changes run Windows/Linux acceptance without publishing. Update `docs/release-notes.md` for each version. Linux builds use `npm run package:linux`; in an isolated Ubuntu x64 environment, `xvfb-run -a node tests/linux-install.mjs` installs/removes the DEB with sudo and runs both packaged payloads. Never run that installer test against your ordinary Linux installation.
+Main and `codex/**` branch changes run Windows/Linux acceptance without publishing. Update `docs/release-notes.md` for each version. Linux builds use `npm run package:linux`; in an isolated Ubuntu x64 environment, `xvfb-run -a node tests/linux-install.mts` installs/removes the DEB with sudo and runs both packaged payloads. Never run that installer test against your ordinary Linux installation.
