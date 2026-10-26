@@ -1,4 +1,4 @@
-Open Typora 0.17.1 adds context menus for document tabs, text and tables, with safe grouped closing and precise editing targets.
+Open Typora 0.17.2 adds context menus for document tabs, text and tables, with safe grouped closing and precise editing targets.
 
 This is an independent, unofficial project, unaffiliated with Typora. If you can afford it, please [buy Typora](https://store.typora.io/) and support its official developers.
 
@@ -6,9 +6,9 @@ This is an independent, unofficial project, unaffiliated with Typora. If you can
 
 | Platform | Recommended | Alternative |
 | --- | --- | --- |
-| macOS 14+, Apple Silicon | `Open-Typora-0.17.1-arm64.dmg` | macOS ZIP |
-| Windows 10/11, x64 | `Open-Typora-0.17.1-windows-x64-Setup.exe` | Windows ZIP |
-| Linux x64 | `Open-Typora-0.17.1-linux-x64.deb` | AppImage |
+| macOS 14+, Apple Silicon | `Open-Typora-0.17.2-arm64.dmg` | macOS ZIP |
+| Windows 10/11, x64 | `Open-Typora-0.17.2-windows-x64-Setup.exe` | Windows ZIP |
+| Linux x64 | `Open-Typora-0.17.2-linux-x64.deb` | AppImage |
 
 SHA-256 checksums are included. macOS is locally signed, not notarized; Windows is unsigned.
 

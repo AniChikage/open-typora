@@ -41,7 +41,9 @@ try{
  page=await app.firstWindow();page.on('pageerror',error=>errors.push(error.message));await page.setViewportSize({width:1300,height:900});
  await expect(tab(names[0])).toHaveAttribute('aria-selected','true',{timeout:20000});await expect(page.getByRole('tab')).toHaveCount(4);
  assert.match(await page.title(),/Alpha 中国\.md — Open Typora/);await expect(pane('menus-0').locator('.rich-document')).toContainText('First paragraph:');
- await command('autosave');
+ const initialMenu=await tabMenu(names[0]),initialAuto=initialMenu.getByRole('menuitemcheckbox',{name:'自动保存已有文件',exact:true});
+ if(await initialAuto.getAttribute('aria-checked')==='true')await initialAuto.click();else await page.keyboard.press('Escape');
+ await expect.poll(()=>page.evaluate(()=>localStorage.getItem('open-typora-autosave'))).toBe('false');
  await app.evaluate(async({clipboard,shell})=>{globalThis.__menuClipboard=await clipboard.read();globalThis.__menuReveals=[];shell.showItemInFolder=file=>globalThis.__menuReveals.push(['reveal',file]);shell.openPath=async file=>{globalThis.__menuReveals.push(['open',file]);return '';};});
  for(const [label,expected] of [['复制文件名（含扩展名）',names[1]],['复制文件名（不含扩展名）','Table'],['复制完整路径',records[1].path],['复制带引号完整路径','"'+records[1].path+'"'],['复制所在文件夹路径',directory]]){
   await chooseTab(names[1],label);await expect.poll(()=>app.evaluate(({clipboard})=>clipboard.readText())).toBe(expected);await expect(tab(names[0])).toHaveAttribute('aria-selected','true');
@@ -99,11 +101,21 @@ try{
  await selectText('menus-0','alpha');const cdp=await app.context().newCDPSession(page);await cdp.send('Input.imeSetComposition',{text:'zhong',selectionStart:5,selectionEnd:5});
  await pane('menus-0').locator('.rich-document').dispatchEvent('contextmenu',{bubbles:true,cancelable:true,clientX:200,clientY:250});await expect(menu('正文编辑菜单')).toHaveCount(0);
  await tab(names[1]).dispatchEvent('contextmenu',{bubbles:true,cancelable:true,clientX:200,clientY:40});await expect(menu('标签页菜单')).toHaveCount(0);await expect(tab(names[0])).toHaveAttribute('aria-selected','true');
- await cdp.send('Input.insertText',{text:'中国'});await command('undo');await saved(records[0].path,alpha);
+ await cdp.send('Input.insertText',{text:'中国'});await expect(pane('menus-0').locator('.rich-document > p').first()).toHaveText('First paragraph: 中国 中国.');
+ await page.keyboard.press(`${mod}+z`);await expect(pane('menus-0').locator('.rich-document > p').first()).toHaveText('First paragraph: alpha 中国.');await saved(records[0].path,alpha);
  checks.push('Source mode uses the same context clipboard; a menu cannot interrupt active Chinese composition.');
 
  await chooseTab(names[1],'重命名文件…');const rename=page.getByRole('dialog',{name:'重命名',exact:true});await rename.getByRole('textbox',{name:'文件名称',exact:true}).fill('Renamed table.md');await rename.getByRole('button',{name:'确定',exact:true}).click();await expect(tab('Renamed table.md')).toBeVisible();await expect(tab(names[0])).toHaveAttribute('aria-selected','true');const renamed=path.join(directory,'Renamed table.md');assert.equal(await readFile(renamed,'utf8'),table);await assert.rejects(stat(records[1].path),{code:'ENOENT'});names[1]='Renamed table.md';records[1].path=renamed;
- await selectText('menus-0','alpha');await page.keyboard.insertText('DIRTY-ALPHA');await tab(names[1]).click();await tablePane.getByRole('cell',{name:'B',exact:true}).click();await page.keyboard.insertText('DIRTY-TABLE');
+ await tabMenu(names[0]);const auto=menu('标签页菜单').getByRole('menuitemcheckbox',{name:'自动保存已有文件',exact:true});
+ await expect(auto).toHaveAttribute('aria-checked','false');await page.keyboard.press('Escape');
+ await expect.poll(()=>page.evaluate(()=>localStorage.getItem('open-typora-autosave'))).toBe('false');
+ await selectText('menus-0','alpha');await page.keyboard.insertText('DIRTY-ALPHA');
+ await expect(pane('menus-0').locator('.rich-document')).toContainText('DIRTY-ALPHA');await expect(tab(names[0]).locator('..').locator('.tab-dirty')).toHaveCount(1);
+ await tab(names[1]).click();await expect(tablePane).toHaveAttribute('data-active','true');await tablePane.getByRole('cell',{name:'B',exact:true}).click();
+ await expect.poll(()=>tablePane.locator('.rich-document').evaluate(root=>root.contains(document.activeElement))).toBe(true);await page.keyboard.insertText('DIRTY-TABLE');
+ await expect(tablePane.locator('.rich-document')).toContainText('DIRTY-TABLE');await expect(tab(names[1]).locator('..').locator('.tab-dirty')).toHaveCount(1);
+ assert.equal(await readFile(records[0].path,'utf8'),alpha);assert.equal(await readFile(renamed,'utf8'),table);
+ console.log('MENU-PREPARED-DIRTY-TABS',JSON.stringify(await page.locator('.document-tab').evaluateAll(tabs=>tabs.map(tab=>({name:tab.querySelector('[role="tab"]')?.textContent,dirty:!!tab.querySelector('.tab-dirty')})))));
  await app.evaluate(({dialog})=>{globalThis.__menuConfirmCalls=[];let n=0;dialog.showMessageBox=async(_window,options)=>{globalThis.__menuConfirmCalls.push(options.message);return {response:n++===0?2:1};};});
  await chooseTab(names[0],'关闭全部标签页');await expect.poll(()=>app.evaluate(()=>globalThis.__menuConfirmCalls.length)).toBe(2);await expect(page.getByRole('tab')).toHaveCount(4);await expect(pane('menus-0').locator('.rich-document')).toContainText('DIRTY-ALPHA');await expect(tablePane.locator('.rich-document')).toContainText('DIRTY-TABLE');assert.equal(await readFile(records[0].path,'utf8'),alpha);assert.equal(await readFile(renamed,'utf8'),table);
  await chooseTab(names[0],'保存全部');await expect.poll(()=>readFile(records[0].path,'utf8')).toContain('DIRTY-ALPHA');await expect.poll(()=>readFile(renamed,'utf8')).toContain('DIRTY-TABLE');
@@ -116,5 +128,10 @@ try{
  checks.push('Rename targets a background file; bulk-close cancellation preserves every dirty tab, save-all writes each file, and saved-only close keeps untitled drafts. Cancelled Save As keeps the draft; save-and-close and reopen preserve bytes.');
  assert.deepEqual(errors,[]);await expect(page.locator('vite-error-overlay')).toHaveCount(0);
  await writeFile(path.join(qa,'context-menu-results.json'),JSON.stringify({platform:process.platform,browser:'Browser plugin not available; existing Electron/Playwright workflow',profile,checks,errors},null,2));console.log(checks.map(check=>'PASS: '+check).join('\n'));
-}catch(error){await page?.screenshot({path:path.join(qa,'context-menu-failure.png')}).catch(()=>{});throw error;}
+}catch(error){
+ const state=page?await page.evaluate(()=>({autosave:localStorage.getItem('open-typora-autosave'),tabs:[...document.querySelectorAll('.document-tab')].map(tab=>({name:tab.querySelector('[role="tab"]')?.textContent,dirty:!!tab.querySelector('.tab-dirty')})),selection:getSelection()?.toString(),focused:document.activeElement?.outerHTML.slice(0,240)})).catch(()=>null):null;
+ console.log('MENU-FAILURE-STATE',JSON.stringify(state));
+ if(app)console.log('MENU-CONFIRM-CALLS',JSON.stringify(await app.evaluate(()=>globalThis.__menuConfirmCalls).catch(()=>null)));
+ await page?.screenshot({path:path.join(qa,'context-menu-failure.png')}).catch(()=>{});throw error;
+}
 finally{if(app){await app.evaluate(async({clipboard})=>{if(globalThis.__menuClipboard?.length)await clipboard.write(globalThis.__menuClipboard);else if(globalThis.__menuClipboard)clipboard.clear();}).catch(()=>{});await app.close();}}
