@@ -1,4 +1,4 @@
-Open Typora 0.16.4 improves editing responsiveness in giant code blocks and large tables, and fixes a code-fence parsing bug.
+Open Typora 0.17.0 adds context menus for document tabs, text and tables, with safe grouped closing and precise editing targets.
 
 This is an independent, unofficial project, unaffiliated with Typora. If you can afford it, please [buy Typora](https://store.typora.io/) and support its official developers.
 
@@ -6,22 +6,24 @@ This is an independent, unofficial project, unaffiliated with Typora. If you can
 
 | Platform | Recommended | Alternative |
 | --- | --- | --- |
-| macOS 14+, Apple Silicon | `Open-Typora-0.16.4-arm64.dmg` | macOS ZIP |
-| Windows 10/11, x64 | `Open-Typora-0.16.4-windows-x64-Setup.exe` | Windows ZIP |
-| Linux x64 | `Open-Typora-0.16.4-linux-x64.deb` | AppImage |
+| macOS 14+, Apple Silicon | `Open-Typora-0.17.0-arm64.dmg` | macOS ZIP |
+| Windows 10/11, x64 | `Open-Typora-0.17.0-windows-x64-Setup.exe` | Windows ZIP |
+| Linux x64 | `Open-Typora-0.17.0-linux-x64.deb` | AppImage |
 
 SHA-256 checksums are included. macOS is locally signed, not notarized; Windows is unsigned.
 
 ## Changes
 
-- **Giant code editing:** ordinary newlines and punctuation now validate the affected lines instead of reparsing the entire block. Block positions and following heading lines stay correct. Removing ordinary text that exposes a closing fence correctly updates the document's structure.
-- **Large table editing:** row indexes update from the changed source range. Unchanged visible rows keep their DOM and receive shifted source maps, reducing work during typing and local row operations.
-- **Faster deletion:** Backspace and Delete locate the current Unicode grapheme directly, preserving family emoji, flags and combining characters without allocating an array for the whole document prefix. Table escape checks and emoji completion inspect nearby text.
-- **Undo after navigation:** arrow, Home/End and page navigation end the rendered editing group immediately. Quick left/right movement followed by Backspace remains a separately undoable edit even when browser selection notifications are coalesced; local code selection changes also close their edit group.
-- **Long editing sessions:** compact position shifts combine their offsets rather than growing a chain of callbacks. Retained table rows detach small text spans so they do not hold older giant source strings alive.
+- **Tab context menu:** save, Save As, save all, close left/right/other/saved/all tabs, and save-and-close all. Copy file names and paths, reveal a file, open its containing folder, rename it, split editing panes and open the outline. Actions target the clicked tab even when another document is active.
+- **Safe grouped closing:** collect all save/discard/cancel decisions before removing any tab. Cancelling a prompt or Save As keeps the whole group open. Unsaved untitled drafts are excluded from the saved-tabs group. The file-operation lock only releases a preparation it owns.
+- **Text context menu:** cut, copy, paste, paste as plain text, copy Markdown, select all, undo/redo, find, formatting, paragraph and insert commands, and source/live mode. Desktop paste uses the existing system editing path, retaining HTML, image and table handling.
+- **Table context menu:** insert, delete and move rows/columns; set alignment, format the source or remove the table. Operations resolve the clicked cell's source position, including virtualized tables and inactive split panes. Header-row deletion and out-of-range movement are disabled.
+- **Keyboard and themes:** Shift+F10 opens menus; arrow keys navigate items and submenus; Escape restores focus and the selection. Menus follow the current light/dark theme, scroll in short windows and keep submenus within the viewport. Read-only mode disables changes; active composition cannot be interrupted by opening a context menu.
+
+Requested in [Issue #3](https://github.com/AniChikage/open-typora/issues/3). The implementation is part of the editor; no extra plugin is required.
 
 ## Validation and limits
 
-Acceptance uses an actual 36,260,060-byte UTF-8 code file and an 80,000-row table. It checks Enter and backtick-containing code, Chinese composition, middle/tail Backspace, complete emoji deletion, local row insertion, exact saved bytes, undo and recovery after restart. Unit tests compare incremental indexes and block boundaries with fresh parsing, and verify retained row identity and 25,000 position shifts. Native WebKit separately checks giant-block editing and persisted recovery content. Installed Windows/Linux suites retain plugin, encoding, conversion, PDF, upgrade and uninstall checks; native Everything 1.4 preview has its own gate.
+Acceptance exercises actual menus, system clipboard, exact file saves, undo, background-tab rename, grouped-close cancellation, cancelled Save As, reopening, read-only plugins, Chinese composition, split panes and a virtualized 12,000-row table. Native WebKit separately verifies menus and the AppKit clipboard. Installed Windows/Linux suites run the context-menu acceptance alongside the existing large-file, encoding, conversion, PDF and recovery checks.
 
-Files still load in memory. Large code blocks omit syntax highlighting and soft wrapping. Complex/footnote-bearing tables, initial parsing, column-wide changes, plugins and concurrent large tabs can remain expensive. Automated composition tests do not replace every physical IME. Linux CI uses Ubuntu 22.04 and an extracted AppImage payload; this version has not been manually accepted on a full Kubuntu 26.04 desktop or through real FUSE mounting. See [performance](https://github.com/AniChikage/open-typora/blob/main/docs/performance.md) and the [feature checklist](https://github.com/AniChikage/open-typora/blob/main/docs/feature-parity.md).
+All cross-application clipboard formats and physical IMEs have not been exhaustively tested. Browser clipboard operations depend on browser permissions. Files still load in memory; complex table-wide changes and plugins can remain expensive. Linux CI uses Ubuntu 22.04 and an extracted AppImage payload, without a new full Kubuntu 26.04 or real FUSE acceptance pass. See the [feature checklist](https://github.com/AniChikage/open-typora/blob/main/docs/feature-parity.md).

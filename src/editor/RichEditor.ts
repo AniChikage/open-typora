@@ -97,6 +97,7 @@ export class RichEditor {
     this.callbacks = callbacks;
     root.contentEditable = "true";
     root.role = "textbox";
+    root.tabIndex = 0;
     root.setAttribute("aria-multiline", "true");
     root.setAttribute("aria-label", "Markdown 编辑器");
     root.spellcheck = false;
@@ -276,6 +277,47 @@ export class RichEditor {
       head: this.point(selection.focusNode, selection.focusOffset),
     };
   }
+  contextSelection(target: HTMLElement, x: number, y: number, keyboard = false) {
+    if (this.composing) return null;
+    const previous = this.bookmark();
+    let position = previous.head;
+    if (!keyboard) {
+      const code = target.closest<HTMLElement>(".cm-editor"), view = code && EditorView.findFromDOM(code);
+      const wrapper = target.closest<HTMLElement>("[data-fence]"), leaf = wrapper && this.leaves.get(wrapper.dataset.fence!);
+      if (view && leaf) {
+        const local = view.posAtCoords({ x, y }) ?? view.state.selection.main.head;
+        const node = this.model.nodes.find(node => node.id === leaf.nodeId);
+        const body = node && leaf.fenceLine !== undefined ? codeBody(node, leaf.fenceLine) : null;
+        position = node && body ? codePosition(node.from + body.from, view.state.doc.toString(), body.prefix, local) : leaf.positions[0] + local;
+      } else {
+        const caretDocument = document as Document & { caretRangeFromPoint?(x: number, y: number): Range | null };
+        const range = caretDocument.caretRangeFromPoint?.(x, y);
+        const cell = target.closest<HTMLElement>("td,th");
+        const rangeCell = range?.startContainer.parentElement?.closest("td,th");
+        if (cell && rangeCell !== cell) position = this.point(cell.querySelector("[data-leaf]") || cell, 0);
+        else if (range && this.root.contains(range.startContainer)) position = this.point(range.startContainer, range.startOffset);
+        else if (this.root.contains(target)) position = this.point(target, 0);
+      }
+    }
+    const from = Math.min(previous.anchor, previous.head), to = Math.max(previous.anchor, previous.head);
+    const selection = keyboard || (from !== to && position >= from && position <= to) ? previous : { anchor: position, head: position };
+    if (selection !== previous) this.fullSelection = false;
+    this.model.selection = selection; this.model.closeGroup();
+    const node = this.model.nodeAt(position);
+    let table: { row: number; rows: number; column: number; columns: number } | undefined;
+    if (node?.kind === "table_open") {
+      const large = this.tableViews.get(node.id), offset = position - node.from;
+      const lines = large ? null : node.source.split("\n");
+      let row = large ? large.index.rowAt(offset) : node.source.slice(0, offset).split("\n").length - 1;
+      if (row === 1) row = 0;
+      const cells = large ? large.index.cells(row) : tableRowCells(lines![row]);
+      const start = large ? large.index.offsets[row] : lines!.slice(0, row).reduce((sum, line) => sum + line.length + 1, 0);
+      const column = Math.max(0, cells.findIndex(cell => offset - start >= cell.start && offset - start <= cell.end));
+      table = { row, rows: large ? large.index.length : lines!.length, column, columns: cells.length };
+    }
+    return { selection, point: { anchor: position, head: position }, table, code: node?.kind === "fence" };
+  }
+  selectAll() { this.fullSelection = true; this.select({ anchor: 0, head: this.model.text.length }); }
   private domPoint(position: number): { node: Node; offset: number } | null {
     const candidates = [...this.leaves.values()].filter(
       (leaf) =>

@@ -42,6 +42,7 @@
     "windowAction",
     "exportHtml", "exportTheme", "previewSettings",
     "readClipboard",
+    "clipboardAction",
     "writeClipboard",
     "chooseImage",
     "reopen",

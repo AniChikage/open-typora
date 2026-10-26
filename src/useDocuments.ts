@@ -24,11 +24,13 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
   const closing = useRef(false);
   const closed = useRef<{ id: string; name: string }[]>([]);
   const activated = useRef<string[]>([]);
-  const update = (id: string, patch: Partial<DocumentRecord>) =>
+  const update = (id: string, patch: Partial<DocumentRecord>) => {
+    current.current = { ...current.current, documents: current.current.documents.map(record => record.id === id ? { ...record, ...patch } : record) };
     setDocuments((records) => {
       const next = records.map(record => record.id === id ? { ...record, ...patch } : record);
       current.current = { ...current.current, documents: next }; return next;
     });
+  };
   const notify = (error: unknown) =>
     setMessage(error instanceof Error ? error.message : String(error));
   function reportFolderScan(result: FolderResult) {
@@ -105,8 +107,8 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
     const promise = host
       .save(id, snapshot.content, saveAs, force)
       .then((result) => {
-        if (result)
-          update(id, {
+        if (!result) return false;
+        update(id, {
             path: result.path,
             name: result.name,
             diskHash: result.diskHash,
@@ -114,18 +116,20 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
             bom: result.bom, encoding: result.encoding,
             conflict: false,
           });
+        return true;
       })
       .catch((error) => {
         if ((error as { code?: string }).code === "EXTERNAL_CHANGE")
           update(id, { conflict: true });
         else notify(error);
+        return false;
       })
       .finally(() => {
         inFlight.current.delete(id);
         setSaving(inFlight.current.size > 0);
       });
     inFlight.current.set(id, promise);
-    await promise;
+    return await promise;
   }
   useEffect(() => {
     if (!ready || !autosave || !host.native) return;
@@ -325,11 +329,12 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
     }
   }
   const fileOperationHandler = useRef<(phase: string, change: PathChange) => Promise<boolean>>(async () => false);
+  const fileOperationPrepared = useRef(false);
   fileOperationHandler.current = async (phase, change) => {
-    if (phase === "release") { closing.current = false; setFileOperationBusy(false); return true; }
+    if (phase === "release") { if (fileOperationPrepared.current) { fileOperationPrepared.current = false; closing.current = false; setFileOperationBusy(false); } return true; }
     if (phase === "prepare") {
       if (closing.current || !prepareEditor.current()) return false;
-      closing.current = true; setFileOperationBusy(true);
+      closing.current = true; fileOperationPrepared.current = true; setFileOperationBusy(true);
       await Promise.allSettled([...inFlight.current.values()]);
       for (const record of current.current.documents) {
         if (!change.removedPath || !record.path || !(record.path === change.removedPath || record.path.startsWith(change.removedPath + "/")) || record.content === record.savedContent) continue;
@@ -380,36 +385,49 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
     }
     setRecent(await host.recent());
   }
-  async function close(id = current.current.activeId) {
-    if (!prepareEditor.current()) { setMessage("请先完成当前输入法组合输入，再关闭文档。"); return; }
-    if (closing.current) return;
-    closing.current = true;
+  async function closeMany(ids: string[], saveChanges = false) {
+    if (!prepareEditor.current()) { setMessage("请先完成当前输入法组合输入，再关闭文档。"); return false; }
+    if (closing.current || !ids.length) return false;
+    closing.current = true; setFileOperationBusy(true);
     try {
-    await inFlight.current.get(id);
-    const record = current.current.documents.find((item) => item.id === id);
-    if (!record) return;
-    if (record.content !== record.savedContent) {
-      const answer = await host.confirmClose(record.name);
-      if (answer === "cancel") return;
-      if (answer === "save") { const saved = await host.save(id, record.content); if (!saved) return; update(id, saved); }
-      else if (record.path) await host.reload(id);
+      const targets = new Set(ids);
+      await Promise.allSettled([...inFlight.current.entries()].filter(([id]) => targets.has(id)).map(([, promise]) => promise));
+      const records = current.current.documents.filter(record => targets.has(record.id));
+      if (!records.length) return false;
+      const discarded: DocumentRecord[] = [];
+      // Resolve every decision before removing any tab. Cancelling keeps the whole group open.
+      for (const record of records) {
+        if (record.content === record.savedContent && !(saveChanges && !record.path)) continue;
+        const answer = saveChanges ? "save" : await host.confirmClose(record.name);
+        if (answer === "cancel") return false;
+        if (answer === "save") {
+          const saved = await host.save(record.id, record.content);
+          if (!saved) return false;
+          const next = current.current.documents.map(item => item.id === saved.id ? saved : item);
+          current.current = { ...current.current, documents: next }; setDocuments(next);
+        } else if (record.path) discarded.push(record);
+      }
+      for (const record of discarded) await host.reload(record.id);
+      const remaining = current.current.documents.filter(record => !targets.has(record.id));
+      const recent = activated.current.findLast(id => remaining.some(record => record.id === id));
+      const at = current.current.documents.findIndex(record => record.id === current.current.activeId);
+      const nextId = targets.has(current.current.activeId) ? recent || remaining[Math.min(at, remaining.length - 1)]?.id || "" : current.current.activeId;
+      const layout = normalizeWorkspace(current.current.workspace, remaining.map(record => record.id), nextId);
+      await host.persist({ documents: remaining, activeId: nextId, workspace: layout });
+      activated.current = [...activated.current.filter(id => !targets.has(id) && id !== nextId), ...(nextId ? [nextId] : [])];
+      current.current = { documents: remaining, activeId: nextId, workspace: layout };
+      setDocuments(remaining); setActiveIdState(nextId); setWorkspaceState(layout);
+      closed.current = [...closed.current.filter(item => !targets.has(item.id)), ...records.map(({ id, name }) => ({ id, name }))].slice(-20);
+      return true;
+    } catch (error) { notify(error); return false; }
+    finally { closing.current = false; setFileOperationBusy(false); setDocuments(records => [...records]); }
+  }
+  function close(id = current.current.activeId) { return closeMany([id]); }
+  async function saveAll() {
+    for (const record of [...current.current.documents]) {
+      if (record.path && record.content === record.savedContent) continue;
+      if (!await save(false, record.id)) break;
     }
-    const remaining = current.current.documents.filter(
-      (item) => item.id !== id,
-    );
-    const recent = activated.current.findLast(previous => previous !== id && remaining.some(record => record.id === previous));
-    const nextId = current.current.activeId === id ? recent || remaining[Math.min(current.current.documents.findIndex(record => record.id === id), remaining.length-1)]?.id || "" : current.current.activeId;
-    const layout = normalizeWorkspace(current.current.workspace, remaining.map(record => record.id), nextId);
-    await host.persist({
-      documents: remaining,
-      activeId: nextId, workspace: layout,
-    });
-    activated.current = [...activated.current.filter(item => item !== id && item !== nextId), ...(nextId ? [nextId] : [])];
-    current.current = { documents: remaining, activeId: nextId, workspace: layout };
-    setDocuments(remaining); setActiveIdState(nextId); setWorkspaceState(layout);
-    closed.current = [...closed.current.filter(item => item.id !== id), { id, name: record.name }].slice(-20);
-    } catch (error) { notify(error); }
-    finally { closing.current = false; setDocuments(records => [...records]); }
   }
   async function reopen() {
     const item = closed.current.at(-1);
@@ -534,6 +552,8 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
     openToken,
     refresh,
     close,
+    closeMany,
+    saveAll,
     reopen,
     reload,
     changeEncoding,

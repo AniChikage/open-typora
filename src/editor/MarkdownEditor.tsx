@@ -34,6 +34,9 @@ import { host } from "../host";
 import type { DocumentRecord } from "../types";
 import type { Preferences } from "../preferences";
 import type { BlockArguments } from "./blockCommands.ts";
+import type { SelectionBookmark } from "./model.ts";
+import { ContextMenu } from "../components/ContextMenu";
+import type { ContextMenuEntry } from "../components/ContextMenu";
 export interface EditorHandle {
   view(): EditorView | null;
   find(): void;
@@ -66,10 +69,12 @@ interface Props {
   onCursor(line: number, column: number): void;
   onSelection?(text: string): void;
   onCompositionEnd?(): void;
+  onCommand(action: string): void;
 }
+type EditorMenu = NonNullable<ReturnType<RichEditor["contextSelection"]>> & { x: number; y: number; source: string; rendered: boolean; image?: ImageReference };
 export const MarkdownEditor = forwardRef<EditorHandle, Props>(
   function MarkdownEditor(
-    { document: record, rendered, active = true, readOnly = false, preferences, typewriter = false, onChange, onError, onCursor, onSelection, onCompositionEnd },
+    { document: record, rendered, active = true, readOnly = false, preferences, typewriter = false, onChange, onError, onCursor, onSelection, onCompositionEnd, onCommand },
     ref,
   ) {
     const root = useRef<HTMLDivElement>(null),
@@ -77,8 +82,8 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
     const model = useRef<MarkdownDocument | null>(null),
       rich = useRef<RichEditor | null>(null),
       source = useRef<EditorView | null>(null);
-    const callbacks = useRef({ onChange, onError, onCursor, onSelection, onCompositionEnd });
-    callbacks.current = { onChange, onError, onCursor, onSelection, onCompositionEnd };
+    const callbacks = useRef({ onChange, onError, onCursor, onSelection, onCompositionEnd, onCommand });
+    callbacks.current = { onChange, onError, onCursor, onSelection, onCompositionEnd, onCommand };
     const initial = useRef(record),
       requested = useRef(rendered),
       activeMode = useRef(rendered);
@@ -86,6 +91,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
       rendered,
     );
     const [editingImage, setEditingImage] = useState<ImageReference | null>(null);
+    const [contextMenu, setContextMenu] = useState<EditorMenu | null>(null);
     const imageQueue = useRef(Promise.resolve());
     const [searchOpen, setSearchOpen] = useState(false),
       [query, setQuery] = useState(""),
@@ -99,6 +105,78 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
     const pendingOptions = useRef(false);
     const compositionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const isComposing = () => !!(rich.current?.composing || sourceComposing.current || source.current?.composing);
+    function imageAt(target: HTMLElement) {
+      const image = target.closest("img"); if (!image) return;
+      const object = image.closest<HTMLElement>(".md-inline[data-mark='image']");
+      let from: number | undefined;
+      if (object) { const leaf = rich.current?.leaves.get(object.closest<HTMLElement>("[data-leaf]")?.dataset.leaf || ""); from = leaf?.positions[Number(object.dataset.inlineFrom)]; }
+      const node = image.closest<HTMLElement>("[data-cid]");
+      if (from === undefined && node) from = model.current?.nodes.find(item => item.id === node.dataset.cid)?.from;
+      return imageReferences(model.current?.text || "").find(item => item.from === from);
+    }
+    function openContextMenu(target: HTMLElement, x: number, y: number, keyboard = false) {
+      const doc = model.current; if (!doc) return;
+      if (isComposing()) { callbacks.current.onError("请先完成当前输入法组合输入，再打开编辑菜单。"); return; }
+      let state: NonNullable<ReturnType<RichEditor["contextSelection"]>>;
+      if (activeMode.current) {
+        const selected = rich.current?.contextSelection(target, x, y, keyboard); if (!selected) return;
+        state = selected;
+      } else {
+        const view = source.current; if (!view) return;
+        const current = view.state.selection.main, position = keyboard ? current.head : view.posAtCoords({ x, y }) ?? current.head;
+        const selection = keyboard || (current.from !== current.to && position >= current.from && position <= current.to) ? { anchor: current.anchor, head: current.head } : { anchor: position, head: position };
+        view.dispatch({ selection }); doc.selection = selection; doc.closeGroup();
+        state = { selection, point: { anchor: position, head: position }, table: undefined, code: false };
+      }
+      if (keyboard || (!x && !y)) {
+        const rect = activeMode.current ? window.getSelection()?.rangeCount ? window.getSelection()!.getRangeAt(0).getBoundingClientRect() : target.getBoundingClientRect() : source.current?.coordsAtPos(state.selection.head);
+        x = rect?.left || 12; y = rect?.bottom || target.getBoundingClientRect().top + 24;
+      }
+      setContextMenu({ ...state, x, y, source: doc.text, rendered: activeMode.current, image: imageAt(target) });
+    }
+    function restoreContext(menu: EditorMenu, table = false) {
+      if (!viewOptions.current.active || !model.current || model.current.text !== menu.source || activeMode.current !== menu.rendered || isComposing()) { callbacks.current.onError("文档或输入状态已变化，请重新打开右键菜单。"); return false; }
+      const selection: SelectionBookmark = table ? menu.point : menu.selection;
+      if (activeMode.current) rich.current?.select(selection);
+      else { source.current?.dispatch({ selection }); source.current?.focus(); }
+      return true;
+    }
+    function contextAction(menu: EditorMenu, action: string) {
+      if (!restoreContext(menu, action.startsWith("table-"))) return;
+      if (viewOptions.current.readOnly && !["copy", "copy-markdown", "copy-image-path", "select-all", "find", "source"].includes(action)) return;
+      if (action === "select-all") {
+        if (activeMode.current) rich.current?.selectAll();
+        else if (source.current) source.current.dispatch({ selection: { anchor: 0, head: source.current.state.doc.length } });
+      } else if (action === "copy" || action === "cut" || action === "paste") void host.clipboardAction(action).catch(error => callbacks.current.onError(error.message));
+      else if (action === "copy-markdown") void host.writeClipboard(activeMode.current ? rich.current?.clipboard().markdown || "" : source.current?.state.sliceDoc(Math.min(menu.selection.anchor, menu.selection.head), Math.max(menu.selection.anchor, menu.selection.head)) || "").catch(error => callbacks.current.onError(error.message));
+      else if (action === "paste-plain") void host.readClipboard().then(text => { if (restoreContext(menu)) insert(text, "paste"); }).catch(error => callbacks.current.onError(error.message));
+      else if (action === "copy-image-path" && menu.image) void host.writeClipboard(menu.image.url).catch(error => callbacks.current.onError(error.message));
+      else if (action === "image-edit" && menu.image) setEditingImage(menu.image);
+      else callbacks.current.onCommand?.(action);
+    }
+    function contextItems(menu: EditorMenu): ContextMenuEntry[] {
+      const editable = !viewOptions.current.readOnly, selected = menu.selection.anchor !== menu.selection.head;
+      const entry = (id: string, label: string, disabled = false) => ({ id, label, disabled });
+      const richEnabled = editable && menu.rendered && !menu.code;
+      const items: ContextMenuEntry[] = [entry("undo", "撤销", !editable || !model.current?.canUndo), entry("redo", "重做", !editable || !model.current?.canRedo), null,
+        entry("cut", "剪切", !editable || !selected), entry("copy", "复制", !selected), entry("paste", "粘贴", !editable), entry("paste-plain", "粘贴为纯文本", !editable), entry("copy-markdown", "复制为 Markdown", !selected), entry("select-all", "全选"), null];
+      if (menu.image) items.push(entry("image-edit", "编辑图片…", !editable), entry("copy-image-path", "复制图片地址"), null);
+      if (menu.table) {
+        const { row, rows, column, columns } = menu.table;
+        items.push({ id: "table-operations", label: "表格", disabled: !editable, children: [
+          entry("table-rowBefore", "上方插入行"), entry("table-row", "下方插入行"), entry("table-columnBefore", "左侧插入列"), entry("table-column", "右侧插入列"), null,
+          entry("table-moveRowUp", "向上移动行", row <= 2), entry("table-moveRowDown", "向下移动行", row < 2 || row >= rows - 1),
+          entry("table-moveColumnLeft", "向左移动列", column === 0), entry("table-moveColumnRight", "向右移动列", column >= columns - 1), null,
+          entry("table-left", "左对齐"), entry("table-center", "居中对齐"), entry("table-right", "右对齐"), entry("table-format", "格式化表格源码"), null,
+          entry("table-removeRow", "删除行", row < 2), entry("table-removeColumn", "删除列"), entry("table-deleteTable", "删除表格"),
+        ] });
+      }
+      items.push({ id: "format-menu", label: "格式", disabled: !richEnabled, children: [entry("bold", "粗体"), entry("italic", "斜体"), entry("underline", "下划线"), entry("strike", "删除线"), entry("inline-code", "行内代码"), entry("highlight", "高亮"), null, entry("clear-format", "清除格式")] },
+        { id: "paragraph-menu", label: "段落", disabled: !richEnabled, children: [entry("heading-0", "普通段落"), ...[1, 2, 3, 4, 5, 6].map(level => entry(`heading-${level}`, `${level} 级标题`)), null, entry("quote", "引用"), entry("unordered-list", "无序列表"), entry("ordered-list", "有序列表"), entry("task-list", "任务列表"), null, entry("paragraph-above", "在上方插入段落"), entry("paragraph-below", "在下方插入段落"), entry("indent", "增加缩进"), entry("outdent", "减少缩进")] },
+        { id: "insert-menu", label: "插入", disabled: !editable, children: [entry("table", "表格…", !menu.rendered), entry("link", "超链接…", !menu.rendered), entry("image", "图片…"), entry("code", "代码块", !menu.rendered), entry("math-block", "公式块", !menu.rendered), entry("hr", "水平分割线", !menu.rendered), entry("pagebreak", "分页符")] },
+        null, entry("find", "查找与替换"), entry("source", menu.rendered ? "切换源码模式" : "切换即时渲染"));
+      return items;
+    }
     function editingBlocked() {
       if (viewOptions.current.readOnly) return true;
       if (!isComposing()) return false;
@@ -551,6 +629,11 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
     return (
       <div
         className={`editor-surface ${visibleMode ? "rich-mode" : "source-mode"}`}
+        onKeyDownCapture={event => {
+          if ((event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) && (event.target as HTMLElement).closest('.rich-scroller,.source-surface')) {
+            event.preventDefault(); event.stopPropagation(); openContextMenu(event.target as HTMLElement, 0, 0, true);
+          }
+        }}
       >
         {searchOpen && visibleMode && (
           <div
@@ -623,14 +706,17 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
           const node = image.closest<HTMLElement>("[data-cid]"); if (from === undefined && node) from = model.current?.nodes.find(item => item.id === node.dataset.cid)?.from;
           const reference = imageReferences(model.current?.text || "").find(item => item.from === from);
           if (reference) { event.preventDefault(); setEditingImage(reference); }
-        }} onContextMenu={event => { if ((event.target as HTMLElement).closest("img")) { event.preventDefault(); (event.target as HTMLElement).dispatchEvent(new MouseEvent("dblclick", { bubbles: true })); } }}>
+        }} onContextMenu={event => { event.preventDefault(); event.stopPropagation(); openContextMenu(event.target as HTMLElement, event.clientX, event.clientY, !event.clientX && !event.clientY); }}>
           <div className="rich-document" ref={root} />
         </div>
         <div
           className="source-surface"
           hidden={visibleMode}
           ref={sourceParent}
+          onContextMenu={event => { event.preventDefault(); event.stopPropagation(); openContextMenu(event.target as HTMLElement, event.clientX, event.clientY, !event.clientX && !event.clientY); }}
         />
+        {contextMenu && <ContextMenu label={contextMenu.table ? "表格编辑菜单" : "正文编辑菜单"} x={contextMenu.x} y={contextMenu.y} items={contextItems(contextMenu)}
+          close={reason => { setContextMenu(null); if (reason === "cancel") restoreContext(contextMenu); }} action={action => contextAction(contextMenu, action)} />}
       </div>
     );
   },

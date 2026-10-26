@@ -1,0 +1,8 @@
+.context-menu { position:fixed; z-index:1200; width:248px; max-width:calc(100vw - 16px); max-height:calc(100vh - 16px); overflow:auto; padding:5px; border:1px solid var(--border); border-radius:8px; background:var(--paper); color:var(--ink); box-shadow:0 8px 28px rgb(0 0 0 / 18%); font-size:12px; scrollbar-width:thin; -webkit-app-region:no-drag; }
+.context-menu-entry > button { display:flex; align-items:center; gap:7px; width:100%; min-height:28px; padding:5px 7px; border-radius:4px; text-align:left; font:inherit; color:inherit; }
+.context-menu-entry > button:focus { background:var(--selected); outline:1px solid var(--accent); outline-offset:-1px; }
+.context-menu-entry > button:disabled { opacity:.4; cursor:default; }
+.context-menu-label { flex:1; }
+.context-menu-check { display:flex; width:13px; flex-shrink:0; }
+.context-menu-separator { height:1px; background:var(--border); margin:5px 4px; }
+@media print { .context-menu-root { display:none!important; } }

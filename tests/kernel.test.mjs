@@ -956,3 +956,37 @@ test("rapid navigation splits undo groups even when selectionchange is coalesced
     f.editor.undo();f.editor.undo();assert.equal(f.model.text,source);f.close();
   }
 });
+
+
+test("context selection uses the pointed table cell rather than the previous row and undoes exactly", () => {
+  const text = "Before\n\n| Key | Value |\n| --- | --- |\n| first | A |\n| second | B |\n\nAfter\n";
+  const run = fixture(text), previousCaret = document.caretRangeFromPoint;
+  try {
+    const cells = run.root.querySelectorAll('tbody td');
+    const target = cells[3].querySelector('[data-leaf]');
+    const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT), targetText = walker.nextNode();
+    document.caretRangeFromPoint = () => { const range = document.createRange(); range.setStart(targetText, 0); range.collapse(true); return range; };
+    point(run.editor, text.indexOf('A |'));
+    const state = run.editor.contextSelection(target, 25, 25);
+    assert.equal(state.table.row, 3); assert.equal(state.table.column, 1);
+    assert.equal(run.model.text, text);
+    run.editor.select(state.point); run.editor.command('table-removeRow');
+    assert.equal(run.model.text, text.replace('| second | B |\n', ''));
+    run.editor.undo(); assert.equal(run.model.text, text);
+  } finally { document.caretRangeFromPoint = previousCaret; run.close(); }
+});
+
+test("context selection retains selected text, keyboard bookmarks and active composition", () => {
+  const text = "First alpha\n\nSecond beta\n", run = fixture(text), previousCaret = document.caretRangeFromPoint;
+  try {
+    const selected = { anchor: 6, head: 11 }; run.editor.select(selected);
+    const target = run.root.querySelector('[data-leaf]'), walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT), node = walker.nextNode();
+    document.caretRangeFromPoint = () => { const range = document.createRange(); range.setStart(node, 8); range.collapse(true); return range; };
+    assert.deepEqual(run.editor.contextSelection(target, 25, 25).selection, selected);
+    assert.deepEqual(run.editor.contextSelection(target, 0, 0, true).selection, selected);
+    run.editor.composing = true;
+    assert.equal(run.editor.contextSelection(target, 25, 25), null);
+    assert.equal(run.model.text, text); assert.deepEqual(run.model.selection, selected);
+    run.editor.composing = false;
+  } finally { document.caretRangeFromPoint = previousCaret; run.close(); }
+});

@@ -11,7 +11,7 @@ contextBridge.exposeInMainWorld("desktop", {
   recent: () => call("recent"),
   recentAction: (action, path) => call("recentAction", action, path),
   searchFiles: (query, options) => call("searchFiles", query, options),
-  reveal: path => call("reveal", path),
+  reveal: (path, openFolder) => call("reveal", path, openFolder),
   onFileOperation: callback => { const listener = async (_, id, phase, change) => { try { ipcRenderer.send("workspace:prepared", id, await callback(phase, change)); } catch { ipcRenderer.send("workspace:prepared", id, false); } }; ipcRenderer.on("workspace:operation", listener); return () => ipcRenderer.removeListener("workspace:operation", listener); },
   restore: () => call("restore"),
   registerDraft: (record) => call("draft", record),
@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld("desktop", {
   previewSettings: enable => call("previewSettings", enable),
   writeClipboard: text => call("writeClipboard", text),
   readClipboard: () => call("readClipboard"),
+  clipboardAction: action => call("clipboardAction", action),
   confirmClose: name => call("confirmClose", name),
   save: (id, text, saveAs = false, force = false, options) =>
     call("save", id, text, saveAs, force, options),

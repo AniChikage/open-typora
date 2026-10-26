@@ -25,6 +25,8 @@ import { documentStatistics } from "./editor/statistics";
 import { FileOperationDialog, RecentDialog, GlobalSearch } from "./components/WorkspaceDialog";
 import type { FileOperation } from "./types";
 import type { Command } from "./types";
+import { tabCloseTargets, tabCopyText } from "./tabActions";
+import type { TabCloseKind, TabCopyKind } from "./tabActions";
 import appIcon from "../design/icon.svg";
 import { version as appVersion } from "../package.json";
 import { applyTheme, builtInThemes } from "./themes";
@@ -40,7 +42,8 @@ import { imeKey } from "./editor/composition";
 import type { BackgroundAsset } from "./background";
 export default function App() {
   const editors = useRef(new Map<string, EditorHandle>());
-  const session = useDocuments(() => ![...editors.current.values()].some(editor => editor.composing()));
+  const composing = useCallback(() => [...editors.current.values()].some(editor => editor.composing()), []);
+  const session = useDocuments(() => !composing());
   const [preferences, setPreferences] = useState(() => { const initial = loadPreferences(); setMarkdownOptions(initial); return initial; });
   const [themes, setThemes] = useState<{ id: string; name: string; css: string }[]>([]);
   const [background,setBackground] = useState<BackgroundAsset | null>(null);
@@ -82,6 +85,28 @@ export default function App() {
   const compositionDocument = useCallback((id: string) => { if (id === sessionRef.current.activeId) pluginRuntime.current?.documentChanged(); }, []);
   const modeDocument = useCallback((id: string, value: boolean) => { setModes(previous => ({...previous,[id]:value})); }, []);
   const closePane = useCallback((id: string) => sessionRef.current.closePane(id), []);
+  const commandDocument = useCallback((id: string, action: string) => {
+    if (sessionRef.current.activeId === id) commands.current({ action });
+  }, []);
+  const tabAction = useCallback((id: string, action: string) => {
+    void (async () => {
+      const current = sessionRef.current, record = current.documents.find(record => record.id === id);
+      if (!record) return;
+      if (action === "close") await current.close(id);
+      else if (action === "close-all-save") await current.closeMany(current.documents.map(record => record.id), true);
+      else if (action.startsWith("close-") && action !== "close-pane") await current.closeMany(tabCloseTargets(current.documents, id, action.slice(6) as TabCloseKind));
+      else if (action === "save" || action === "saveAs") await current.save(action === "saveAs", id);
+      else if (action === "save-all") await current.saveAll();
+      else if (action.startsWith("copy-")) { const text = tabCopyText(record, action.slice(5) as TabCopyKind); if (text !== null) await host.writeClipboard(text); }
+      else if ((action === "reveal" || action === "open-directory") && record.path) await host.reveal(record.path, action === "open-directory");
+      else if (action === "rename" && record.path) setFileOperation({ action: "rename", path: record.path, name: record.name });
+      else if (action === "split-right" || action === "split-down") { if (current.setActiveId(id)) await current.split(action === "split-right" ? "columns" : "rows"); }
+      else if (action === "close-pane") current.closePane(id);
+      else if (action === "autosave") current.setAutosave(value => !value);
+      else if (action === "outline") commands.current({ action });
+      requestAnimationFrame(() => { if (document.activeElement === document.body) editors.current.get(sessionRef.current.activeId)?.focus(); });
+    })().catch(error => sessionRef.current.setMessage((error as Error).message));
+  }, []);
   const pluginContext = useRef({ active, editor, notify: session.setMessage });
   pluginContext.current = { active, editor, notify: session.setMessage };
   const pluginDefinitions = useMemo(() => [...bundledPlugins, ...installedPlugins].map(definition => ({ ...definition, config: { ...definition.config, ...pluginPreferences[definition.id]?.config } })), [installedPlugins, pluginPreferences]);
@@ -282,7 +307,7 @@ export default function App() {
   useEffect(() => host.onCommand((command) => commands.current(command)), []);
   useEffect(() => {
     const shortcut = (event: KeyboardEvent) => {
-      if (imeKey(event) || pluginContext.current.editor()?.composing() || (event.target as HTMLElement)?.closest('input,textarea,select,[role="dialog"]')) return;
+      if (imeKey(event) || pluginContext.current.editor()?.composing() || (event.target as HTMLElement)?.closest('input,textarea,select,[role="dialog"],[role="menu"]')) return;
       if (event.key === "Escape") {
         setFocus(false);
         setAbout(false);
@@ -386,7 +411,7 @@ export default function App() {
         ) : (
           <>
             <EditorWorkspace documents={session.documents} activeId={session.activeId} layout={session.workspace} modes={modes}
-              preferences={preferences} readOnly={readOnly} typewriter={typewriter} select={selectDocument} register={registerEditor} change={changeDocument} error={session.setMessage} cursor={cursorDocument} selection={selectionDocument} compositionEnd={compositionDocument} mode={modeDocument} closePane={closePane}
+              preferences={preferences} readOnly={readOnly} typewriter={typewriter} select={selectDocument} register={registerEditor} change={changeDocument} error={session.setMessage} cursor={cursorDocument} selection={selectionDocument} compositionEnd={compositionDocument} mode={modeDocument} closePane={closePane} command={commandDocument} tabAction={tabAction} autosave={session.autosave} composing={composing}
               create={() => void session.create()} close={id => void session.close(id)} reorder={session.reorder} split={direction => void session.split(direction)} swap={session.swapPanes} resize={session.resizeWorkspace} />
             <article
               className="print-document"

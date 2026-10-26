@@ -494,6 +494,49 @@ try {
   window.__openTypora.command({action:'undo'});await wait(()=>!root()?.querySelector('tr[data-source-row="20002"]'));
   check(true,'native large-table appended cell edits and both structural undo steps preserve the table');
   window.__openTypora.command({action:'opened',document:saved.value});await wait(()=>document.querySelector('.document-title')?.textContent===saved.value.name && root()?.textContent.includes('粗测新体'));
+  const menuButton = label => [...document.querySelectorAll('[role="menu"] button')].find(button => button.textContent.trim() === label);
+  const openNativeContext = async target => {
+    const rect = target.getBoundingClientRect();
+    target.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: rect.left + Math.min(4, rect.width / 2), clientY: rect.top + rect.height / 2 }));
+    await wait(() => document.querySelector('[role="menu"]'));
+  };
+  const nativeMenuClipboard = async expected => {
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const result = await window.desktop.readClipboard();
+      if (result.ok && result.value === expected) return;
+      await new Promise(resolve => setTimeout(resolve, 25));
+    }
+    const last = await window.desktop.readClipboard();
+    throw new Error('Native context clipboard mismatch: ' + JSON.stringify({expected,actual:last.value,selection:getSelection()?.toString(),focus:document.activeElement?.outerHTML.slice(0,160),notice:document.querySelector('.toast')?.textContent}));
+  };
+  const savedTab = document.querySelector(`[data-tab-id="${saved.value.id}"]`);
+  savedTab.focus(); savedTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true, cancelable: true }));
+  await wait(() => document.querySelector('[role="menu"][aria-label="标签页菜单"]'));
+  menuButton('复制文件名（含扩展名）').click(); await nativeMenuClipboard(saved.value.name);
+  check(true, 'native tab context menu opens from Shift+F10 and copies the clicked document name');
+  await sourceMode(true); const contextBaseline = readSource(); await sourceMode(false);
+  const selectNativeWord = () => {
+    pointText('粗测新体', 0); const selected = getSelection();
+    selected.setBaseAndExtent(selected.anchorNode, selected.anchorOffset, selected.anchorNode, selected.anchorOffset + 4);
+    document.dispatchEvent(new Event('selectionchange'));
+    root().dispatchEvent(new KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true, cancelable: true }));
+  };
+  selectNativeWord(); await wait(() => menuButton('复制')); menuButton('复制').click(); await nativeMenuClipboard('粗测新体');
+  check(true, 'native context Copy uses AppKit and preserves the selected rich text');
+  await window.desktop.writeClipboard('菜单粘贴');
+  selectNativeWord(); await wait(() => menuButton('粘贴')); menuButton('粘贴').click(); await wait(() => root().textContent.includes('菜单粘贴'));
+  window.__openTypora.command({action:'undo'}); await wait(() => root().textContent.includes('粗测新体') && !root().textContent.includes('菜单粘贴'));
+  await sourceMode(true); check(readSource() === contextBaseline, 'native context Paste uses AppKit and undoes to exact Markdown'); await sourceMode(false);
+  const targetCell = root().querySelector('tbody tr:last-child td:last-child'), beforeRows = root().querySelectorAll('tbody tr').length;
+  targetCell.scrollIntoView({block:'center'}); await new Promise(resolve => setTimeout(resolve, 50));
+  await openNativeContext(targetCell); menuButton('表格').click(); await wait(() => menuButton('下方插入行')); menuButton('下方插入行').click();
+  await wait(() => root().querySelectorAll('tbody tr').length === beforeRows + 1);
+  window.__openTypora.command({action:'undo'}); await wait(() => root().querySelectorAll('tbody tr').length === beforeRows);
+  await sourceMode(true); check(readSource() === contextBaseline, 'native table right-click inserts at the clicked row and undoes to exact source'); await sourceMode(false);
+  root().focus(); root().dispatchEvent(new KeyboardEvent('keydown', {key:'F10',shiftKey:true,bubbles:true,cancelable:true})); await wait(() => document.querySelector('[role="menu"]'));
+  document.activeElement.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape',bubbles:true,cancelable:true}));
+  await wait(() => !document.querySelector('[role="menu"]'));
+  check(root().contains(document.activeElement), 'native Escape dismisses the context menu and restores editor focus');
   pointText("粗测新体", 2);
   input("insertText", "保留");
   window.__openTypora.command({ action: "close-window" });

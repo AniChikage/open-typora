@@ -136,7 +136,11 @@ const handlers = {
     const result = await workspace.search(inventory.files, query, { ...options, encodings: Object.fromEntries([...store.records.values()].filter(record => record.path).map(record => [record.path, record.encoding])) });
     return { ...result, skipped: result.skipped + inventory.skipped };
   },
-  reveal: async (_, file) => shell.showItemInFolder(await workspace.authorize(file, store)),
+  reveal: async (_, file, openFolder) => {
+    const authorized = await workspace.authorize(file, store);
+    if (!openFolder) return shell.showItemInFolder(authorized);
+    const error = await shell.openPath(path.dirname(authorized)); if (error) throw new Error(error);
+  },
   fileOperation: async (_, operation) => {
     if (operationRunning) throw new Error("另一个文件操作正在进行。"); operationRunning = true;
     try {
@@ -188,6 +192,10 @@ const handlers = {
   reopen: (_, id) => store.reopen(id),
   writeClipboard: (_, text) => clipboard.writeText(String(text)),
   readClipboard: () => clipboard.readText(),
+  clipboardAction: (_, action) => {
+    if (!["cut", "copy", "paste"].includes(action)) throw new Error("不支持的剪贴板操作。");
+    window.webContents[action]();
+  },
   chooseImage: async (_, id, options) => {
     store.require(id);
     const result = await dialog.showOpenDialog(window, { title: "插入图片", properties: ["openFile"], filters: [{ name: "图片", extensions: ["png", "jpg", "jpeg", "gif", "webp"] }] });

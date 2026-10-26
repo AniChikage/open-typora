@@ -468,7 +468,9 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       return try jsonValue(owner.workspace.recentAction(action, path: path))
     case "reveal":
       let target = try owner.workspace.authorize(arg(args, 0, String.self), store: store)
-      NSWorkspace.shared.activateFileViewerSelecting([target]); return nil
+      if args.count > 1, args[1] as? Bool == true { NSWorkspace.shared.open(target.deletingLastPathComponent()) }
+      else { NSWorkspace.shared.activateFileViewerSelecting([target]) }
+      return nil
     case "restore":
       if let seed {
         for record in seed.documents { store.records[record.id] = record }
@@ -543,6 +545,13 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       NSPasteboard.general.clearContents(); NSPasteboard.general.setString(text, forType: .string)
       return nil
     case "readClipboard": return NSPasteboard.general.string(forType: .string) ?? ""
+    case "clipboardAction":
+      let action = try arg(args, 0, String.self)
+      guard ["cut", "copy", "paste"].contains(action) else { throw NativeFailure("不支持的剪贴板操作。") }
+      guard window.makeFirstResponder(webView), let responder = window.firstResponder,
+        NSApp.sendAction(NSSelectorFromString(action + ":"), to: responder, from: nil)
+      else { throw NativeFailure("当前无法执行剪贴板操作，请重新选择编辑区域。") }
+      return nil
     case "previewSettings": return ["supported":false,"available":false,"enabled":false]
     case "exportTheme":
       let name = try arg(args, 0, String.self), css = try arg(args, 1, String.self)

@@ -1,6 +1,6 @@
 {
   "name": "open-typora",
-  "version": "0.16.4",
+  "version": "0.17.0",
   "description": "A local Markdown writing space with live rendering and lossless source editing.",
   "private": true,
   "type": "module",
@@ -36,7 +36,8 @@
     "test:indentation": "node tests/indentation-desktop.mjs",
     "test:next": "node tests/next-desktop.mjs",
     "test:preview": "node tests/preview-desktop.mjs",
-    "test:huge": "node tests/huge-blocks-desktop.mjs"
+    "test:huge": "node tests/huge-blocks-desktop.mjs",
+    "test:menus": "node tests/context-menu-desktop.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "6.20.3",

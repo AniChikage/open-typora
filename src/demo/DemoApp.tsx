@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Bold, Italic, Heading2, List, Table2, Undo2, Redo2, Search, Upload, Download, RotateCcw, ArrowUpRight } from "lucide-react";
+import { host } from "../host";
+import { InsertDialog } from "../components/InsertDialog";
+import type { InsertKind } from "../components/InsertDialog";
 import { MarkdownEditor } from "../editor/MarkdownEditor";
 import type { EditorHandle } from "../editor/MarkdownEditor";
 import { setMarkdownOptions } from "../editor/markdown";
@@ -22,6 +25,7 @@ export default function DemoApp() {
   const [rendered, setRendered] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [insertKind, setInsertKind] = useState<InsertKind | null>(null);
   const [importing, setImporting] = useState(false);
   const editor = useRef<EditorHandle>(null);
   const picker = useRef<HTMLInputElement>(null);
@@ -104,11 +108,27 @@ export default function DemoApp() {
     else if (action === "undo") editor.current?.undo();
     else if (action === "redo") editor.current?.redo();
     else if (action === "find") editor.current?.find();
-    else if (action === "table") editor.current?.command("table", { rows: 3, columns: 2 });
+    else if (["table", "link", "footnote", "reference-link"].includes(action)) setInsertKind(action as InsertKind);
+    else if (action === "source") setRendered(previous => !previous);
+    else if (action === "clear-format") editor.current?.clearFormat();
+    else if (action === "code") editor.current?.codeBlock();
+    else if (action === "pagebreak") editor.current?.insert("\n\n<!-- pagebreak -->\n\n");
+    else if (action === "image") {
+      const id = current.current.id;
+      void host.chooseImage(id).then(image => { if (image && current.current.id === id) editor.current?.insert(`![${image.alt.replace(/[\[\]]/g, "")}](${image.path})`); }).catch(error => setError(error.message));
+    } else if (["underline", "strike", "inline-code", "highlight"].includes(action)) {
+      const marks: Record<string, [string, string]> = { underline: ["<u>", "</u>"], strike: ["~~", "~~"], "inline-code": ["`", "`"], highlight: ["==", "=="] };
+      editor.current?.wrap(...marks[action]);
+    }
     else editor.current?.command(action);
   }
 
   return <div className="demo-shell">
+    {insertKind && <InsertDialog kind={insertKind} selected={editor.current?.selectionText() || ""} close={() => { setInsertKind(null); editor.current?.focus(); }} submit={value => {
+      if (insertKind === "link") editor.current?.insert(`[${(value.label || value.value || "链接").replace(/[\[\]]/g, character => "\\" + character)}](${value.value})`);
+      else editor.current?.command(insertKind, value);
+      setInsertKind(null); editor.current?.focus();
+    }} />}
     <header className="demo-header">
       <a className="demo-brand" href={repository} target="_blank" rel="noreferrer"><img src={icon} alt="" width="36" height="36" /><span>Open Typora</span></a>
       <span className="demo-label">WEB DEMO</span>
@@ -135,7 +155,7 @@ export default function DemoApp() {
       </div>
       {error && <div className="demo-error" role="alert"><span>{error}</span><button aria-label="Dismiss error" onClick={() => setError("")}>×</button></div>}
       <div className="demo-editor document-editor">
-        <MarkdownEditor key={record.id} ref={editor} document={record} rendered={rendered} preferences={preferences} onChange={onChange} onError={setError} onCursor={onCursor} />
+        <MarkdownEditor key={record.id} ref={editor} document={record} rendered={rendered} preferences={preferences} onChange={onChange} onError={setError} onCursor={onCursor} onCommand={command} />
       </div>
       <footer className="demo-status"><span className="file-name">{record.name}<span className={dirty ? "edit-dot edited" : "edit-dot"} aria-label={dirty ? "Edited in this tab" : "Original document"} /></span><span role="status">{notice || "Stays in this tab · Download to keep your work"}</span><span className="character-count">{Array.from(record.content).length.toLocaleString()} characters</span></footer>
     </main>

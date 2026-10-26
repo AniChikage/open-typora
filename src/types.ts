@@ -82,7 +82,7 @@ export interface Host {
   recent(): Promise<RecentEntry[]>;
   recentAction(action: string, path?: string): Promise<FolderResult | DocumentRecord | RecentEntry[] | null>;
   searchFiles(query: string, options: { regex: boolean; caseSensitive: boolean }): Promise<SearchResult>;
-  reveal(path: string): Promise<unknown>;
+  reveal(path: string, openFolder?: boolean): Promise<unknown>;
   openToken(token: string): Promise<DocumentRecord>;
   reopen(id: string): Promise<DocumentRecord>;
   chooseImage(id: string, options?: Record<string, unknown>): Promise<{ path: string; alt: string } | null>;
@@ -108,6 +108,7 @@ export interface Host {
   previewSettings(enable?: boolean): Promise<{ supported: boolean; available: boolean; enabled: boolean }>;
   writeClipboard(text: string): Promise<unknown>;
   readClipboard(): Promise<string>;
+  clipboardAction(action: "cut" | "copy" | "paste"): Promise<unknown>;
   openLink(url: string): Promise<unknown>;
   openDocumentLink(id: string, url: string): Promise<unknown>;
   confirmDiscard(name: string): Promise<boolean>;
