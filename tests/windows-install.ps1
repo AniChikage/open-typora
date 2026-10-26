@@ -15,6 +15,8 @@ $env:OPEN_TYPORA_EXECUTABLE = Join-Path $destination 'Open Typora.exe'
 if (!(Test-Path $env:OPEN_TYPORA_EXECUTABLE)) { throw 'Installer did not produce the application executable' }
 node tests/context-menu-desktop.mjs
 if ($LASTEXITCODE -ne 0) { throw 'Installed context-menu, clipboard and safe tab-close acceptance failed' }
+node tests/community-plugins-desktop.mjs
+if ($LASTEXITCODE -ne 0) { throw 'Installed community plugin acceptance failed' }
 node tests/huge-blocks-desktop.mjs
 if ($LASTEXITCODE -ne 0) { throw 'Giant blocks and beyond-20-MiB editing/recovery acceptance failed' }
 node tests/next-desktop.mjs

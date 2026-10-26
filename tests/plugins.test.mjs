@@ -296,3 +296,33 @@ test("self-contained themes with embedded font data can be reimported above the 
     await writeFile(file,' '.repeat(32*1024*1024+1));await assert.rejects(installTheme(file,path.join(root,'profile')),/32 MB/);
   } finally { await rm(root,{recursive:true,force:true}); }
 });
+
+
+test("owned eWrite listeners follow active editors and retain once, remove and abort semantics", async () => {
+  const container = document.getElementById("root"), original = container.innerHTML;
+  container.innerHTML = '<div class="document-editor" data-active="true"><div class="rich-document"><p>A</p></div></div><div class="document-editor" data-active="false"><div class="rich-document"><p>B</p></div></div>';
+  const panes = [...container.querySelectorAll('.document-editor')], roots = panes.map(pane => pane.querySelector('.rich-document'));
+  let id = 'A'; const seen = [], once = [], aborted = [];
+  const run = new PluginRuntime({getMarkdown:()=>id,getPath:()=>'/tmp/'+id+'.md',getDocumentId:()=>id,getSelection:()=>'',insert(){},replace(){},setReadOnly(){},notify(){},changed(){},saveConfig(){}});
+  const controller = new window.AbortController();
+  try {
+    await run.setEnabled({id:'follow-write',name:'Follow write',description:'',config:{},factory:c=>class extends c.BasePlugin {
+      process() {
+        this.write = this.utils.entities.eWrite;
+        this.listener = () => seen.push(id);
+        this.write.addEventListener('click', this.listener, true);
+        this.write.addEventListener('click', this.listener, true);
+        this.write.addEventListener('dblclick', () => once.push(id), {once:true});
+        this.write.addEventListener('mousedown', () => aborted.push(id), {signal:controller.signal});
+      }
+      call() { this.write.removeEventListener('click', this.listener, true); }
+    }},true);
+    roots[0].dispatchEvent(new MouseEvent('click',{bubbles:true})); roots[0].dispatchEvent(new MouseEvent('dblclick',{bubbles:true}));
+    panes[0].dataset.active='false'; panes[1].dataset.active='true'; id='B'; run.documentChanged();
+    roots[0].dispatchEvent(new MouseEvent('click',{bubbles:true})); roots[1].dispatchEvent(new MouseEvent('click',{bubbles:true})); roots[1].dispatchEvent(new MouseEvent('dblclick',{bubbles:true}));
+    roots[1].dispatchEvent(new MouseEvent('mousedown',{bubbles:true})); controller.abort(); roots[1].dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
+    assert.deepEqual(seen,['A','B']); assert.deepEqual(once,['A']); assert.deepEqual(aborted,['B']);
+    await run.invoke('follow-write'); roots[1].dispatchEvent(new MouseEvent('click',{bubbles:true})); assert.deepEqual(seen,['A','B']);
+    await run.destroy(); roots[1].dispatchEvent(new MouseEvent('click',{bubbles:true})); assert.deepEqual(seen,['A','B']);
+  } finally { await run.destroy(); container.innerHTML=original; }
+});

@@ -21,7 +21,7 @@ const errors=[],checks=[];let app,page,mounter,mountPath,runtimeMount,running;le
 try{
  mounter=spawn(image,['--appimage-mount'],{env,stdio:['ignore','pipe','pipe']});mounter.stdout.on('data',chunk=>mountOut+=chunk);mounter.stderr.on('data',chunk=>mountErr+=chunk);
  await expect.poll(()=>mountOut.trim().split('\n').find(line=>line.startsWith('/')),{timeout:30000}).toBeTruthy();mountPath=mountOut.trim().split('\n').find(line=>line.startsWith('/'));
- const manual=mountInfo(mountPath);assert.equal(manual.target,mountPath);assert.match(manual.fstype,/^fuse(?:\.|$)/);await stat(path.join(mountPath,'AppRun'));await stat(path.join(mountPath,'open-typora'));
+ const manual=mountInfo(mountPath);assert.equal(manual.target,mountPath);assert.match(manual.fstype,/^fuse(?:\.|$)/);const launcher=await readFile(path.join(mountPath,'AppRun'),'utf8');assert.ok(!launcher.includes('--no-sandbox'),'The packaged launcher must not disable sandboxing.');await stat(path.join(mountPath,'open-typora'));
  checks.push('The ordinary-user AppImage runtime creates an actual FUSE filesystem, not an extracted directory.');
  const closed=once(mounter,'close');mounter.kill('SIGINT');await closed;mounter=null;await expect.poll(()=>stat(mountPath).then(()=>true,()=>false)).toBe(false);
  checks.push('The explicit FUSE mount unmounts after the runtime receives its normal interrupt.');

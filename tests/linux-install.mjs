@@ -13,7 +13,7 @@ const run = (command,args,options={}) => execFileSync(command,args,{stdio:"inher
 const exercise = async (executable,kind) => {
   const evidence = path.join(qa,kind); await mkdir(evidence,{recursive:true});
   const env = {...process.env, OPEN_TYPORA_EXECUTABLE:executable, OPEN_TYPORA_QA_DIR:evidence};
-  for (const file of ["context-menu-desktop.mjs","desktop.mjs","electron-shell.mjs","parity-desktop.mjs","indentation-desktop.mjs","workspace-desktop.mjs","next-desktop.mjs","huge-blocks-desktop.mjs","compatibility-desktop.mjs","ime-desktop.mjs","plugin-package-desktop.mjs"]) run(process.execPath,[`tests/${file}`],{env});
+  for (const file of ["context-menu-desktop.mjs","community-plugins-desktop.mjs","desktop.mjs","electron-shell.mjs","parity-desktop.mjs","indentation-desktop.mjs","workspace-desktop.mjs","next-desktop.mjs","huge-blocks-desktop.mjs","compatibility-desktop.mjs","ime-desktop.mjs","plugin-package-desktop.mjs"]) run(process.execPath,[`tests/${file}`],{env});
   const {dataDir} = JSON.parse(await readFile(path.join(evidence,"desktop-results.json"),"utf8"));
   const session = path.join(dataDir,"session.json");
   return {session,hash:createHash("sha256").update(await readFile(session)).digest("hex")};
@@ -54,5 +54,6 @@ run(image,["--appimage-extract"],{cwd:extraction,stdio:"ignore"});
 const sandbox = path.join(extraction,"squashfs-root/chrome-sandbox");
 run("sudo",["chown","root:root",sandbox]); run("sudo",["chmod","4755",sandbox]);
 await exercise(path.join(extraction,"squashfs-root/open-typora"),"appimage");
-await writeFile(path.join(qa,"installer-results.json"),JSON.stringify({version:pkg.version,debInstall:true,upgradeFrom:["0.13.1","0.15.0"],oldInstallPathRemoved:true,desktopGioAndKdeLaunch:true,debUninstall:true,recoveryPreserved:true,desktopAssociation:true,appImageExtractedPayload:true,fuseMountTested:false,sandboxDisabled:false},null,2));
-console.log("PASS: installed DEB, AppImage payload, PDF/edit/save/recovery, file association and uninstall");
+run(process.execPath,["tests/linux-appimage-fuse.mjs",image],{env:{...process.env,OPEN_TYPORA_QA_DIR:path.join(qa,"appimage-real-fuse")}});
+await writeFile(path.join(qa,"installer-results.json"),JSON.stringify({version:pkg.version,debInstall:true,upgradeFrom:["0.13.1","0.15.0"],oldInstallPathRemoved:true,desktopGioAndKdeLaunch:true,debUninstall:true,recoveryPreserved:true,desktopAssociation:true,appImageExtractedPayload:true,fuseMountTested:true,sandboxDisabled:false},null,2));
+console.log("PASS: installed DEB, real FUSE AppImage runtime and extracted payload, PDF/edit/save/recovery, file association and uninstall");

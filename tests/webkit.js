@@ -139,6 +139,14 @@ try {
       check(command()?.getAttribute('aria-pressed')==='true','upstream dynamic command is visible with its checked state');
       command().click(); await wait(()=>command()?.getAttribute('aria-pressed')==='false');
       check(true,'plugin command calls the original plugin and persists the changed setting');
+      closePlugins();
+      const list=root().querySelector('ul'), triangle=getComputedStyle(list,'::before'), bounds=list.getBoundingClientRect();
+      check(triangle.borderTopWidth==='9px' && triangle.borderTopColor!=='rgba(0, 0, 0, 0)','native upstream list triangle has visible themed geometry');
+      list.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,clientX:bounds.left-11,clientY:bounds.top+4}));
+      check(list.classList.contains('plugin-collapsed-list'),'native list folding handles the writing-surface event');
+      list.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,clientX:bounds.left-11,clientY:bounds.top+4}));
+      check(!list.classList.contains('plugin-collapsed-list'),'native list unfolding restores its original state');
+      await openPlugins();
     }
     if (id === 'read_only') {
       closePlugins(); pointText('粗体', 1); input('insertText','BLOCKED');
@@ -152,6 +160,12 @@ try {
     await wait(() => !document.querySelector('style[data-plugin="'+id+'"]'));
   }
   check(!document.documentElement.classList.contains('plugin-dark') && root().getAttribute('aria-readonly') === 'false', 'plugin teardown restores editing and removes presentation effects');
+  const communityNames=['列表折叠','只读模式','无图阅读','段落聚焦','常显语法标记','反色夜间模式'];
+  for(const name of communityNames){pluginCard(name).querySelector('input[type="checkbox"]').click();await wait(()=>!pluginCard(name).querySelector('.plugin-actions button').disabled);}
+  check(document.querySelectorAll('style[data-plugin]').length===6 && root().getAttribute('aria-readonly')==='true','all six original community plugins coexist in native WebKit');
+  for(const name of communityNames)pluginCard(name).querySelector('input[type="checkbox"]').click();
+  await wait(()=>!document.querySelector('style[data-plugin]'));
+  check(!document.documentElement.classList.contains('plugin-dark') && root().getAttribute('aria-readonly')==='false','native combined plugin teardown removes styles and unlocks editing');
   closePlugins();
   for (const [needle, offset] of [["粗体",1],["任务",1],["B",1]]) {
     pointText(needle,offset);

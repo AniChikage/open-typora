@@ -1,6 +1,6 @@
 # Themes and plugin compatibility
 
-Open Typora 0.12.0 includes six original themes and a compatibility host for a subset of [obgnail/typora_plugin](https://github.com/obgnail/typora_plugin). This is an independent integration, with no affiliation to Typora or the plugin authors. It does not load the complete Typora plugin distribution.
+Open Typora 0.17.3 includes six original themes and a compatibility host for a subset of [obgnail/typora_plugin](https://github.com/obgnail/typora_plugin). This is an independent integration, with no affiliation to Typora or the plugin authors. It does not load the complete Typora plugin distribution.
 
 ## Included community plugins
 
@@ -32,6 +32,8 @@ Folder modules may use relative `require('./helper')`, `require('../config.json'
 The adapter provides style insertion/removal, notifications, local settings updates, lifecycle/document events, basic selection and Markdown access, undoable text insertion/replacement, `File.lock/unlock/freshLock`, tracked document event listeners, and a small `$` helper. It does **not** provide Node built-ins, filesystem/process modules, Electron APIs, npm dependencies, the full jQuery API, or arbitrary Typora internals. Unsupported module requests fail visibly. Plugins using those interfaces require a port. Direct global DOM mutations outside the tracked helpers remain the plugin author's cleanup responsibility.
 
 ### Events, commands and cleanup
+
+Owned `entities.eWrite` listeners follow the active editor when switching tabs or split panes, including cached writing-surface references. Once-only listeners, removal, abort signals and disable cleanup retain their semantics. The list-folding triangle uses the host muted color if the upstream metadata-color variable is absent.
 
 The host distinguishes document-load events (`fileOpened`, `otherFileOpened`, `fileContentLoaded`, with a path argument) from `fileEdited`. Load notifications describe the newly active document; they do not fire on each keystroke. Provisional IME text does not trigger an edit notification; a completed commit exposes the current Markdown once, and cancellation exposes no temporary candidates. `eventHub.on/off`, `addEventListener/removeEventListener`, ordered listeners, `once`, and cross-plugin `emit/publishEvent` are available. `beforeToggleSourceMode` reports a mode request, which may wait for composition to finish; `afterToggleSidebar` reports its visible state. Async listener failures unload only the failing plugin.
 
@@ -70,4 +72,4 @@ Personal backgrounds are excluded from exported HTML, PDF and converted document
 
 ## Verification scope
 
-Tests execute the pinned upstream sources, exercise lifecycle cleanup, failed dependencies, real DOM effects, read-only guards, installation integrity and theme assets. The native WebKit suite additionally imports an installed CommonJS module under the actual script policy and checks an undoable document edit. UI acceptance and platform-specific limitations are recorded in the feature checklist. Passing these checks does not establish compatibility with all Typora plugins, themes, IMEs or operating systems.
+Installed-application acceptance exercises all six pinned community plugins individually and together, computed styles, tab/split folding, live/source read-only behavior, restart persistence and disable cleanup. Tests execute the pinned upstream sources, exercise lifecycle cleanup, failed dependencies, real DOM effects, read-only guards, installation integrity and theme assets. The native WebKit suite additionally imports an installed CommonJS module under the actual script policy and checks an undoable document edit. UI acceptance and platform-specific limitations are recorded in the feature checklist. Passing these checks does not establish compatibility with all Typora plugins, themes, IMEs or operating systems.

@@ -1,5 +1,5 @@
 import { build, Platform, Arch } from "electron-builder";
-import { readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { readFile, readdir, rm, writeFile, copyFile, chmod } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import pkg from "../package.json" with { type: "json" };
@@ -16,6 +16,12 @@ await build({
     directories: { app: application, output: "release/linux" },
     files: ["**/*"], asar: true, npmRebuild: false,
     electronVersion: pkg.devDependencies.electron,
+    afterPack: async ({appOutDir}) => {
+      const launcher = path.join(appOutDir, "AppRun");
+      await copyFile("scripts/linux-AppRun.sh", launcher);
+      await chmod(launcher, 0o755);
+    },
+    appImage: { executableArgs: [] },
     deb: { fpm: [`${path.resolve("scripts/linux-mime.xml")}=/usr/share/mime/packages/open-typora.xml`] },
     linux: {
       desktop: { entry: { Name: pkg.build.productName } },

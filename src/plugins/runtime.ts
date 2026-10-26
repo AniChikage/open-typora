@@ -4,6 +4,7 @@ import type { PluginDefinition, PluginState, PluginAction } from "./types.ts";
 import { PluginEvents } from "./events.ts";
 import { imeKey } from "../editor/composition.ts";
 import { StateRecorder } from "./stateRecorder.ts";
+import { WriteEvents } from "./writeEvents.ts";
 
 interface Options {
   getMarkdown(): string; getPath(): string | null; getSelection(): string;
@@ -24,6 +25,7 @@ interface Running {
   file: any;
   actionMeta?: Record<string,unknown>;
   recorder?: StateRecorder;
+  writeEvents?: WriteEvents;
 }
 export function matchesHotkey(event: KeyboardEvent, shortcut: string, mac = /Mac/.test(navigator.platform)) {
   const parts = shortcut.toLowerCase().split(/[+-]/).map(x => x.trim()).filter(Boolean), key = parts.pop();
@@ -67,6 +69,7 @@ export class PluginRuntime {
   private syncDOM() {
     const root = this.write();
     for (const other of document.querySelectorAll('.rich-document[id="write"]')) if (other !== root) other.removeAttribute("id");
+    for (const item of this.running.values()) item.writeEvents?.setRoot(root);
     if (!root) return;
     root.id = "write";
     for (const child of root.children) child.setAttribute("cid", child.getAttribute("data-cid") || child.getAttribute("data-leaf") || "block");
@@ -128,7 +131,14 @@ export class PluginRuntime {
     const insert = (text: string) => { if (!item.disposed) this.options.insert(text); };
     const recorder = new StateRecorder(this.write, () => this.options.getDocumentId?.() || this.options.getPath() || "untitled");
     item.recorder = recorder; own(() => recorder.clear());
-    const track = <T extends object>(target: T): T => new Proxy(target, { get: (object, key) => {
+    const writeEvents = new WriteEvents(error => { void this.fail(item, error); });
+    item.writeEvents = writeEvents; writeEvents.setRoot(this.write()); own(() => writeEvents.clear());
+    const track = <T extends object>(target: T, followWrite = false): T => new Proxy(target, { get: (object, key) => {
+      if (followWrite) {
+        if (key === "addEventListener") return writeEvents.add.bind(writeEvents);
+        if (key === "removeEventListener") return writeEvents.remove.bind(writeEvents);
+        object = (this.write() || object) as T;
+      }
       if (key === "addEventListener") return (name: string, fn: EventListener, opts?: boolean | AddEventListenerOptions) => { (object as EventTarget).addEventListener(name, fn, opts); own(() => (object as EventTarget).removeEventListener(name, fn, opts)); };
       if (key === "classList") {
         const list = (object as Element).classList;
@@ -154,7 +164,8 @@ export class PluginRuntime {
       if (item.disposed) return;
       let style = item.styles.get(name);
       if (!style) { style = document.createElement("style"); style.dataset.plugin = item.definition.id; item.styles.set(name, style); document.head.append(style); }
-      style.textContent = adaptThemeCss(css).replace(/(\d+)\s+ms\b/g, "$1ms");
+      style.textContent = adaptThemeCss(css).replace(/(\d+)\s+ms\b/g, "$1ms")
+        .replace(/var\(\s*--meta-content-color\s*\)/g, "var(--meta-content-color,var(--muted))");
     };
     const eventType = Object.fromEntries(["allPluginsHadInjected", "fileContentLoaded", "fileEdited", "beforeFileOpen", "fileOpened", "otherFileOpened", "beforeToggleSourceMode", "afterToggleSidebar", "toggleSettingPage", "outlineUpdated"].map(name => [name,name]));
     const on = (name: string, callback: (...args: any[]) => unknown, order = 0, once = false) =>
@@ -198,7 +209,7 @@ export class PluginRuntime {
     };
     Object.defineProperty(file, "isLocked", { configurable: true, enumerable: true, get: () => this.locks.size > 0, set: value => value ? file.lock() : file.unlock() });
     item.file = file;
-    const entities = { get eWrite() { const root = document.getElementById("write"); if (!root) throw new Error("请先打开文档。"); return track(root); }, get eContent() { return document.querySelector(".writing-area"); }, querySelectorAllInWrite: (selector: string) => this.write()?.querySelectorAll(selector) || [] };
+    const entities = { get eWrite() { const root = document.getElementById("write"); if (!root) throw new Error("请先打开文档。"); return track(root, true); }, get eContent() { return document.querySelector(".writing-area"); }, querySelectorAllInWrite: (selector: string) => this.write()?.querySelectorAll(selector) || [] };
     const utils: any = {
       PLUGIN_LOAD_ABORT: Symbol("PLUGIN_LOAD_ABORT"), supportHasSelector: CSS.supports("selector(:has(*))"), entities,
       insertStyle, upsertStyle: insertStyle, removeStyle: (name: string) => { item.styles.get(name)?.remove(); item.styles.delete(name); },
