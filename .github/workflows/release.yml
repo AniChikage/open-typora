@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, "codex/**"]
     tags: ["v*"]
-    paths: ["native/**", "electron/**", "windows-preview/**", "public/**", "preview.html", "src/**", "shared/**", "scripts/**", "tests/**", "design/icon.svg", "package*.json", ".github/workflows/release.yml"]
+    paths: ["native/**", "browser/**", "tsconfig*.json", "electron/**", "windows-preview/**", "public/**", "preview.html", "src/**", "shared/**", "scripts/**", "tests/**", "design/icon.svg", "package*.json", ".github/workflows/release.yml"]
   workflow_dispatch:
     inputs:
       tag:
@@ -33,6 +33,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - run: npm run typecheck
       - name: Install desktop runtime libraries
         run: sudo apt-get update && sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2 libgbm1 libxss1 libxtst6 xdg-utils desktop-file-utils libglib2.0-bin dbus-x11 kde-cli-tools fonts-noto-cjk pandoc libreoffice-writer libfuse2
       - name: Prepare real FUSE device
@@ -48,7 +49,7 @@ jobs:
       - name: Build Linux x64 DEB and AppImage
         run: npm run package:linux
       - name: Install DEB, exercise both packaged payloads, and uninstall
-        run: xvfb-run -a node tests/linux-install.mjs
+        run: xvfb-run -a node tests/linux-install.mts
         env:
           OPEN_TYPORA_QA_DIR: ${{ runner.temp }}/open-typora-linux-qa
       - name: Save Linux acceptance evidence
@@ -82,6 +83,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - run: npm run typecheck
       - name: Install conversion tools for actual DOC, RTF and media acceptance
         shell: pwsh
         run: |
@@ -99,7 +101,7 @@ jobs:
             $install = Start-Process msiexec.exe -ArgumentList @('/i', "`"$installer`"", '/qn', '/norestart', 'ALLUSERS=1') -Wait -PassThru
             if ($install.ExitCode -ne 0 -and $install.ExitCode -ne 3010) { throw ($package.Name + ' install failed: ' + $install.ExitCode) }
           }
-          node --input-type=module -e "import {pandocPath,libreOfficePath} from './electron/interchange.mjs'; if (!(await pandocPath()) || !(await libreOfficePath())) process.exit(1)"
+          node --input-type=module -e "import {pandocPath,libreOfficePath} from './build/runtime/electron/interchange.mjs'; if (!(await pandocPath()) || !(await libreOfficePath())) process.exit(1)"
           if ($LASTEXITCODE -ne 0) { throw 'Installed conversion tools were not found' }
           exit 0
       - name: Prepare actual PDF content validation
@@ -149,7 +151,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci --ignore-scripts
-      - run: node --test tests/large-documents.test.mjs
+      - run: node --test tests/large-documents.test.mts
       - run: npm run build
       - name: Compile and exercise the native preview component in Everything
         shell: pwsh
@@ -183,6 +185,7 @@ jobs:
       - name: Check Apple Silicon runner
         run: node -e "if(process.platform !== 'darwin' || process.arch !== 'arm64') process.exit(1)"
       - run: npm ci
+      - run: npm run typecheck
       - run: npm test
       - run: npm run test:native
       - name: Build native app, DMG, ZIP, and checksums
@@ -237,7 +240,7 @@ jobs:
           sudo apparmor_parser -r "$RUNNER_TEMP/open-typora-appimage.apparmor"
           test "$(sysctl -n kernel.apparmor_restrict_unprivileged_userns)" = 1
       - name: Exercise actual FUSE runtime and sandboxed editing
-        run: xvfb-run -a node tests/linux-appimage-fuse.mjs "$OPEN_TYPORA_APPIMAGE"
+        run: xvfb-run -a node tests/linux-appimage-fuse.mts "$OPEN_TYPORA_APPIMAGE"
         env:
           OPEN_TYPORA_QA_DIR: ${{ runner.temp }}/open-typora-real-fuse-qa
           OPEN_TYPORA_FUSE_APPARMOR: app-specific profile for verified AppImage; global restriction remains enabled

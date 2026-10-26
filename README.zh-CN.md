@@ -20,7 +20,7 @@
 
 Open Typora 是一款开源 Markdown 编辑器，受 Typora 的行内编辑体验启发。直接修改排版后的正文，需要时切换源码，文档以普通 `.md` 文件保存在自己的文件夹中。
 
-**项目状态：**当前为早期开发版本 **0.17.4**，发布目标为 **macOS 14+、Apple Silicon**、**Windows 10/11 x64** 和 **Linux x64**，界面目前为简体中文。本项目独立实现，与 Typora 无隶属关系；功能和交互仍在持续完善。
+**项目状态：**当前为早期开发版本 **0.18.0**，发布目标为 **macOS 14+、Apple Silicon**、**Windows 10/11 x64** 和 **Linux x64**，界面目前为简体中文。本项目独立实现，与 Typora 无隶属关系；功能和交互仍在持续完善。
 
 ## 功能
 
@@ -56,18 +56,18 @@ Open Typora 是一款开源 Markdown 编辑器，受 Typora 的行内编辑体�
 
 | 平台 | 安装包 | 其他方式 |
 | --- | --- | --- |
-| Windows 10/11 · x64 | **[下载 Setup.exe](https://github.com/AniChikage/open-typora/releases/download/v0.17.4/Open-Typora-0.17.4-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.17.4/Open-Typora-0.17.4-windows-x64.zip) |
-| macOS 14+ · Apple Silicon | **[下载 DMG](https://github.com/AniChikage/open-typora/releases/download/v0.17.4/Open-Typora-0.17.4-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.17.4/Open-Typora-0.17.4-arm64.zip) |
-| Linux · x64 | **[下载 DEB](https://github.com/AniChikage/open-typora/releases/download/v0.17.4/Open-Typora-0.17.4-linux-x64.deb)** | [AppImage](https://github.com/AniChikage/open-typora/releases/download/v0.17.4/Open-Typora-0.17.4-linux-x64.AppImage) |
+| Windows 10/11 · x64 | **[下载 Setup.exe](https://github.com/AniChikage/open-typora/releases/download/v0.18.0/Open-Typora-0.18.0-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.18.0/Open-Typora-0.18.0-windows-x64.zip) |
+| macOS 14+ · Apple Silicon | **[下载 DMG](https://github.com/AniChikage/open-typora/releases/download/v0.18.0/Open-Typora-0.18.0-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.18.0/Open-Typora-0.18.0-arm64.zip) |
+| Linux · x64 | **[下载 DEB](https://github.com/AniChikage/open-typora/releases/download/v0.18.0/Open-Typora-0.18.0-linux-x64.deb)** | [AppImage](https://github.com/AniChikage/open-typora/releases/download/v0.18.0/Open-Typora-0.18.0-linux-x64.AppImage) |
 
-[SHA-256 校验文件](https://github.com/AniChikage/open-typora/releases/download/v0.17.4/SHA256SUMS.txt) · [所有版本](https://github.com/AniChikage/open-typora/releases)
+[SHA-256 校验文件](https://github.com/AniChikage/open-typora/releases/download/v0.18.0/SHA256SUMS.txt) · [所有版本](https://github.com/AniChikage/open-typora/releases)
 
 ### 安装 Linux 版
 
 以 Ubuntu 22.04 x64 为验收基线，下载 DEB 后运行：
 
 ```sh
-sudo apt install ./Open-Typora-0.17.4-linux-x64.deb
+sudo apt install ./Open-Typora-0.18.0-linux-x64.deb
 ```
 
 安装后可从桌面启动器打开，并关联 Markdown 文件。`sudo apt remove open-typora` 卸载保留文档和恢复数据。
@@ -86,7 +86,7 @@ Windows 版目前**没有代码签名证书**，系统可能显示未知发布�
 
 ### 安装 macOS 版
 
-1. 从 [Releases](https://github.com/AniChikage/open-typora/releases/latest) 下载 **[Open-Typora-0.17.4-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.17.4/Open-Typora-0.17.4-arm64.dmg)**。
+1. 从 [Releases](https://github.com/AniChikage/open-typora/releases/latest) 下载 **[Open-Typora-0.18.0-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.18.0/Open-Typora-0.18.0-arm64.dmg)**。
 2. 打开 DMG，把 **Open Typora** 拖入 **Applications（应用程序）**。
 3. 从应用程序中启动 Open Typora。
 
@@ -108,7 +108,7 @@ npm run package:mac
 打开 `release/native/Open Typora.app`，或安装到 `~/Applications`：
 
 ```sh
-node scripts/install.mjs
+node scripts/install.mts
 ```
 
 替换前请先退出正在运行的 Open Typora。安装器保留应用数据，验证新应用后删除旧应用；构建同时在 `release/native/` 生成 ZIP 包；`npm run package:release` 另外生成 DMG 和校验文件。
@@ -145,6 +145,8 @@ Linux x64 上运行 `npm run package:linux`，DEB 与 AppImage 输出至 `releas
 
 ## 开发
 
+使用 Node.js 26（见 `.nvmrc`）。
+
 ```sh
 npm ci
 npm run dev:app
@@ -152,9 +154,10 @@ npm run dev:app
 
 运行 `npm run dev:demo` 开发独立网页试玩，`npm run build:demo` 将静态站点输出到 `dist-demo/`。入口在 `src/demo/`，独立内容安全策略位于 `web/index.html`。
 
-Windows/Linux 发布应用和开发宿主采用 **Electron/Chromium**；macOS 发布应用采用 **Swift/AppKit + WKWebView**。二者共用 TypeScript/React 界面及独立实现的编辑模型。
+Windows/Linux 发布应用和开发宿主采用 **Electron/Chromium**；macOS 发布应用采用 **Swift/AppKit + WKWebView**。二者共用 TypeScript/React 界面及独立实现的编辑模型。自有编辑器、桌面桥、构建脚本和测试均采用 TypeScript，安装包运行编译后的 JavaScript；第三方插件保留原始 JavaScript 源码和许可证。
 
 ```sh
+npm run typecheck         # 界面、桌面桥、脚本和测试的严格类型检查
 npm test                  # 编辑内核与文件层单元测试
 npm run build             # 类型检查与前端生产构建
 npm run test:native       # macOS 文件系统测试
@@ -165,7 +168,7 @@ npm run test:webkit       # 原生 WebKit 集成测试，需要 Pandoc
 
 ## 当前限制
 
-- 文件上限为 20 MB；超过 300,000 字符的文档进入源码模式。
+- Markdown 打开、保存和恢复已无固定 20 MiB 限制；大文档按视口渲染，大代码块和表格也采用局部视口。可用内存、初始解析和运行时字符串上限仍然适用，见[性能说明](docs/performance.md)。复杂转换和媒体另有资源预算。
 - 没有 BOM 的传统编码需要手动选择。
 - 正文和源码具有独立撤销历史；返回正文时，源码修改合并为一次事务。
 - 格式转换可能改变排版或不支持的文档结构；部分 RTF 图片格式会明确拒绝。导入时请保留原文件。

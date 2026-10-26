@@ -11,7 +11,7 @@ REA 6.4.0 的 `inspect-macho` 确认官方可执行文件为原生 Mach-O，链�
 独立片段在原始调用后追加一个惰性的分号，以便作为独立 JS 文件解析。初次 manifest 的 `start/end` 是原始 CallExpression 的区间，其 `sha256` 是追加分号后的片段哈希；本次 [rea-provenance.json](rea-provenance.json) 补充了 `sourceSpanSHA256` 和 `appendedTerminator`，明确区分源区间与分析输入。复现脚本已核对九份片段的哈希与封存输入完全相同。
 
 ```sh
-node scripts/extract-typora-modules.mjs \
+node scripts/extract-typora-modules.mts \
   /Applications/Typora.app/Contents/Resources/TypeMark/appsrc/main.js \
   /tmp/typora-rea-excerpts
 npx --yes rea-agents@6.4.0 analyze-javascript-application \

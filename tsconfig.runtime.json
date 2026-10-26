@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "strict": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "rootDir": ".",
+    "outDir": "build/runtime",
+    "noEmitOnError": true,
+    "declaration": true,
+    "types": [
+      "node"
+    ],
+    "moduleDetection": "legacy"
+  },
+  "include": [
+    "electron/**/*.mts",
+    "electron/**/*.cts",
+    "shared/**/*.mts",
+    "shared/**/*.d.ts"
+  ]
+}

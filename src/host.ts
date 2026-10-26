@@ -1,3 +1,4 @@
+import type { BridgeResponse } from "../shared/contracts.js";
 import type { DocumentRecord, Host, Recovery, SessionSnapshot } from "./types";
 import samples from "../shared/samples.json";
 import { browserBackground, chooseBrowserBackground } from "./browserBackground";
@@ -157,7 +158,7 @@ export const host: Host = window.desktop
         if (name === "onCommand" || name === "onFileOperation" || name === "closeWindow")
           return window.desktop![name];
         return async (...args: unknown[]) => {
-          const response = await window.desktop![name](...args);
+          const response = await (window.desktop![name] as (...values: unknown[]) => Promise<BridgeResponse<unknown>>)(...args);
           if (!response.ok) {
             const error = new Error(response.error);
             Object.assign(error, { code: response.code });

@@ -1,5 +1,6 @@
 import type { Preferences } from "./preferences";
-export interface BackgroundAsset { name: string; dataUrl: string }
+import type { BackgroundAsset } from "../shared/contracts.js";
+export type { BackgroundAsset } from "../shared/contracts.js";
 export const backgroundRevisionKey = "open-typora-background-revision";
 export const backgroundDefaults = { backgroundOpacity: 18, backgroundBlur: 0, backgroundPosition: "center", backgroundSize: "cover" } as const;
 export function backgroundStyle(asset: BackgroundAsset, value: Preferences) {

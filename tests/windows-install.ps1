@@ -13,31 +13,31 @@ $process = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$destina
 if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
 $env:OPEN_TYPORA_EXECUTABLE = Join-Path $destination 'Open Typora.exe'
 if (!(Test-Path $env:OPEN_TYPORA_EXECUTABLE)) { throw 'Installer did not produce the application executable' }
-node tests/context-menu-desktop.mjs
+node tests/context-menu-desktop.mts
 if ($LASTEXITCODE -ne 0) { throw 'Installed context-menu, clipboard and safe tab-close acceptance failed' }
-node tests/community-plugins-desktop.mjs
+node tests/community-plugins-desktop.mts
 if ($LASTEXITCODE -ne 0) { throw 'Installed community plugin acceptance failed' }
-node tests/huge-blocks-desktop.mjs
+node tests/huge-blocks-desktop.mts
 if ($LASTEXITCODE -ne 0) { throw 'Giant blocks and beyond-20-MiB editing/recovery acceptance failed' }
-node tests/next-desktop.mjs
+node tests/next-desktop.mts
 if ($LASTEXITCODE -ne 0) { throw 'Large document, theme and print acceptance failed' }
 & pwsh.exe -NoProfile -ExecutionPolicy Bypass -File tests/windows-preview.ps1
 if ($LASTEXITCODE -ne 0) { throw 'Native and actual Everything preview acceptance failed' }
-node tests/desktop.mjs
+node tests/desktop.mts
 $desktopExit = $LASTEXITCODE
-node tests/electron-shell.mjs
+node tests/electron-shell.mts
 $shellExit = $LASTEXITCODE
-node tests/parity-desktop.mjs
+node tests/parity-desktop.mts
 $parityExit = $LASTEXITCODE
-node tests/indentation-desktop.mjs
+node tests/indentation-desktop.mts
 $indentationExit = $LASTEXITCODE
-node tests/workspace-desktop.mjs
+node tests/workspace-desktop.mts
 $workspaceExit = $LASTEXITCODE
-node tests/compatibility-desktop.mjs
+node tests/compatibility-desktop.mts
 $compatibilityExit = $LASTEXITCODE
-node tests/ime-desktop.mjs
+node tests/ime-desktop.mts
 $imeExit = $LASTEXITCODE
-node tests/plugin-package-desktop.mjs
+node tests/plugin-package-desktop.mts
 $packageExit = $LASTEXITCODE
 if ($indentationExit -ne 0) { throw 'Installed indentation shortcut regression failed' }
 if ($workspaceExit -ne 0) { throw 'Installed tabs and split-pane regression failed' }

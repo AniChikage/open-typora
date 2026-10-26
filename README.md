@@ -20,7 +20,7 @@
 
 Open Typora is an open-source Markdown editor inspired by Typora's inline editing experience. Write directly in the rendered document, switch to source when you need it, and save ordinary `.md` files in your own folders.
 
-**Status:** early development, version **0.17.4**. Release builds support **macOS 14+ on Apple Silicon**, **Windows 10/11 x64**, and **Linux x64**. The interface is currently in Simplified Chinese. This is an independent project, unaffiliated with Typora; full feature and behavior parity is still in progress.
+**Status:** early development, version **0.18.0**. Release builds support **macOS 14+ on Apple Silicon**, **Windows 10/11 x64**, and **Linux x64**. The interface is currently in Simplified Chinese. This is an independent project, unaffiliated with Typora; full feature and behavior parity is still in progress.
 
 ## Features
 
@@ -56,18 +56,18 @@ The demo keeps documents in the current tab's memory; it does not upload or pers
 
 | Platform | Installer | Alternative |
 | --- | --- | --- |
-| Windows 10/11 · x64 | **[Download Setup.exe](https://github.com/AniChikage/open-typora/releases/download/v0.17.4/Open-Typora-0.17.4-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.17.4/Open-Typora-0.17.4-windows-x64.zip) |
-| macOS 14+ · Apple Silicon | **[Download DMG](https://github.com/AniChikage/open-typora/releases/download/v0.17.4/Open-Typora-0.17.4-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.17.4/Open-Typora-0.17.4-arm64.zip) |
-| Linux · x64 | **[Download DEB](https://github.com/AniChikage/open-typora/releases/download/v0.17.4/Open-Typora-0.17.4-linux-x64.deb)** | [AppImage](https://github.com/AniChikage/open-typora/releases/download/v0.17.4/Open-Typora-0.17.4-linux-x64.AppImage) |
+| Windows 10/11 · x64 | **[Download Setup.exe](https://github.com/AniChikage/open-typora/releases/download/v0.18.0/Open-Typora-0.18.0-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.18.0/Open-Typora-0.18.0-windows-x64.zip) |
+| macOS 14+ · Apple Silicon | **[Download DMG](https://github.com/AniChikage/open-typora/releases/download/v0.18.0/Open-Typora-0.18.0-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.18.0/Open-Typora-0.18.0-arm64.zip) |
+| Linux · x64 | **[Download DEB](https://github.com/AniChikage/open-typora/releases/download/v0.18.0/Open-Typora-0.18.0-linux-x64.deb)** | [AppImage](https://github.com/AniChikage/open-typora/releases/download/v0.18.0/Open-Typora-0.18.0-linux-x64.AppImage) |
 
-[SHA-256 checksums](https://github.com/AniChikage/open-typora/releases/download/v0.17.4/SHA256SUMS.txt) · [All releases](https://github.com/AniChikage/open-typora/releases)
+[SHA-256 checksums](https://github.com/AniChikage/open-typora/releases/download/v0.18.0/SHA256SUMS.txt) · [All releases](https://github.com/AniChikage/open-typora/releases)
 
 ### Install on Linux
 
 Ubuntu 22.04 or a compatible x64 distribution is the tested baseline. Download the DEB and install it with:
 
 ```sh
-sudo apt install ./Open-Typora-0.17.4-linux-x64.deb
+sudo apt install ./Open-Typora-0.18.0-linux-x64.deb
 ```
 
 The desktop launcher and Markdown file association are included. Uninstalling with `sudo apt remove open-typora` retains your documents and recovery data.
@@ -86,7 +86,7 @@ The Windows build is currently **not code-signed**. Windows may display an unkno
 
 ### Install on macOS
 
-1. Download **[Open-Typora-0.17.4-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.17.4/Open-Typora-0.17.4-arm64.dmg)** from [Releases](https://github.com/AniChikage/open-typora/releases/latest).
+1. Download **[Open-Typora-0.18.0-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.18.0/Open-Typora-0.18.0-arm64.dmg)** from [Releases](https://github.com/AniChikage/open-typora/releases/latest).
 2. Open the DMG and drag **Open Typora** into **Applications**.
 3. Launch Open Typora from Applications.
 
@@ -108,7 +108,7 @@ npm run package:mac
 Open `release/native/Open Typora.app`, or install it in `~/Applications`:
 
 ```sh
-node scripts/install.mjs
+node scripts/install.mts
 ```
 
 Quit a running Open Typora before replacing it. The installer preserves application data and removes the previous application after verifying the replacement. The build also produces a ZIP in `release/native/`; `npm run package:release` builds the DMG and checksum file too.
@@ -145,6 +145,8 @@ Open a Markdown file or a folder, or try [the example document](examples/a-quiet
 
 ## Development
 
+Use Node.js 26 (see `.nvmrc`).
+
 ```sh
 npm ci
 npm run dev:app
@@ -152,9 +154,10 @@ npm run dev:app
 
 To work on the standalone browser demo, use `npm run dev:demo`; `npm run build:demo` writes the static site to `dist-demo/`. Its entry point is `src/demo/`, with a separate content security policy in `web/index.html`.
 
-The Windows/Linux apps and development host use **Electron/Chromium**. The macOS app uses **Swift/AppKit + WKWebView**. Both share the same TypeScript/React interface and independently implemented editing model.
+The Windows/Linux apps and development host use **Electron/Chromium**. The macOS app uses **Swift/AppKit + WKWebView**. Both share the same TypeScript/React interface and independently implemented editing model. First-party editor, desktop bridge, build, and test code is TypeScript; installers ship compiled JavaScript. Original third-party JavaScript plugins keep their upstream source and license notices.
 
 ```sh
+npm run typecheck         # Strict checks for renderer, desktop bridges, scripts, and tests
 npm test                  # Editor and file-layer unit tests
 npm run build             # Type checking and production frontend build
 npm run test:native       # macOS filesystem tests
