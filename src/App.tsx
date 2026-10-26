@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { FilePlus2, FolderOpen, X, AlertCircle } from "lucide-react";
 import { useDocuments } from "./useDocuments";
 import { EncodingDialog, encodingNames } from "./components/EncodingDialog";
@@ -88,6 +88,12 @@ export default function App() {
   const commandDocument = useCallback((id: string, action: string) => {
     if (sessionRef.current.activeId === id) commands.current({ action });
   }, []);
+  const [tabFocusRequest, setTabFocusRequest] = useState(0);
+  useLayoutEffect(() => {
+    // Restore after React removes a closed tab; a frame can run before that commit.
+    if (tabFocusRequest && document.activeElement === document.body)
+      editors.current.get(sessionRef.current.activeId)?.focus();
+  }, [tabFocusRequest]);
   const tabAction = useCallback((id: string, action: string) => {
     void (async () => {
       const current = sessionRef.current, record = current.documents.find(record => record.id === id);
@@ -104,7 +110,7 @@ export default function App() {
       else if (action === "close-pane") current.closePane(id);
       else if (action === "autosave") current.setAutosave(value => !value);
       else if (action === "outline") commands.current({ action });
-      requestAnimationFrame(() => { if (document.activeElement === document.body) editors.current.get(sessionRef.current.activeId)?.focus(); });
+      setTabFocusRequest(request => request + 1);
     })().catch(error => sessionRef.current.setMessage((error as Error).message));
   }, []);
   const pluginContext = useRef({ active, editor, notify: session.setMessage });

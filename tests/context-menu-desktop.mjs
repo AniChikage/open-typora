@@ -39,6 +39,7 @@ async function selectedMenu(){const rect=await page.evaluate(()=>{const r=getSel
 try{
  app=await electron.launch({...(process.env.OPEN_TYPORA_EXECUTABLE?{executablePath:process.env.OPEN_TYPORA_EXECUTABLE,args:[]}:{args:[process.cwd()]}),env,timeout:60000});
  page=await app.firstWindow();page.on('pageerror',error=>errors.push(error.message));await page.setViewportSize({width:1300,height:900});
+ if(process.platform==='darwin')await app.evaluate(({app,BrowserWindow})=>{const win=BrowserWindow.getAllWindows()[0];win.show();app.focus({steal:true});win.focus();});
  await expect(tab(names[0])).toHaveAttribute('aria-selected','true',{timeout:20000});await expect(page.getByRole('tab')).toHaveCount(4);
  assert.match(await page.title(),/Alpha 中国\.md — Open Typora/);await expect(pane('menus-0').locator('.rich-document')).toContainText('First paragraph:');
  const initialMenu=await tabMenu(names[0]),initialAuto=initialMenu.getByRole('menuitemcheckbox',{name:'自动保存已有文件',exact:true});
@@ -54,7 +55,11 @@ try{
  await page.setViewportSize({width:640,height:460});await tabMenu(names[3]);const box=await menu('标签页菜单').boundingBox();assert.ok(box.x>=0&&box.y>=0&&box.x+box.width<=641&&box.y+box.height<=461);await page.screenshot({path:path.join(qa,'tabs-context-compact.png')});await page.keyboard.press('Escape');await page.setViewportSize({width:1300,height:900});
  await tabMenu(names[1]);await page.screenshot({path:path.join(qa,'tabs-context.png')});await page.keyboard.press('Escape');
  checks.push('Background-tab copy/reveal targets the clicked file; Shift+F10, keyboard traversal, Escape focus and small-window menu bounds work.');
- await chooseTab(names[3],'关闭标签页');await expect(page.getByRole('tab')).toHaveCount(3);await expect(tab(names[0])).toHaveAttribute('aria-selected','true');await expect(pane('menus-0').locator('.rich-document')).toBeFocused();await command('reopen');await expect(page.getByRole('tab')).toHaveCount(4);await tab(names[0]).click();
+ await selectText('menus-0','alpha');
+ await chooseTab(names[3],'关闭标签页');await expect(page.getByRole('tab')).toHaveCount(3);await expect(tab(names[0])).toHaveAttribute('aria-selected','true');await expect(pane('menus-0').locator('.rich-document')).toBeFocused();
+ await page.keyboard.insertText('立即输入');await saved(records[0].path,alpha.replace('alpha','立即输入'));await command('undo');await saved(records[0].path,alpha);
+ checks.push('Closing a background tab restores the active editor selection after commit; immediate typing replaces that selection and undoes once.');
+ await command('reopen');await expect(page.getByRole('tab')).toHaveCount(4);await tab(names[0]).click();
 
  await selectText('menus-0','alpha');await item(await selectedMenu(),'复制').click();await expect.poll(()=>app.evaluate(({clipboard})=>clipboard.readText())).toBe('alpha');
  await selectText('menus-0','alpha');await item(await selectedMenu(),'剪切').click();await saved(records[0].path,alpha.replace('alpha',''));

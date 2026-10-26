@@ -1,16 +1,18 @@
-Open Typora 0.17.3 fixes community-plugin interactions and adds real AppImage FUSE acceptance.
+Open Typora 0.17.4 fixes community-plugin interactions and adds real AppImage FUSE acceptance.
 
 This is an independent, unofficial project, unaffiliated with Typora. If you can afford it, please [buy Typora](https://store.typora.io/) and support its official developers.
 
 ## Downloads
 
-- macOS 14+, Apple Silicon: `Open-Typora-0.17.3-arm64.dmg` or ZIP.
-- Windows 10/11 x64: `Open-Typora-0.17.3-windows-x64-Setup.exe` or ZIP.
-- Linux x64: `Open-Typora-0.17.3-linux-x64.deb` or AppImage.
+- macOS 14+, Apple Silicon: `Open-Typora-0.17.4-arm64.dmg` or ZIP.
+- Windows 10/11 x64: `Open-Typora-0.17.4-windows-x64-Setup.exe` or ZIP.
+- Linux x64: `Open-Typora-0.17.4-linux-x64.deb` or AppImage.
 
 SHA-256 checksums are included. macOS is locally signed, not notarized; Windows is unsigned.
 
 ## Fixes and acceptance
+
+- Closing a background tab restores the active editor focus and selection after the tab is removed, so immediate typing works reliably.
 
 - List folding now displays its triangle when the upstream metadata color is absent. Plugin writing-surface listeners move with active tabs and split panes. Cached references, once listeners, removal, abort signals and disabling retain their semantics.
 - All six original bundled community plugins are exercised individually and together, including actual styles, tab/split interaction, read-only behavior, persistence after restart and cleanup. Native WebKit separately checks folding geometry and combined teardown.

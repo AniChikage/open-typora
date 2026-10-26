@@ -3,8 +3,8 @@
 Use the x64 AppImage from this repository's Releases page and verify its SHA-256 checksum. Make it executable, then run it as your ordinary user. The DEB is the recommended Ubuntu installation, with desktop and file associations included.
 
 ```sh
-chmod +x Open-Typora-0.17.3-linux-x64.AppImage
-./Open-Typora-0.17.3-linux-x64.AppImage
+chmod +x Open-Typora-0.17.4-linux-x64.AppImage
+./Open-Typora-0.17.4-linux-x64.AppImage
 ```
 
 ## FUSE runtime
@@ -18,11 +18,11 @@ sudo apt install libfuse2
 sudo apt install libfuse2t64
 ```
 
-To inspect a real mount, run `./Open-Typora-0.17.3-linux-x64.AppImage --appimage-mount`. While it remains running, inspect the printed directory with `findmnt --target /printed/mountpoint`. Its filesystem type should start with `fuse`. Press Ctrl+C to unmount. This is different from `--appimage-extract`.
+To inspect a real mount, run `./Open-Typora-0.17.4-linux-x64.AppImage --appimage-mount`. While it remains running, inspect the printed directory with `findmnt --target /printed/mountpoint`. Its filesystem type should start with `fuse`. Press Ctrl+C to unmount. This is different from `--appimage-extract`.
 
 ## Ubuntu's user namespace restriction
 
-Chromium also needs a working sandbox. Starting with 0.17.3, the launcher keeps sandboxing enabled instead of silently appending `--no-sandbox` when a namespace probe fails.
+Chromium also needs a working sandbox. Starting with 0.17.4, the launcher keeps sandboxing enabled instead of silently appending `--no-sandbox` when a namespace probe fails.
 
 On Ubuntu 24.04 with restricted unprivileged user namespaces, an administrator may need to allow namespaces for the verified AppImage. The following example grants that permission only to the exact executable path in the profile; the system-wide restriction stays enabled. Only do this for an AppImage you trust, and update the path after moving or renaming it.
 
@@ -31,7 +31,7 @@ Save this as `/etc/apparmor.d/open-typora-appimage`, replacing the example with 
 ```text
 abi <abi/4.0>,
 include <tunables/global>
-profile open-typora-appimage "/absolute/path/Open-Typora-0.17.3-linux-x64.AppImage" flags=(unconfined) {
+profile open-typora-appimage "/absolute/path/Open-Typora-0.17.4-linux-x64.AppImage" flags=(unconfined) {
   userns,
 }
 ```
