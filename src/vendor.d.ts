@@ -11,8 +11,9 @@ declare module "turndown" {
   export default class TurndownService {
     constructor(options?: Record<string, string>);
     use(plugin: (service: TurndownService) => void): this;
-    addRule(name: string, rule: { filter: string; replacement: (content: string) => string }): this;
+    addRule(name: string, rule: { filter: string; replacement: (content: string, node: HTMLElement) => string }): this;
     turndown(html: string): string;
+    escape(text: string): string;
   }
 }
 declare module "turndown-plugin-gfm" { export const gfm: (service: import("turndown").default) => void; }

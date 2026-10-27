@@ -990,3 +990,71 @@ test("context selection retains selected text, keyboard bookmarks and active com
     run.editor.composing = false;
   } finally { document.caretRangeFromPoint = previousCaret; run.close(); }
 });
+
+
+function spreadsheetPaste(f: ReturnType<typeof fixture>, plain: string, html = "", images = false) {
+  const event = new window.Event("paste", { bubbles: true, cancelable: true });
+  Object.defineProperty(event, "clipboardData", { value: { files: images ? [{ type: "image/png" }] : [], getData(type: string) { return type === "text/html" ? html : type === "text/plain" ? plain : ""; } } });
+  f.root.dispatchEvent(event);
+  return event;
+}
+test("spreadsheet Excel HTML with a PNG alternative becomes an editable table, not an image", () => {
+  const f = fixture("Before after"); point(f.editor, 7);
+  spreadsheetPaste(f, "项目\t数量\t备注\r\n苹果\t2\t含|分隔符\r\n香蕉\t\t第一行", '<html><head><meta name="ProgId" content="Excel.Sheet"></head><body><table><colgroup><col><col><col></colgroup><tr><td>项目</td><td>数量</td><td>备注</td></tr><tr><td>苹果</td><td>2</td><td>含|分隔符</td></tr><tr><td>香蕉</td><td></td><td>第一行</td></tr></table></body></html>', true);
+  assert.equal(f.model.text, 'Before \n\n| 项目 | 数量 | 备注 |\n| --- | --- | --- |\n| 苹果 | 2 | 含\\|分隔符 |\n| 香蕉 |  | 第一行 |\n\nafter');
+  assert.equal(f.root.querySelectorAll('table').length, 1);
+  assert.equal(f.root.querySelectorAll('tbody tr').length, 2);
+  f.editor.undo(); assert.equal(f.model.text, "Before after");
+  f.editor.redo(); assert.equal(f.root.querySelectorAll('table').length, 1); f.close();
+});
+test("spreadsheet quoted TSV keeps empty cells, literal formatting, quotes and cell line breaks", () => {
+  const f = fixture(""); point(f.editor, 0);
+  spreadsheetPaste(f, '名称\t备注\t空列\r\n"说""你好"""\t"第一行\n第二行"\t\r\n**原样**\tA|B\t\r\n');
+  assert.equal(f.root.querySelectorAll('table').length, 1);
+  const cells=[...f.root.querySelectorAll('tbody td')];
+  assert.equal(cells.length, 6); assert.equal(cells[0].textContent, '说"你好"');
+  assert.equal(cells[1].querySelectorAll('br').length, 1);
+  assert.equal(cells[3].querySelectorAll('strong').length, 0);
+  const visible=cells[4].cloneNode(true) as HTMLElement;visible.querySelectorAll('.md-meta').forEach(node=>node.remove());assert.equal(visible.textContent, 'A|B');
+  f.editor.undo(); assert.equal(f.model.text, ""); f.close();
+});
+test("spreadsheet merged HTML expands to a rectangular table without shifting values", () => {
+  const f=fixture(""); point(f.editor,0);
+  spreadsheetPaste(f,"",'<table><tr><td colspan="2">Header</td><td>Value</td></tr><tr><td rowspan="2">Group</td><td>A</td><td>1</td></tr><tr><td>B</td><td>2</td></tr></table>');
+  assert.equal(f.model.text, '| Header |  | Value |\n| --- | --- | --- |\n| Group | A | 1 |\n|  | B | 2 |');
+  f.editor.undo(); assert.equal(f.model.text, ""); f.close();
+});
+test("spreadsheet grid paste into an existing cell parses quoted TSV and remains one undo", () => {
+  const original='| A | B |\n| --- | --- |\n| x | y |\n';
+  const f=fixture(original);point(f.editor,original.indexOf('x'));
+  spreadsheetPaste(f,'"第一行\n第二行"\t"A\tB"\r\n"说""好"""\t尾\r\n');
+  assert.ok(f.model.text.includes('| 第一行<br>第二行 | A\tB |'));
+  assert.ok(f.model.text.includes('| 说"好" | 尾 |'));
+  f.editor.undo();assert.equal(f.model.text,original);f.close();
+});
+
+test("spreadsheet rich inline-code paste stays literal instead of inserting a table or image",()=>{
+  const f=fixture('`code`');point(f.editor,2);
+  spreadsheetPaste(f,'a\tb','<table><tr><td>a</td><td>b</td></tr></table>',true);
+  assert.equal(f.model.text,'`ca\tbode`');assert.equal(f.root.querySelectorAll('table,img').length,0);
+  f.editor.undo();assert.equal(f.model.text,'`code`');f.close();
+});
+
+test("spreadsheet paste at a distant virtual table row only replaces that source rectangle",()=>{
+  const source='| Key | Value |\n| --- | --- |\n'+Array.from({length:12000},(_,i)=>`| row-${i} | value-${i} |`).join('\n')+'\n';
+  const f=fixture(source);const at=source.indexOf('row-10000');f.editor.select({anchor:at,head:at});
+  const tr=f.root.querySelector('tr[data-source-row="10002"]');assert.ok(tr);
+  spreadsheetPaste(f,'替换一\t值一\n替换二\t值二');
+  assert.equal(f.model.text,source.replace('| row-10000 | value-10000 |\n| row-10001 | value-10001 |','| 替换一 | 值一 |\n| 替换二 | 值二 |'));
+  f.editor.undo();assert.equal(f.model.text,source);f.close();
+});
+
+test("spreadsheet paste expands beyond the old 100-row and 30-column editor limits",()=>{
+  const original='| A | B |\n| --- | --- |\n| x | y |\n';
+  const f=fixture(original);point(f.editor,original.indexOf('x'));
+  const values=Array.from({length:150},(_,row)=>Array.from({length:40},(_,column)=>`R${row}C${column}`));
+  spreadsheetPaste(f,values.map(row=>row.join('\t')).join('\n'));
+  assert.ok(f.model.text.includes('| '+values[149].join(' | ')+' |'));
+  assert.equal(f.root.querySelectorAll('th').length,40);
+  f.editor.undo();assert.equal(f.model.text,original);f.close();
+});

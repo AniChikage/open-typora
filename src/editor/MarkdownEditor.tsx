@@ -1,4 +1,5 @@
 import { codeSelectionCommand, selectionActions } from "./selectionCommands";
+import { clipboardTable, tableMarkdown, tablePasteBlock } from "./clipboard.ts";
 import { ImageDialog } from "../components/ImageDialog";
 import { imageReferences } from "./images";
 import type { ImageReference } from "./images";
@@ -25,6 +26,7 @@ import {
   defaultHighlightStyle,
   bracketMatching,
   indentUnit,
+  syntaxTree,
 } from "@codemirror/language";
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { search, searchKeymap, openSearchPanel, findNext as cmFindNext, findPrevious as cmFindPrevious } from "@codemirror/search";
@@ -415,7 +417,21 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
               }
             }),
             EditorView.domEventHandlers({
-              paste(event) {
+              paste(event, view) {
+                const data = event.clipboardData;
+                if (!data) return false;
+                if (editingBlocked()) { event.preventDefault(); return true; }
+                const selection = view.state.selection.main;
+                let literal = ["fence", "code_block", "frontmatter", "math_block", "html_block"].includes(doc.nodeAt(selection.from)?.kind || "");
+                for (let node = syntaxTree(view.state).resolveInner(selection.from, 1); node.parent; node = node.parent) if (node.name === "InlineCode") literal = true;
+                if (literal && (/<table\b/i.test(data.getData("text/html")) || data.getData("text/plain").includes("\t"))) return false;
+                const table = !data.getData("text/x-open-typora-markdown") ? clipboardTable(data) : null;
+                const grid = table?.cells;
+                if (grid) {
+                  event.preventDefault();
+                  insert(tablePasteBlock(tableMarkdown(grid, table?.align), doc.text, selection.from, selection.to), "paste");
+                  return true;
+                }
                 const images = [...(event.clipboardData?.files || [])].filter(
                   (file) => file.type.startsWith("image/"),
                 );
@@ -584,6 +600,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
           void (/^(?:https?:|mailto:)/i.test(url) ? host.openLink(url) : host.openDocumentLink(original.id, url))
             .catch((error) => callbacks.current.onError(error.message)),
         compositionFinished,
+        error: message => callbacks.current.onError(message),
       });
       setMode(requested.current);
       if (!root.current?.closest(".document-editor")?.hasAttribute("hidden")) focusEditor();

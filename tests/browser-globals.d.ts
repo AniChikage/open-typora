@@ -10,3 +10,5 @@ declare var __menuClipboard: Electron.ClipboardItem[];
 declare var __menuReveals: string[][];
 declare var __menuConfirmCalls: string[];
 declare var packageDialogProperties: Electron.OpenDialogOptions['properties'];
+
+declare var __sheetClipboard: Electron.ClipboardItem[];

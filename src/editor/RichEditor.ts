@@ -26,7 +26,7 @@ import { renderMath } from "./math.ts";
 import { fenceLanguage } from "./fenceLanguage.ts";
 import { applyBlockCommand } from "./blockCommands.ts";
 import type { BlockArguments } from "./blockCommands.ts";
-import { htmlToMarkdown } from "./clipboard.ts";
+import { clipboardTable, htmlToMarkdown, tableCellMarkdown, tableMarkdown, tablePasteBlock } from "./clipboard.ts";
 import { inlineTokens, markdownOptionsVersion } from "./markdown.ts";
 import { imeKey } from "./composition.ts";
 export interface RichCallbacks {
@@ -35,6 +35,7 @@ export interface RichCallbacks {
   image(file: File): void;
   link(url: string): void;
   compositionFinished(): void;
+  error?(message: string): void;
 }
 export class RichEditor {
   leaves = new Map<string, Leaf>();
@@ -817,21 +818,34 @@ export class RichEditor {
   }
   private paste = (event: ClipboardEvent) => {
     if ((event.target as HTMLElement).closest(".cm-editor")) return;
-    const images = [...(event.clipboardData?.files || [])].filter(file => file.type.startsWith("image/"));
-    if (images.length) {
+    if (this.composing) { event.preventDefault(); return; }
+    const data = event.clipboardData;
+    if (!data) return;
+    const parent = window.getSelection()?.anchorNode?.parentElement;
+    if (parent?.closest('.md-inline[data-mark="code"]')) { event.preventDefault(); this.insert(data.getData("text/plain"), "paste"); return; }
+    const cell = parent?.closest("td,th");
+    const internal = data.getData("text/x-open-typora-markdown");
+    const table = !internal || cell ? clipboardTable(data) : null;
+    const grid = table?.cells;
+    if (grid && cell) {
+      event.preventDefault();
+      if (!this.pasteTable(grid, cell as HTMLTableCellElement)) this.callbacks.error?.("粘贴范围过大，请在新段落粘贴或使用源码模式。");
+      return;
+    }
+    if (grid && !cell) {
+      event.preventDefault();
+      const selection = this.bookmark();
+      this.insert(tablePasteBlock(tableMarkdown(grid, table?.align), this.model.text, Math.min(selection.anchor, selection.head), Math.max(selection.anchor, selection.head)), "paste");
+      return;
+    }
+    const images = [...(data.files || [])].filter(file => file.type.startsWith("image/"));
+    if (images.length && !/<table\b/i.test(data.getData("text/html"))) {
       event.preventDefault();
       this.model.selection = this.bookmark();
       for (const image of images) this.callbacks.image(image);
       return;
     }
-    const html = event.clipboardData?.getData("text/html");
-    const plain = event.clipboardData?.getData("text/plain") || "";
-    const cell = window.getSelection()?.anchorNode?.parentElement?.closest("td,th");
-    if (cell && (plain.includes("\t") || html && /<table\b/i.test(html))) {
-      const table = html ? new DOMParser().parseFromString(html, "text/html").querySelector("table") : null;
-      const grid = table ? [...table.rows].map(row => [...row.cells].map(cell => htmlToMarkdown(cell.innerHTML))) : plain.replace(/\r\n/g, "\n").replace(/\n$/, "").split("\n").map(line => line.split("\t"));
-      if (this.pasteTable(grid, cell as HTMLTableCellElement)) { event.preventDefault(); return; }
-    }
+    const html = data.getData("text/html");
     const text = event.clipboardData?.getData("text/x-open-typora-markdown") || (html ? htmlToMarkdown(html) : event.clipboardData?.getData("text/plain"));
     if (text !== undefined) {
       event.preventDefault();
@@ -1516,16 +1530,38 @@ export class RichEditor {
     if (this.model.replace(0, this.model.text.length, next.text, "clear-format", { anchor: next.from, head: next.to })) this.publish();
   }
   pasteTable(grid: string[][], cell: HTMLTableCellElement) {
-    if (!grid.length || grid.length > 100 || grid.some(row => row.length > 30)) return false;
+    if (!grid.length) return false;
+    let pastedWidth = 0;
+    for (const row of grid) pastedWidth = Math.max(pastedWidth, row.length);
+    if (!pastedWidth || grid.length * pastedWidth > 1_000_000) return false;
     const element = cell.closest<HTMLElement>("[data-cid]"), node = this.model.nodes.find(node => node.id === element?.dataset.cid);
     if (!node || node.kind !== "table_open") return false;
+    const rowElement = cell.parentElement as HTMLTableRowElement, large = this.tableViews.get(node.id);
+    let row = large ? Number(rowElement.dataset.sourceRow) : rowElement.rowIndex;
+    if (!Number.isInteger(row) || row < 0) return false;
+    if (!large && row > 0) row++;
+    const column = cell.cellIndex;
+    const last = row + grid.length - 1 + (row === 0 && grid.length > 1 ? 1 : 0);
+    if (large && column + pastedWidth <= large.index.width && last < large.index.length) {
+      const lines = Array.from({ length: last - row + 1 }, (_, i) => large.index.line(row + i));
+      for (let i = 0; i < grid.length; i++) {
+        const local = i + (row === 0 && i > 0 ? 1 : 0), values = tableRowCells(lines[local]).map(cell => cell.raw);
+        while (values.length < large.index.width) values.push("");
+        for (let j = 0; j < grid[i].length; j++) values[column + j] = tableCellMarkdown(grid[i][j]);
+        lines[local] = `| ${values.join(" | ")} |`;
+      }
+      const from = node.from + large.index.offsets[row], to = node.from + large.index.end(last);
+      this.model.closeGroup();
+      if (this.model.replace(from, to, lines.join("\n"), "table-paste")) this.publish();
+      return true;
+    }
+    const width = Math.max(large?.index.width || tableRowCells(node.source.split("\n", 1)[0]).length, column + pastedWidth);
+    const rowCount = large?.index.length || node.source.split("\n").length;
+    if (width * Math.max(rowCount, last + 1) > 1_000_000) return false;
     const lines = node.source.split("\n"), rows = lines.map(line => tableRowCells(line).map(cell => cell.raw));
-    let row = (cell.parentElement as HTMLTableRowElement).rowIndex; if (row > 0) row++;
-    const column = cell.cellIndex, width = Math.max(rows[0].length, column + Math.max(...grid.map(row => row.length)));
-    if (width > 30 || row + grid.length > 102) return false;
     while (rows.length < row + grid.length + (row === 0 ? 1 : 0)) rows.push(Array(width).fill(""));
     for (const [i, cells] of rows.entries()) while (cells.length < width) cells.push(i === 1 ? "---" : "");
-    for (let i = 0; i < grid.length; i++) { const at = row + i + (row === 0 && i > 0 ? 1 : 0); if (!rows[at]) rows[at] = Array(width).fill(""); for (let j = 0; j < grid[i].length; j++) rows[at][column + j] = grid[i][j].replace(/(?<!\\)\|/g, "\\|").replace(/\r?\n/g, "<br>"); }
+    for (let i = 0; i < grid.length; i++) { const at = row + i + (row === 0 && i > 0 ? 1 : 0); if (!rows[at]) rows[at] = Array(width).fill(""); for (let j = 0; j < grid[i].length; j++) rows[at][column + j] = tableCellMarkdown(grid[i][j]); }
     const output = rows.map(cells => `| ${cells.join(" | ")} |`).join("\n");
     this.model.closeGroup();
     if (this.model.replace(node.from, node.to, output, "table-paste")) this.publish();

@@ -56,6 +56,7 @@ Additional suites:
 | `npm run test:kernel-desktop` | Code/formula editing, keyboard interactions, and mode history | macOS desktop |
 | `npm run test:features` | Outline, tables, preferences, navigation, and writing modes | macOS desktop |
 | `npm run test:alignment` | File workflows, themes, images, and conversion | macOS desktop + Pandoc |
+| `npm run test:spreadsheet` | Office/WPS clipboard HTML/TSV, live/source/code paste, exact saves and undo | Electron desktop |
 | `npm run test:encoding` | Encoding conversion, save protection, composition, and image paste | macOS desktop |
 
 Automated desktop suites use isolated temporary application data. To keep screenshots and reports outside the checkout, set `OPEN_TYPORA_QA_DIR` to an absolute output directory. Synthetic composition tests do not replace manual input-method checks.

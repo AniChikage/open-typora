@@ -13,6 +13,8 @@ $process = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$destina
 if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
 $env:OPEN_TYPORA_EXECUTABLE = Join-Path $destination 'Open Typora.exe'
 if (!(Test-Path $env:OPEN_TYPORA_EXECUTABLE)) { throw 'Installer did not produce the application executable' }
+node tests/spreadsheet-desktop.mts
+if ($LASTEXITCODE -ne 0) { throw "Spreadsheet clipboard acceptance failed" }
 node tests/context-menu-desktop.mts
 if ($LASTEXITCODE -ne 0) { throw 'Installed context-menu, clipboard and safe tab-close acceptance failed' }
 node tests/community-plugins-desktop.mts

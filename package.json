@@ -1,6 +1,6 @@
 {
   "name": "open-typora",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "description": "A local Markdown writing space with live rendering and lossless source editing.",
   "private": true,
   "type": "module",
@@ -38,6 +38,7 @@
     "test:preview": "node tests/preview-desktop.mts",
     "test:huge": "node tests/huge-blocks-desktop.mts",
     "test:menus": "node tests/context-menu-desktop.mts",
+    "test:spreadsheet": "node tests/spreadsheet-desktop.mts",
     "build:runtime": "node scripts/build-runtime.mts",
     "typecheck": "npm run build:runtime && tsc -p tsconfig.json && tsc -p tsconfig.tools.json && tsc -p tsconfig.tests.json",
     "pretest": "npm run build:runtime",
