@@ -15,13 +15,14 @@ async function runWebKitClipboardTests() {
   try {
     await wait(()=>!!root()?.querySelector('h1'));
     const restored=await desktop.restore();if(!restored.ok)throw Error(restored.error);if(!restored.value)throw Error('Native clipboard fixture session is missing');const original=restored.value.documents[0].content;
-    await mode(true);const editor=document.querySelector<HTMLElement>('.document-editor[data-active="true"] .source-surface .cm-content')!;editor.focus();document.execCommand('selectAll');await new Promise(resolve=>setTimeout(resolve,80));
+    const expectedSource=original+(original.endsWith('\n\n')?'':original.endsWith('\n')?'\n':'\n\n')+expected;
+    await mode(true);const editor=document.querySelector<HTMLElement>('.document-editor[data-active="true"] .source-surface .cm-content')!;editor.focus();await new Promise(resolve=>setTimeout(resolve,80));
     await desktop.testSpreadsheetClipboard();
-    await desktop.clipboardAction('paste');await wait(()=>source()===expected);
+    await desktop.clipboardAction('paste');await wait(()=>source()===expectedSource);
     check(true,'native trusted source paste prefers the table over its PNG alternative');
-    window.__openTypora.command({action:'undo'});await wait(()=>source()===original);window.__openTypora.command({action:'redo'});await wait(()=>source()===expected);
+    window.__openTypora.command({action:'undo'});await wait(()=>source()===original);window.__openTypora.command({action:'redo'});await wait(()=>source()===expectedSource);
     check(true,'native source spreadsheet paste is one exact undo/redo transaction');
-    window.__openTypora.command({action:'save'});let saved=false;const deadline=Date.now()+10000;while(Date.now()<deadline){const recovery=await desktop.testRecovery();if(recovery.ok){const record=recovery.value.documents.find(record=>record.id==='webkit-fixture');if(record?.content===expected&&record.savedContent===expected){saved=true;break;}}await new Promise(resolve=>setTimeout(resolve,40));}
+    window.__openTypora.command({action:'save'});let saved=false;const deadline=Date.now()+10000;while(Date.now()<deadline){const recovery=await desktop.testRecovery();if(recovery.ok){const record=recovery.value.documents.find(record=>record.id==='webkit-fixture');if(record?.content===expectedSource&&record.savedContent===expectedSource){saved=true;break;}}await new Promise(resolve=>setTimeout(resolve,40));}
     check(saved,'native source paste persists the exact Markdown to recovery and saved content');
     const draft={id:crypto.randomUUID(),name:'Clipboard-rich.md',path:null,content:'',savedContent:'',diskHash:null,lineEnding:'\n'};
     await desktop.registerDraft(draft);window.__openTypora.command({action:'opened',document:draft});await wait(()=>document.querySelector('.document-title')?.textContent===draft.name);await mode(false);
@@ -29,6 +30,6 @@ async function runWebKitClipboardTests() {
     check(!root().querySelector('img')&&root().querySelectorAll('tbody tr').length===2,'native trusted rich paste chooses table contents over the PNG alternative');
     await mode(true);check(source()===expected,'native rich clipboard serializes to exact GFM including the empty cell');await mode(false);window.__openTypora.command({action:'undo'});await wait(()=>root().querySelectorAll('table').length===0);window.__openTypora.command({action:'redo'});await wait(()=>root().querySelectorAll('table').length===1);
     check(errors.length===0,'native rich paste undoes/redoes once without runtime errors');
-    return {clipboardOnly:true,passed,errors,source:expected};
+    return {clipboardOnly:true,passed,errors,source:expectedSource};
   }catch(error){return {clipboardOnly:true,passed,errors,error:String(error),source:source()};}
 }
