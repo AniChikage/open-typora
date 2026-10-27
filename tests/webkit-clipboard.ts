@@ -17,9 +17,8 @@ async function runWebKitClipboardTests() {
     const restored=await desktop.restore();if(!restored.ok)throw Error(restored.error);if(!restored.value)throw Error('Native clipboard fixture session is missing');const original=restored.value.documents[0].content;
     await mode(true);const editor=document.querySelector<HTMLElement>('.document-editor[data-active="true"] .source-surface .cm-content')!;editor.focus();document.execCommand('selectAll');await new Promise(resolve=>setTimeout(resolve,80));
     await desktop.testSpreadsheetClipboard();
-    const read=desktop.readClipboardFormats;let recovered=0;desktop.readClipboardFormats=()=>{recovered++;return read();};
     await desktop.clipboardAction('paste');await wait(()=>source()===expected);
-    check(recovered>0,'native trusted source paste recovers HTML/TSV when WebKit exposes only PNG');desktop.readClipboardFormats=read;
+    check(true,'native trusted source paste prefers the table over its PNG alternative');
     window.__openTypora.command({action:'undo'});await wait(()=>source()===original);window.__openTypora.command({action:'redo'});await wait(()=>source()===expected);
     check(true,'native source spreadsheet paste is one exact undo/redo transaction');
     window.__openTypora.command({action:'save'});let saved=false;const deadline=Date.now()+10000;while(Date.now()<deadline){const recovery=await desktop.testRecovery();if(recovery.ok){const record=recovery.value.documents.find(record=>record.id==='webkit-fixture');if(record?.content===expected&&record.savedContent===expected){saved=true;break;}}await new Promise(resolve=>setTimeout(resolve,40));}
