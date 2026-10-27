@@ -32,6 +32,7 @@ contextBridge.exposeInMainWorld("desktop", {
   previewSettings: enable => call("previewSettings", enable),
   writeClipboard: text => call("writeClipboard", text),
   readClipboard: () => call("readClipboard"),
+  readClipboardFormats: () => call("readClipboardFormats"),
   clipboardAction: action => call("clipboardAction", action),
   confirmClose: name => call("confirmClose", name),
   save: (id, text, saveAs = false, force = false, options) =>

@@ -111,6 +111,7 @@ export interface Host {
   previewSettings(enable?: boolean): Promise<{ supported: boolean; available: boolean; enabled: boolean }>;
   writeClipboard(text: string): Promise<unknown>;
   readClipboard(): Promise<string>;
+  readClipboardFormats(): Promise<{ text: string; html: string }>;
   clipboardAction(action: "cut" | "copy" | "paste"): Promise<unknown>;
   openLink(url: string): Promise<unknown>;
   openDocumentLink(id: string, url: string): Promise<unknown>;

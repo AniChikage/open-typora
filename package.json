@@ -39,6 +39,7 @@
     "test:huge": "node tests/huge-blocks-desktop.mts",
     "test:menus": "node tests/context-menu-desktop.mts",
     "test:spreadsheet": "node tests/spreadsheet-desktop.mts",
+    "test:clipboard-native": "npm run build && node scripts/test-webkit.mts --clipboard",
     "build:runtime": "node scripts/build-runtime.mts",
     "typecheck": "npm run build:runtime && tsc -p tsconfig.json && tsc -p tsconfig.tools.json && tsc -p tsconfig.tests.json",
     "pretest": "npm run build:runtime",

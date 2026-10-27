@@ -47,7 +47,7 @@ type NativeChange = import("../shared/contracts.js").PathChange;
     "viewState",
     "windowAction",
     "exportHtml", "exportTheme", "previewSettings",
-    "readClipboard",
+    "readClipboard", "readClipboardFormats",
     "clipboardAction",
     "writeClipboard",
     "chooseImage",

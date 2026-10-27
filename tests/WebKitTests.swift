@@ -50,6 +50,12 @@ final class WebKitTests: NSObject, NSApplicationDelegate, WKNavigationDelegate {
           guard saved == output["source"] as? String else {
             throw NativeFailure("Native saved bytes differ from the editor document.")
           }
+          if output["clipboardOnly"] as? Bool == true {
+            let data = try JSONSerialization.data(withJSONObject: output, options: [.prettyPrinted, .sortedKeys])
+            print(String(data: data, encoding: .utf8)!)
+            print("PASS: native trusted clipboard persisted exact editor bytes")
+            exit(0)
+          }
           let pdfURL = self.owner.directory.appendingPathComponent("native-test.pdf")
           guard let pdf = CGPDFDocument(pdfURL as CFURL), pdf.numberOfPages == 1,
             try Data(contentsOf: pdfURL).count < 1_000_000

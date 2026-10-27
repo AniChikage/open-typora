@@ -435,8 +435,27 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
                 const images = [...(event.clipboardData?.files || [])].filter(
                   (file) => file.type.startsWith("image/"),
                 );
-                if (!images.length) return false;
+                const nativeFormats = event.isTrusted && host.native && (images.length > 0 || !data.getData("text/plain") && !data.getData("text/html"));
+                if (!images.length && !nativeFormats) return false;
                 event.preventDefault();
+                if (nativeFormats) {
+                  // WebKit's plaintext-only CodeMirror surface can expose only
+                  // Office's PNG alternative. Recover the native table formats
+                  // without changing the editor's input-method behavior.
+                  const snapshot = doc.text;
+                  void host.readClipboardFormats().then(formats => {
+                    const current = view.state.selection.main;
+                    if (source.current !== view || activeMode.current || !viewOptions.current.active || doc.text !== snapshot || current.anchor !== selection.anchor || current.head !== selection.head || isComposing() || viewOptions.current.readOnly) {
+                      callbacks.current.onError("粘贴期间文档或选区已变化，请重试。"); return;
+                    }
+                    const table = clipboardTable({ getData: type => type === "text/html" ? formats.html : type === "text/plain" ? formats.text : "" });
+                    if (literal && (table || /<table\b/i.test(formats.html))) insert(formats.text.replace(/\r\n?/g, "\n"), "paste");
+                    else if (table) insert(tablePasteBlock(tableMarkdown(table.cells, table.align), doc.text, selection.from, selection.to), "paste");
+                    else if (!images.length && formats.text) insert(formats.text.replace(/\r\n?/g, "\n"), "paste");
+                    else for (const image of images) void insertImage(image);
+                  }).catch(error => callbacks.current.onError(error.message));
+                  return true;
+                }
                 for (const image of images) void insertImage(image);
                 return true;
               },

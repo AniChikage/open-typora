@@ -14,6 +14,7 @@ SHA-256 checksums are included. macOS is locally signed, not notarized; Windows 
 
 - Copy a cell range from Excel or WPS and paste it into a document to create an editable Markdown table. Both live editing and source mode recognize HTML tables and tab-separated text. The copied first row becomes the Markdown header.
 - Spreadsheet HTML takes precedence over the screenshot that Office applications also place on the clipboard. Plain image paste keeps its existing behavior.
+- Source-mode paste recovers table formats from the native clipboard when WebKit exposes only Office's PNG alternative. A delayed clipboard read cannot overwrite text or a selection changed in the meantime.
 - Blank cells, literal pipes, quoted tabs and multiline cell values retain their positions. Merged HTML cells expand into a rectangular grid with empty covered cells, since Markdown tables do not support merged cells.
 - Pasting into an existing live table uses the same parser. A paste remains one undo/redo transaction; code fences retain literal spreadsheet text, and Paste as Plain Text bypasses table conversion.
 - The old 100-row/30-column grid-paste restriction is removed. Bulk expansion uses a one-million-cell resource budget; existing large tables can still receive smaller edits without reconstruction.

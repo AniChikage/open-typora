@@ -127,6 +127,7 @@ const browser: Host = {
   async exportHtml(name, html) { download(name.replace(/\.(?:md|markdown|mdown)$/i, "") + ".html", html, "text/html;charset=utf-8"); return null; },
   writeClipboard: text => navigator.clipboard.writeText(text),
   readClipboard: () => navigator.clipboard.readText(),
+  async readClipboardFormats() { return { text: await navigator.clipboard.readText(), html: "" }; },
   async clipboardAction(action) {
     if (!document.execCommand(action)) throw new Error("浏览器未允许此剪贴板操作，请使用键盘快捷键。");
   },

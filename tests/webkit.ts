@@ -1,5 +1,5 @@
 async function runWebKitTests(uploaderURL: string) {
-const desktop = window.desktop! as Omit<import("../shared/contracts.js").DesktopBridge, "importDocument"> & { importDocument(format?: string): ReturnType<import("../shared/contracts.js").DesktopBridge["importDocument"]>; testRecovery(): Promise<import("../shared/contracts.js").BridgeResponse<import("../shared/contracts.js").Recovery>> };
+const desktop = window.desktop! as Omit<import("../shared/contracts.js").DesktopBridge, "importDocument"> & { importDocument(format?: string): ReturnType<import("../shared/contracts.js").DesktopBridge["importDocument"]>; testSpreadsheetClipboard(): Promise<import("../shared/contracts.js").BridgeResponse<null>>; testRecovery(): Promise<import("../shared/contracts.js").BridgeResponse<import("../shared/contracts.js").Recovery>> };
 const passed: string[] = [],
   errors: string[] = [];
 window.addEventListener("error", (event) => errors.push(event.message));
@@ -455,8 +455,11 @@ try {
   await sourceMode(false);window.__openTypora.command({action:'undo'});await sourceMode(true);await wait(()=>readSource()==='');
   check(true,'native rich spreadsheet paste undoes once after returning from source inspection');
   const spreadsheetSource=document.querySelector<HTMLElement>('.document-editor[data-active="true"] .source-surface .cm-content')!;
-  spreadsheetSource.focus();spreadsheetSource.dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData:spreadsheetData}));
-  await wait(()=>readSource()===spreadsheetMarkdown);check(true,'native source paste also prefers table data over the spreadsheet screenshot');
+  spreadsheetSource.focus();await desktop.testSpreadsheetClipboard();
+  const originalClipboardRead=desktop.readClipboardFormats;let recoveredClipboardReads=0;
+  desktop.readClipboardFormats=()=>{recoveredClipboardReads++;return originalClipboardRead();};
+  await desktop.clipboardAction('paste');
+  await wait(()=>readSource()===spreadsheetMarkdown);check(recoveredClipboardReads>0,'native trusted source paste recovers table formats when WebKit exposes only the PNG alternative');desktop.readClipboardFormats=originalClipboardRead;
   window.__openTypora.command({action:'undo'});await wait(()=>readSource()==='');window.__openTypora.command({action:'redo'});await wait(()=>readSource()===spreadsheetMarkdown);
   check(true,'native rich/source spreadsheet paste remains one undo and redo transaction');
   window.__openTypora.command({action:'undo'});await wait(()=>readSource()==='');await sourceMode(false);window.__openTypora.command({action:'close'});

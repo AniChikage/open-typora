@@ -185,6 +185,15 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       let args = request["args"] as? [Any]
     else { return }
     #if WEBTEST
+      if name == "testSpreadsheetClipboard" {
+        let board = NSPasteboard.general
+        board.clearContents()
+        board.setString("项目\t数量\n苹果\t2\n香蕉\t", forType: .string)
+        board.setString("<table><tr><td>项目</td><td>数量</td></tr><tr><td>苹果</td><td>2</td></tr><tr><td>香蕉</td><td></td></tr></table>", forType: .html)
+        board.setData(Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aNNsAAAAASUVORK5CYII="), forType: .png)
+        reply(id, ["ok": true, "value": NSNull()])
+        return
+      }
       if name == "testRecovery" {
         do {
           let session = try JSONSerialization.jsonObject(with: Data(contentsOf: store.dataDirectory.appendingPathComponent("session.json")))
@@ -545,6 +554,8 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       NSPasteboard.general.clearContents(); NSPasteboard.general.setString(text, forType: .string)
       return nil
     case "readClipboard": return NSPasteboard.general.string(forType: .string) ?? ""
+    case "readClipboardFormats":
+      return ["text": NSPasteboard.general.string(forType: .string) ?? "", "html": NSPasteboard.general.string(forType: .html) ?? ""]
     case "clipboardAction":
       let action = try arg(args, 0, String.self)
       guard ["cut", "copy", "paste"].contains(action) else { throw NativeFailure("不支持的剪贴板操作。") }

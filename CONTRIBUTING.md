@@ -56,6 +56,7 @@ Additional suites:
 | `npm run test:kernel-desktop` | Code/formula editing, keyboard interactions, and mode history | macOS desktop |
 | `npm run test:features` | Outline, tables, preferences, navigation, and writing modes | macOS desktop |
 | `npm run test:alignment` | File workflows, themes, images, and conversion | macOS desktop + Pandoc |
+| `npm run test:clipboard-native` | Actual AppKit clipboard → native WebKit source/live tables, exact saves and undo | macOS; no Pandoc required |
 | `npm run test:spreadsheet` | Office/WPS clipboard HTML/TSV, live/source/code paste, exact saves and undo | Electron desktop |
 | `npm run test:encoding` | Encoding conversion, save protection, composition, and image paste | macOS desktop |
 
@@ -99,4 +100,4 @@ Do not commit generated bundles, test output, credentials, personal documents, o
 
 Set the package version, commit the change, and push a matching `v<version>` tag. The [release workflow](.github/workflows/release.yml) builds on Apple Silicon macOS, Windows x64 and Ubuntu 22.04 x64 runners. All three builds and required tests must pass before publication. Windows is installed and uninstalled; Linux tests the installed DEB and extracted AppImage payload, including recovery preservation on uninstall. The publisher verifies combined checksums before publishing DMG, EXE, two ZIPs, DEB, AppImage and `SHA256SUMS.txt`. Published assets are never overwritten by a rerun.
 
-Main and `codex/**` branch changes run Windows/Linux acceptance without publishing. Update `docs/release-notes.md` for each version. Linux builds use `npm run package:linux`; in an isolated Ubuntu x64 environment, `xvfb-run -a node tests/linux-install.mts` installs/removes the DEB with sudo and runs both packaged payloads. Never run that installer test against your ordinary Linux installation.
+Main and `codex/**` branch changes run macOS, Windows and Linux acceptance without publishing. The native clipboard suite uses the system clipboard; CI runs it on a separate macOS desktop. Update `docs/release-notes.md` for each version. Linux builds use `npm run package:linux`; in an isolated Ubuntu x64 environment, `xvfb-run -a node tests/linux-install.mts` installs/removes the DEB with sudo and runs both packaged payloads. Never run that installer test against your ordinary Linux installation.

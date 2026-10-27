@@ -24,6 +24,7 @@
     "native/bridge.ts",
     "browser/pagination.ts",
     "tests/webkit.ts",
+    "tests/webkit-clipboard.ts",
     "shared/contracts.d.ts",
     "tests/browser-globals.d.ts"
   ]

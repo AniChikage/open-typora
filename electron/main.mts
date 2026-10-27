@@ -196,6 +196,12 @@ const handlers: IpcHandlers = {
   reopen: (_, id) => store.reopen(id),
   writeClipboard: (_, text) => clipboard.writeText(String(text)),
   readClipboard: () => clipboard.readText(),
+  readClipboardFormats: async () => {
+    const item = (await clipboard.read())[0];
+    const read = async (type: string) => item?.types.includes(type) ? (await item.getType(type) as Blob).text() : "";
+    const [text, html] = await Promise.all([read("text/plain"), read("text/html")]);
+    return { text, html };
+  },
   clipboardAction: (_, action) => {
     if (!["cut", "copy", "paste"].includes(action)) throw new Error("不支持的剪贴板操作。");
     window!.webContents[action]();

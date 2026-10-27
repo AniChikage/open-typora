@@ -170,7 +170,6 @@ jobs:
           retention-days: 7
 
   macos:
-    if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
     runs-on: macos-15
     timeout-minutes: 25
     steps:
@@ -190,6 +189,8 @@ jobs:
       - run: npm run test:native
       - name: Build native app, DMG, ZIP, and checksums
         run: npm run package:release
+      - name: Verify real native spreadsheet clipboard, source mode and undo
+        run: node scripts/test-webkit.mts --clipboard
       - run: mv release/native/SHA256SUMS.txt release/native/SHA256SUMS-macos-arm64.txt
       - name: Save tested macOS packages
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7

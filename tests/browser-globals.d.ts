@@ -12,3 +12,5 @@ declare var __menuConfirmCalls: string[];
 declare var packageDialogProperties: Electron.OpenDialogOptions['properties'];
 
 declare var __sheetClipboard: Electron.ClipboardItem[];
+declare var __sheetReleaseClipboard: (()=>void) | undefined;
+declare var __sheetClipboardOwnership: { plain:string; html:string; image:boolean; png:string } | undefined;
