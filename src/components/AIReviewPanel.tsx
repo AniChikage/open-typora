@@ -11,17 +11,18 @@ export function AIReviewPanel({ selection, documentName, current, composing, app
   apply(text: string): boolean; recapture(): void; settings(): void; settingsRevision: number; close(): void; notify(message: string): void;
 }) {
   const [instruction, setInstruction] = useState("改善表达，保持原意和 Markdown 格式。");
+  const [configLoading, setConfigLoading] = useState(true);
   const [config, setConfig] = useState<AISettings | null>(null), [result, setResult] = useState<string | null>(null);
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [rejected, setRejected] = useState<Set<number>>(() => new Set());
   const pending = useRef(""), alive = useRef(true), prompt = useRef<HTMLTextAreaElement>(null), promptComposing = useRef(false);
-  useEffect(() => { let active = true; void host.aiSettings().then(value => { if (active) setConfig(value); }).catch(error => { if (active) setError(error.message); }); return () => { active = false; }; }, [settingsRevision]);
+  useEffect(() => { let active = true; setConfigLoading(true); void host.aiSettings().then(value => { if (active) setConfig(value); }).catch(error => { if (active) setError(error.message); }).finally(() => { if (active) setConfigLoading(false); }); return () => { active = false; }; }, [settingsRevision]);
   useEffect(() => { alive.current = true; prompt.current?.focus({ preventScroll: true }); return () => { alive.current = false; const id = pending.current; pending.current = ""; if (id) void host.aiCancel(id).catch(() => {}); }; }, []);
   const changes = useMemo(() => result === null ? [] : rewriteChanges(selection.text, result), [selection.text, result]);
   const chosen = changes.length - rejected.size;
   const combined = useMemo(() => result === null ? "" : reviewedText(selection.text, changes, changes.map((_, index) => !rejected.has(index))), [selection.text, result, changes, rejected]);
   function blocked() { if (!composing() && !promptComposing.current) return false; notify("请先完成当前输入法组合输入。"); return true; }
   async function generate() {
-    if (busy || blocked() || !instruction.trim() || !current) return;
+    if (busy || configLoading || blocked() || !instruction.trim() || !current) return;
     if (!config?.baseUrl || !config.model) { settings(); return; }
     const id = crypto.randomUUID(); pending.current = id; setBusy(true); setError(""); setResult(null); setRejected(new Set());
     try { const response = await host.aiRewrite({ id, instruction, text: selection.text }); if (alive.current && pending.current === id) setResult(response.text); }
@@ -38,7 +39,7 @@ export function AIReviewPanel({ selection, documentName, current, composing, app
       <details className="ai-original"><summary>查看原始选区</summary><pre>{selection.text}</pre></details>
       <label className="ai-instruction">改写要求<textarea ref={prompt} aria-label="AI 改写要求" rows={3} maxLength={8000} value={instruction} onChange={event => setInstruction(event.target.value)} onCompositionStart={() => { promptComposing.current = true; }} onCompositionEnd={() => { promptComposing.current = false; }} onKeyDown={event => { if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !imeKey(event.nativeEvent)) { event.preventDefault(); void generate(); } }} /></label>
       <div className="ai-presets">{["更简洁，保留原意和数字", "润色，保持原有语气", "翻译成英文，保留 Markdown 格式"].map(value => <button key={value} disabled={busy} onClick={() => setInstruction(value)}>{value.startsWith("更") ? "更简洁" : value.startsWith("润") ? "润色" : "译为英文"}</button>)}</div>
-      <div className="ai-generate"><span className="dialog-note">{config?.model || "尚未配置模型"}</span>{busy ? <button onClick={cancel}>取消生成</button> : <button className="primary-button" disabled={!current || !instruction.trim()} onPointerDown={event => { if (composing() || promptComposing.current) event.preventDefault(); }} onClick={() => void generate()}>{config?.model ? result === null ? "生成改写" : "重新生成" : "配置模型…"}</button>}</div>
+      <div className="ai-generate"><span className="dialog-note">{configLoading ? "正在读取模型配置…" : config?.model || "尚未配置模型"}</span>{busy ? <button onClick={cancel}>取消生成</button> : <button className="primary-button" disabled={configLoading || !current || !instruction.trim()} onPointerDown={event => { if (composing() || promptComposing.current) event.preventDefault(); }} onClick={() => void generate()}>{configLoading ? "正在读取配置…" : config?.model ? result === null ? "生成改写" : "重新生成" : "配置模型…"}</button>}</div>
       {busy && <p role="status" className="ai-status">正在生成，你可以继续编辑；原文变化后需重新选择。</p>}
       {error && <p className="form-error" role="alert">{error}</p>}
       {result !== null && <section className="ai-diff" aria-label="改写差异">

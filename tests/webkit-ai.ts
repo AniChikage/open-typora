@@ -13,7 +13,7 @@ async function runWebKitAITests(endpoint:string) {
   const source=()=>[...document.querySelectorAll('.document-editor[data-active="true"] .source-surface .cm-line')].map(node=>node.textContent).join('\n');
   const assertSource=async(expected:string)=>{await mode(true);check(source()===expected,'native AI source bytes match the reviewed selection');await mode(false);};
   const apply=async()=>{await wait(()=>!!panel()?.querySelector('.ai-change'));const button=[...panel().querySelectorAll<HTMLButtonElement>('button')].find(button=>/^应用 \d+ 处修改$/.test(button.textContent||''))!;check(!!button&&!button.disabled,'native AI review has an enabled explicit Apply control');button.click();await wait(()=>!panel());};
-  const begin=async(text:string)=>{select(text);window.__openTypora.command({action:'ai-rewrite'});await wait(()=>!!panel());click(panel(),'生成改写');};
+  const begin=async(text:string)=>{select(text);window.__openTypora.command({action:'ai-rewrite'});await wait(()=>!!panel());await wait(()=>[...panel().querySelectorAll<HTMLButtonElement>('button')].some(button=>button.textContent==='生成改写'&&!button.disabled));click(panel(),'生成改写');};
   let original='';
   try{
     await wait(()=>!!root()?.querySelector('h1'));const restored=await desktop.restore();if(!restored.ok||!restored.value)throw Error('Missing native AI fixture');original=restored.value.documents[0].content;await desktop.persist({documents:restored.value.documents,activeId:restored.value.documents[0].id});
