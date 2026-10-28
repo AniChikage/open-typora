@@ -13,6 +13,7 @@ export function AIReviewPanel({ selection, documentName, current, composing, app
   const [instruction, setInstruction] = useState("改善表达，保持原意和 Markdown 格式。");
   const [configLoading, setConfigLoading] = useState(true);
   const [config, setConfig] = useState<AISettings | null>(null), [result, setResult] = useState<string | null>(null);
+  const [applied, setApplied] = useState(0);
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [rejected, setRejected] = useState<Set<number>>(() => new Set());
   const pending = useRef(""), alive = useRef(true), prompt = useRef<HTMLTextAreaElement>(null), promptComposing = useRef(false);
   useEffect(() => { let active = true; setConfigLoading(true); void host.aiSettings().then(value => { if (active) setConfig(value); }).catch(error => { if (active) setError(error.message); }).finally(() => { if (active) setConfigLoading(false); }); return () => { active = false; }; }, [settingsRevision]);
@@ -22,12 +23,17 @@ export function AIReviewPanel({ selection, documentName, current, composing, app
   const combined = useMemo(() => result === null ? "" : reviewedText(selection.text, changes, changes.map((_, index) => !rejected.has(index))), [selection.text, result, changes, rejected]);
   function blocked() { if (!composing() && !promptComposing.current) return false; notify("请先完成当前输入法组合输入。"); return true; }
   async function generate() {
-    if (busy || configLoading || blocked() || !instruction.trim() || !current) return;
+    if (busy || configLoading || blocked() || !instruction.trim() || !selection.text.trim() || !current) return;
     if (!config?.baseUrl || !config.model) { settings(); return; }
-    const id = crypto.randomUUID(); pending.current = id; setBusy(true); setError(""); setResult(null); setRejected(new Set());
+    const id = crypto.randomUUID(); pending.current = id; setBusy(true); setError(""); setApplied(0); setResult(null); setRejected(new Set());
     try { const response = await host.aiRewrite({ id, instruction, text: selection.text }); if (alive.current && pending.current === id) setResult(response.text); }
     catch (error) { if (alive.current && pending.current === id) setError((error as Error).message); }
     finally { if (alive.current && pending.current === id) { pending.current = ""; setBusy(false); } }
+  }
+  function accept() {
+    if (blocked() || !current || !chosen || result === null) return;
+    if (!apply(combined)) return;
+    setApplied(chosen); setResult(null); setRejected(new Set()); setError("");
   }
   function cancel() { const id = pending.current; pending.current = ""; setBusy(false); if (id) void host.aiCancel(id).catch(error => setError(error.message)); }
   return <aside className="ai-review-panel" aria-label="AI 改写选区">
@@ -36,10 +42,11 @@ export function AIReviewPanel({ selection, documentName, current, composing, app
       <p className="ai-target" title={documentName}>{documentName} · {selection.text.length.toLocaleString()} 字符</p>
       <p className="dialog-note">仅发送所选文字与改写要求。建议需经你审阅后才会写入文档。</p>
       {!current && <div className="ai-stale" role="status">原文或当前文档已变化，重新选择后再生成或应用。<button onPointerDown={event => event.preventDefault()} onClick={() => { if (!blocked()) recapture(); }}>读取当前选区</button></div>}
-      <details className="ai-original"><summary>查看原始选区</summary><pre>{selection.text}</pre></details>
+      {applied > 0 && current && <div className="ai-applied" role="status"><strong>已应用 {applied} 处修改</strong><p>{selection.text.trim() ? "可调整要求继续改写，也可读取其他选区。" : "选区已清空，请选择其他文字后读取当前选区。"}</p><button onPointerDown={event => event.preventDefault()} onClick={() => { if (!blocked()) recapture(); }}>读取当前选区</button></div>}
+      <details className="ai-original"><summary>{applied ? "查看当前选区" : "查看原始选区"}</summary><pre>{selection.text}</pre></details>
       <label className="ai-instruction">改写要求<textarea ref={prompt} aria-label="AI 改写要求" rows={3} maxLength={8000} value={instruction} onChange={event => setInstruction(event.target.value)} onCompositionStart={() => { promptComposing.current = true; }} onCompositionEnd={() => { promptComposing.current = false; }} onKeyDown={event => { if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !imeKey(event.nativeEvent)) { event.preventDefault(); void generate(); } }} /></label>
       <div className="ai-presets">{["更简洁，保留原意和数字", "润色，保持原有语气", "翻译成英文，保留 Markdown 格式"].map(value => <button key={value} disabled={busy} onClick={() => setInstruction(value)}>{value.startsWith("更") ? "更简洁" : value.startsWith("润") ? "润色" : "译为英文"}</button>)}</div>
-      <div className="ai-generate"><span className="dialog-note">{configLoading ? "正在读取模型配置…" : config?.model || "尚未配置模型"}</span>{busy ? <button onClick={cancel}>取消生成</button> : <button className="primary-button" disabled={configLoading || !current || !instruction.trim()} onPointerDown={event => { if (composing() || promptComposing.current) event.preventDefault(); }} onClick={() => void generate()}>{configLoading ? "正在读取配置…" : config?.model ? result === null ? "生成改写" : "重新生成" : "配置模型…"}</button>}</div>
+      <div className="ai-generate"><span className="dialog-note">{configLoading ? "正在读取模型配置…" : config?.model || "尚未配置模型"}</span>{busy ? <button onClick={cancel}>取消生成</button> : <button className="primary-button" disabled={configLoading || !current || !selection.text.trim() || !instruction.trim()} onPointerDown={event => { if (composing() || promptComposing.current) event.preventDefault(); }} onClick={() => void generate()}>{configLoading ? "正在读取配置…" : config?.model ? result === null ? applied ? "继续改写" : "生成改写" : "重新生成" : "配置模型…"}</button>}</div>
       {busy && <p role="status" className="ai-status">正在生成，你可以继续编辑；原文变化后需重新选择。</p>}
       {error && <p className="form-error" role="alert">{error}</p>}
       {result !== null && <section className="ai-diff" aria-label="改写差异">
@@ -51,6 +58,6 @@ export function AIReviewPanel({ selection, documentName, current, composing, app
         </div>)}
       </section>}
     </div>
-    {result !== null && <div className="ai-panel-footer"><button onClick={() => void host.writeClipboard(combined).then(() => notify("已复制审阅后的选区。")).catch(error => setError(error.message))}>复制结果</button><button className="primary-button" disabled={!current || !chosen} onPointerDown={event => { event.preventDefault(); }} onClick={() => { if (!blocked() && apply(combined)) close(); }}>应用 {chosen} 处修改</button></div>}
+    {result !== null && <div className="ai-panel-footer"><button onClick={() => void host.writeClipboard(combined).then(() => notify("已复制审阅后的选区。")).catch(error => setError(error.message))}>复制结果</button><button className="primary-button" disabled={!current || !chosen} onPointerDown={event => { event.preventDefault(); }} onClick={accept}>应用 {chosen} 处修改</button></div>}
   </aside>;
 }

@@ -27,7 +27,7 @@ Other proprietary API formats are not supported unless the service offers an Ope
 2. Click the sparkle button or use **⌘⇧R** on macOS / **Ctrl+Shift+R** on Windows and Linux.
 3. Describe the edit, or choose a concise/rewrite/English preset. Click **生成改写**.
 4. Review each original/suggested change. Uncheck any change you want to keep, or keep the entire original. Generation does not modify or save the document.
-5. Click **应用 … 处修改** to apply the reviewed selection as one isolated undoable edit. Undo restores the exact original; redo restores the approved result. Closing the panel discards the proposal.
+5. Click **应用 … 处修改** to apply the reviewed selection as one isolated undoable edit. Undo restores the exact original; redo restores the approved result. The panel stays open, clears the consumed differences and retains your instruction. Use **继续改写** to edit the approved text again, or select other text and click **读取当前选区**. Each application has its own undo step; closing the panel discards only an unapplied proposal.
 
 Only the selected text, your instruction and the editor's fixed preservation instruction are sent. The rest of the document, file path, other tabs and nearby paragraphs are not added automatically. A narrow selection therefore gives the model less context. Review names, numbers, facts, code, links and Markdown syntax before applying; preservation instructions are not a guarantee of model accuracy.
 

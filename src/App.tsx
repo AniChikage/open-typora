@@ -441,7 +441,12 @@ export default function App() {
             {aiSelection && <AIReviewPanel key={aiSelection.id} selection={aiSelection.selection} documentName={session.documents.find(document => document.id === aiSelection.selection.documentId)?.name || "已关闭文档"}
               current={!!editor()?.rewriteCurrent(aiSelection.selection)} composing={composing} settingsRevision={aiSettingsRevision}
               settings={() => setDialog("ai-settings")} recapture={startRewrite} close={() => setAISelection(null)} notify={session.setMessage}
-              apply={text => { const target = editor(); if (!target) return false; return target.applyRewrite(aiSelection.selection, text); }} />}
+              apply={text => {
+                const target = editor(); if (!target || !target.applyRewrite(aiSelection.selection, text)) return false;
+                const selection = { ...aiSelection.selection, source: target.markdown(), to: aiSelection.selection.from + text.length, text };
+                setAISelection(previous => previous?.id === aiSelection.id ? { ...previous, selection } : previous);
+                return true;
+              }} />}
             </div>
             <article
               className="print-document"

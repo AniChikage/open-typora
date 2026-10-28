@@ -1,6 +1,6 @@
 # Typora 功能对齐清单
 
-当前交付版本：**0.20.0，macOS arm64 / Windows x64 / Linux x64**。基准为本机 Typora 1.14.10 的菜单、实际交互和官方公开文档。功能存在、自动化通过与完整等价是不同结论；未验证的组合不写成已对齐。当前发布及 GitHub 问题回归范围见[版本化验收记录](verification.md)。
+当前交付版本：**0.20.1，macOS arm64 / Windows x64 / Linux x64**。基准为本机 Typora 1.14.10 的菜单、实际交互和官方公开文档。功能存在、自动化通过与完整等价是不同结论；未验证的组合不写成已对齐。当前发布及 GitHub 问题回归范围见[版本化验收记录](verification.md)。
 
 公开依据：[Markdown](https://support.typora.io/Markdown-Reference/)、[文件管理](https://support.typora.io/File-Management/)、[图片](https://support.typora.io/Images/)、[导出](https://support.typora.io/Export/)、[HTML](https://support.typora.io/HTML/)、[快捷键](https://support.typora.io/Shortcut-Keys/)。REA 的静态证据及覆盖边界见 [research.md](research.md)。
 
@@ -42,7 +42,7 @@
 | 安装更新与旧版本清理 | 已实现并回归 | M 图标保留；验证新包后替换安装版并删除临时回滚包；只保留当前版本归档。用户文档/草稿不属于版本清理对象 |
 | Windows、其他平台与签名 | 部分交付 | Windows x64 提供 NSIS EXE / ZIP，安装验收覆盖编辑、保存、PDF、图片、恢复、单实例与文件关联；Windows 实体候选交互未人工验收。Linux x64 提供 DEB / AppImage，验证安装/卸载、恢复数据、编辑、PDF、插件、背景和第二实例；0.17.4 增加 Ubuntu 22.04 / 24.04 完整 VM 的真实 FUSE 挂载、普通用户启动、沙箱状态、保存/撤销及退出卸载，24.04 使用应用级 userns 规则且保留全局限制，详见 [AppImage 指南](linux-appimage.md)。不同桌面环境未穷尽。Windows/Linux ARM / Intel Mac 未交付；Windows 无代码签名证书，macOS 未公证 |
 
-剩余项为其他输入法及列表/表格/局部代码的完整候选组合、未覆盖的跨应用剪贴板/复杂跨块编辑、第三方主题与图形扩展，以及 Windows 实体输入法，Intel Mac / ARM 等其他平台发布。复杂转换覆盖已列样本和目标格式，无法代表任意格式无损往返。**0.20.0 仍不能标为 Typora 全功能完全等价**；外部图床真实上传仍需独立配置与验收。
+剩余项为其他输入法及列表/表格/局部代码的完整候选组合、未覆盖的跨应用剪贴板/复杂跨块编辑、第三方主题与图形扩展，以及 Windows 实体输入法，Intel Mac / ARM 等其他平台发布。复杂转换覆盖已列样本和目标格式，无法代表任意格式无损往返。**0.20.1 仍不能标为 Typora 全功能完全等价**；外部图床真实上传仍需独立配置与验收。
 
 ## 版本记录
 
@@ -76,3 +76,7 @@
 ## 可选 AI 扩展（0.20.0）
 
 这是本项目新增的选区工作流，不据此宣称 Typora 官方支持同样接口。支持自带 OpenAI 兼容服务与 Ollama、逐项差异审阅、一次撤销／重做；生成不自动写入，原文变化、切换目标文档、只读和组合输入期间均有保护。第三方服务的生成质量与实体输入法验收必须和协议夹具区分，详见 [AI 指南](ai.zh-CN.md)。
+
+## 0.20.1 连续 AI 改写
+
+采纳后侧栏保持打开，显示已应用状态，保留要求并清除已消耗的差异。下一轮使用采纳后的选区书签，也可读取其他选区；两次采纳可分别撤销和重做。原文变化、只读、分屏及输入法组合期间的保护继续生效。
