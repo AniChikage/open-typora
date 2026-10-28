@@ -10,6 +10,8 @@
 
 三平台安装版回归与 Ubuntu 24.04 的真实 FUSE 挂载检查均已通过，含 Windows 的 Everything 预览组件。对应构建为 [Desktop release #124](https://github.com/AniChikage/open-typora/actions/runs/40634956286)，代码提交 46de283。最终公开安装包发布与本机覆盖安装将继续独立核对。
 
+0.20.0 已公开发布，正式标签构建的 macOS、Windows、Linux、Windows 预览和真实 FUSE 检查全部通过，七个公开下载文件已按 SHA-256 校验。代码与文档已同步主分支。Mac 当前锁屏，无法正常退出仍运行的 0.19.0，因此本机覆盖安装和更新后的钥匙串授权复核尚未完成；文档、设置及当前应用未被安装脚本替换。旧公开下载包与已退出的预览应用已清理。 [正式发布构建](https://github.com/AniChikage/open-typora/actions/runs/40636548271)。
+
 # 0.13.4 Kubuntu 26.04 回归验收
 
 2026-10-22，在完整的 Kubuntu 26.04 x86-64 虚拟机桌面中，检查 [Issue #1](https://github.com/AniChikage/open-typora/issues/1) 的两项修复。环境为 KDE Plasma 6.6.4、Wayland、英文 US 键盘布局，使用公开发布的 `Open-Typora-0.13.4-linux-x64.deb` 安装版；安装包 SHA-256 与发布的校验文件一致。
