@@ -4,21 +4,22 @@ import type { AIConfig, AISettings, AISettingsUpdate, AIRewriteRequest } from ".
 import { aiDefaults, aiConfig, aiEndpoint, aiRequest, aiBody, aiResponse, aiHttpError, aiResponseLimit } from "../shared/ai.mjs";
 import { atomicWrite } from "./store.mjs";
 interface Protector { available(): boolean; encrypt(text: string): Buffer; decrypt(bytes: Buffer): string }
-interface Stored extends AIConfig { version: 1; keyCipher?: string }
+interface Stored extends AIConfig { version: 1 | 2; keyCipher?: string; apiKey?: string }
 export class AIService {
   private memoryKey: { endpoint: string; key: string } | null = null;
   private requests = new Map<string, AbortController>();
   private cancelled = new Set<string>();
   private directory: string;
   private protector: Protector;
-  constructor(directory: string, protector: Protector) { this.directory = directory; this.protector = protector; }
+  private storage: "file" | "system";
+  constructor(directory: string, protector: Protector, storage: "file" | "system" = "system") { this.directory = directory; this.protector = protector; this.storage = storage; }
   private get file() { return path.join(this.directory, "ai-settings.json"); }
   private async read(): Promise<Stored | null> {
     try {
       const value: unknown = JSON.parse(await readFile(this.file, "utf8"));
       const config = aiConfig(value), record = value as Record<string, unknown>;
-      if (record.version !== 1 || record.keyCipher !== undefined && (typeof record.keyCipher !== "string" || record.keyCipher.length > 65536)) throw new Error("invalid");
-      return { ...config, version: 1, keyCipher: record.keyCipher as string | undefined };
+      if (record.version !== 1 && record.version !== 2 || record.keyCipher !== undefined && (typeof record.keyCipher !== "string" || record.keyCipher.length > 65536) || record.apiKey !== undefined && (typeof record.apiKey !== "string" || record.apiKey.length > 16000 || /[\r\n]/.test(record.apiKey))) throw new Error("invalid");
+      return { ...config, version: record.version as 1 | 2, keyCipher: record.keyCipher as string | undefined, apiKey: record.apiKey as string | undefined };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
       throw new Error("模型配置无法读取；原文件已保留，请检查本机配置文件。");
@@ -26,6 +27,7 @@ export class AIService {
   }
   private secret(record: Stored) {
     const endpoint = aiEndpoint(record);
+    if (record.apiKey) return record.apiKey;
     if (this.memoryKey?.endpoint === endpoint) return this.memoryKey.key;
     if (!record.keyCipher) return "";
     if (!this.protector.available()) throw new Error("系统密钥存储暂不可用。请重新填写密钥并选择仅本次会话使用。");
@@ -39,18 +41,22 @@ export class AIService {
       const config = aiConfig(update);
       if (update.apiKey !== undefined && (typeof update.apiKey !== "string" || update.apiKey.length > 16000 || /[\r\n]/.test(update.apiKey))) throw new Error("API 密钥格式无效。");
       const endpoint = aiEndpoint(config);
+      if (this.storage === "file" && record?.keyCipher && !record.apiKey && aiEndpoint(record) === endpoint && !update.apiKey && !update.clearKey && update.migrateLegacyKey !== true) throw new Error("请先迁移旧密钥或重新填写。保存完成后将使用本机配置文件。");
       const key = update.clearKey ? "" : update.apiKey || (record && aiEndpoint(record) === endpoint ? this.secret(record) : "");
-      const next: Stored = { ...config, version: 1 };
+      const next: Stored = { ...config, version: this.storage === "file" ? 2 : 1 };
       if (key && update.rememberKey) {
-        if (!this.protector.available()) throw new Error("本机没有安全密钥存储，请取消记住密钥，仅在本次会话使用。");
-        next.keyCipher = this.protector.encrypt(key).toString("base64");
+        if (this.storage === "file") next.apiKey = key;
+        else {
+          if (!this.protector.available()) throw new Error("本机没有安全密钥存储，请取消记住密钥，仅在本次会话使用。");
+          next.keyCipher = this.protector.encrypt(key).toString("base64");
+        }
       }
-      await atomicWrite(this.file, JSON.stringify(next));
-      this.memoryKey = key ? { endpoint, key } : null;
+      await atomicWrite(this.file, JSON.stringify(next), undefined, this.storage === "file" ? 0o600 : undefined);
+      this.memoryKey = key && (this.storage !== "file" || !update.rememberKey) ? { endpoint, key } : null;
       record = next;
     }
     const endpoint = record ? aiEndpoint(record) : "";
-    return { protocol: record?.protocol || aiDefaults.protocol, baseUrl: record?.baseUrl || "", model: record?.model || "", hasKey: !!record?.keyCipher || !!(this.memoryKey?.endpoint === endpoint && this.memoryKey.key), keyStorage: record?.keyCipher ? "system" : this.memoryKey?.endpoint === endpoint ? "session" : "none", secureStorage: this.protector.available() };
+    return { protocol: record?.protocol || aiDefaults.protocol, baseUrl: record?.baseUrl || "", model: record?.model || "", hasKey: !!record?.apiKey || !!record?.keyCipher || !!(this.memoryKey?.endpoint === endpoint && this.memoryKey.key), keyStorage: record?.apiKey ? "file" : record?.keyCipher ? "system" : this.memoryKey?.endpoint === endpoint ? "session" : "none", secureStorage: this.storage === "system" && this.protector.available(), persistentStorage: this.storage, needsKeyMigration: this.storage === "file" && !!record?.keyCipher && !record.apiKey };
   }
   cancel(id: string) {
     if (typeof id !== "string" || !/^[a-zA-Z0-9-]{1,100}$/.test(id)) return;
@@ -63,6 +69,7 @@ export class AIService {
     if (this.cancelled.delete(request.id)) throw new Error("已取消改写。");
     if (!config) throw new Error("请先配置模型服务。");
     if (this.requests.has(request.id) || this.requests.size >= 4) throw new Error("已有模型请求正在处理，请取消或等待完成。");
+    if (this.storage === "file" && config.keyCipher && !config.apiKey) throw new Error("请在模型设置中迁移旧密钥或重新填写一次；之后将使用本机配置文件。");
     const key = this.secret(config), controller = new AbortController();
     this.requests.set(request.id, controller);
     const timer = setTimeout(() => controller.abort("模型响应超时，请稍后重试。"), 180_000);

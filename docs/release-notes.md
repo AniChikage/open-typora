@@ -1,20 +1,21 @@
-Open Typora 0.20.1 keeps AI review open after applying a rewrite.
+Open Typora 0.20.2 stores remembered macOS model keys in a local configuration file.
 
 This is an independent, unofficial project, unaffiliated with Typora. If you can afford it, please [buy Typora](https://store.typora.io/) and support its official developers.
 
 ## Downloads
 
-- macOS 14+, Apple Silicon: `Open-Typora-0.20.1-arm64.dmg` or ZIP.
-- Windows 10/11 x64: `Open-Typora-0.20.1-windows-x64-Setup.exe` or ZIP.
-- Linux x64: `Open-Typora-0.20.1-linux-x64.deb` or AppImage.
+- macOS 14+, Apple Silicon: `Open-Typora-0.20.2-arm64.dmg` or ZIP.
+- Windows 10/11 x64: `Open-Typora-0.20.2-windows-x64-Setup.exe` or ZIP.
+- Linux x64: `Open-Typora-0.20.2-linux-x64.deb` or AppImage.
 
 SHA-256 checksums are included. macOS is locally signed, not notarized; Windows is unsigned. Updates preserve documents, preferences and recovery data.
 
 ## Changes
 
-- Applying an AI suggestion keeps the panel open, confirms the applied changes and retains your rewrite instruction. Consumed differences disappear so they cannot be applied twice.
-- Continue rewriting the approved text, or select a different passage and read the current selection. The next request uses the updated source bookmark; generating still does not modify a document.
-- Each application is a separate undoable edit. Undoing or changing the target text disables stale continuation; read-only, split-pane and IME composition guards remain in place.
-- Adds a two-round desktop regression with exact save bytes, partial approval, independent undo/redo and stale-result protection. Native WebKit acceptance also checks the retained panel and refreshed target.
+- macOS remembered keys use plaintext `ai-settings.json` with owner-only read/write permissions (`0600`), rather than Keychain. Normal settings, rewrites and restarts use the file. The settings screen explains the storage mode; saved keys remain hidden from the renderer.
+- Legacy macOS keys first attempt a noninteractive import. If authorization is required, explicitly migrate the old key once or re-enter it. After migration the app stops querying Keychain.
+- Session-only mode removes the persisted key. Clearing a key and changing the endpoint retain their existing behavior; manual configuration edits take effect without a stale persisted-key cache.
+- The Mac Electron development host uses the same file policy. Windows/Linux retain system-backed encryption.
+- Adds restart, permission, migration, session, endpoint and bridge-metadata regressions. Existing selection rewriting, retained review, IME guards and undo/redo acceptance continue to run.
 
-AI remains optional and uses your own compatible API or local model server. See the [English guide](https://github.com/AniChikage/open-typora/blob/main/docs/ai.md) or [中文指南](https://github.com/AniChikage/open-typora/blob/main/docs/ai.zh-CN.md) for setup, data scope and limits. Model output needs human review; this release does not claim complete Typora feature parity.
+See the [English AI guide](https://github.com/AniChikage/open-typora/blob/main/docs/ai.md) or [中文指南](https://github.com/AniChikage/open-typora/blob/main/docs/ai.zh-CN.md). Do not commit or share a configuration file containing your key. This release does not claim complete Typora feature parity.

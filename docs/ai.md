@@ -37,9 +37,9 @@ AI capture, apply and keyboard submission are guarded during IME composition. Th
 
 ## Credentials and data
 
-- macOS stores remembered keys in the system Keychain. Windows/Linux use Electron's system-backed encryption; insecure Linux `basic_text` storage is refused.
-- If secure storage is unavailable, uncheck **使用系统安全存储记住密钥** to use a key only until the app exits. Session keys are not written to disk. Local servers without authentication need no key.
-- A locally signed macOS update can require renewed Keychain authorization. If access is refused, approve the app in the system prompt or re-enter the key in model settings; never put a key in chat or a bug report. See [Apple's Keychain access help](https://support.apple.com/guide/keychain-access/kyca1243/mac).
+- Starting with 0.20.2, the macOS app stores remembered keys in plaintext in `~/Library/Application Support/Open Typora/ai-settings.json`, with file permissions `0600` (read/write for the current user only). Regular settings and rewrite requests read that file, without Keychain access. Do not commit or share the configuration file. Windows/Linux retain Electron's system-backed encryption; insecure Linux `basic_text` storage is refused.
+- Uncheck **保存密钥到本机配置文件** on macOS, or **使用系统安全存储记住密钥** on Windows/Linux, to keep a key only until the app exits. Session keys are not written to disk. Local servers without authentication need no key.
+- For a macOS configuration from 0.20.1 or earlier, the app first attempts a noninteractive import of its own legacy Keychain entry. If access needs approval, settings offers **迁移旧密钥到配置文件**, or you can re-enter the key. This explicit migration may need one final system authorization; after migration, settings and rewrites no longer query Keychain. The old entry is not used again. Never put a key in chat or an issue.
 - Settings return only key-presence/storage flags to the interface. The password field is cleared after saving. Reopening settings does not reveal a saved key. Changing the service endpoint does not reuse its previous key.
 - Base URLs cannot contain passwords, query strings or fragments. HTTP redirects are refused so a model key and selected text are not forwarded to another endpoint by a redirect.
 - Selected text is sent to the service you configure. Use your own public test text when checking a free provider's behavior. A local server keeps the request local only if its own configuration does so.
@@ -58,7 +58,7 @@ Truncated responses and empty results cannot be applied. Authentication, endpoin
 | --- | --- |
 | Connection test fails | Match the interface and URL to your service, use its exact model ID, and check the key and provider quota. A valid configuration stays saved even when the test request fails. |
 | Local server cannot be reached | Start LM Studio or Ollama separately, load a model and verify the host and port. Open Typora does not install or start a local model server. |
-| A saved key is unavailable after a macOS update | Allow Keychain access for the installed app, or re-enter the key in model settings. Do not include it in an issue. |
+| An old macOS key still needs migration | In model settings, choose **迁移旧密钥到配置文件**, or re-enter the key once and save. Subsequent launches use the file. Do not include the key or configuration file in an issue. |
 | Apply is disabled | Finish any IME candidate input, leave read-only mode, and return to the unchanged original document and pane. If the text changed, select it again and generate a new proposal. |
 | Empty, truncated or oversized output | Narrow the selection or requested change and check the model's context/output limits. The rejected result has not changed your document. |
 

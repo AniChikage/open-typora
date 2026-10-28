@@ -10,6 +10,7 @@ const server = createServer(async (request, response) => {
   try {
     let data = ""; for await (const chunk of request) data += chunk;
     const body = JSON.parse(data);
+    if (request.headers.authorization) assert.equal(request.headers.authorization, "Bearer owned-native-fixture-not-a-real-key" + (body.model === "edited-credential" ? "-edited" : ""));
     assert.equal(body.stream, false); assert.equal(body.messages.length, 2);
     const selection = JSON.parse(body.messages[1].content); assert.equal(typeof selection.selection, "string"); assert.equal(typeof selection.instruction, "string");
     calls.push({ url: request.url || "", authorized: !!request.headers.authorization, format: request.url === "/api/chat" ? "ollama" : "compatible" });

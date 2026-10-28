@@ -80,65 +80,94 @@ private final class AIHTTPExchange: NSObject, URLSessionDataDelegate, @unchecked
     else { done?(.failure(aiFailure("模型服务没有返回有效响应。"))) }
   }
 }
+private struct StoredAIConfiguration {
+  let config: AIConfiguration, secret: String
+  let needsMigration: Bool
+}
 final class NativeAIService {
   let directory: URL
   private let state = NSLock()
   private var cancelled = [String]()
   private var memoryKeys = [String: String](), requests = [String: AIHTTPExchange]()
-  init(_ directory: URL) { self.directory = directory }
+  private var legacyAttempted = Set<String>()
+  private let legacyReader: (String, Bool) throws -> String?
+  init(_ directory: URL, legacyReader: ((String, Bool) throws -> String?)? = nil) {
+    self.directory = directory
+    self.legacyReader = legacyReader ?? { try NativeAIService.readLegacyKey($0, interactive: $1) }
+  }
   private func locked<T>(_ work: () throws -> T) rethrows -> T { state.lock(); defer { state.unlock() }; return try work() }
-  private func read() throws -> AIConfiguration? {
-    let file = directory.appendingPathComponent("ai-settings.json")
-    if !FileManager.default.fileExists(atPath: file.path) { return nil }
-    do { guard let value = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any], value["version"] as? Int == 1 else { throw aiFailure("invalid") }; return try AIConfiguration(value) }
-    catch { throw aiFailure("模型配置无法读取；原文件已保留，请检查本机配置文件。") }
-  }
   private func account(_ config: AIConfiguration) -> String { SHA256.hash(data: Data((directory.standardizedFileURL.path + "\n" + config.format + "\n" + config.endpoint.absoluteString).utf8)).map { String(format: "%02x", $0) }.joined() }
-  private func query(_ account: String) -> [String: Any] { [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: aiKeyService, kSecAttrAccount as String: account] }
-  private func keyExists(_ account: String) -> Bool {
-    var request = query(account); request[kSecReturnAttributes as String] = true; request[kSecMatchLimit as String] = kSecMatchLimitOne; let context = LAContext(); context.interactionNotAllowed = true; request[kSecUseAuthenticationContext as String] = context
-    let status = SecItemCopyMatching(request as CFDictionary, nil)
-    return status == errSecSuccess || status == errSecInteractionNotAllowed
-  }
-  private func key(_ account: String) throws -> String {
-    if let value = memoryKeys[account] { return value }
-    var request = query(account); request[kSecReturnData as String] = true; request[kSecMatchLimit as String] = kSecMatchLimitOne
+  private static func readLegacyKey(_ account: String, interactive: Bool) throws -> String? {
+    var query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: aiKeyService, kSecAttrAccount as String: account, kSecReturnData as String: true, kSecMatchLimit as String: kSecMatchLimitOne]
+    if !interactive {
+      let context = LAContext(); context.interactionNotAllowed = true
+      query[kSecUseAuthenticationContext as String] = context
+      query[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
+    }
     var value: CFTypeRef?
-    let status = SecItemCopyMatching(request as CFDictionary, &value)
-    if status == errSecItemNotFound { return "" }
-    guard status == errSecSuccess, let data = value as? Data, let text = String(data: data, encoding: .utf8) else { throw aiFailure("无法读取系统钥匙串中的模型密钥，请解锁钥匙串或重新填写密钥。") }
+    let status = SecItemCopyMatching(query as CFDictionary, &value)
+    if status == errSecItemNotFound { return nil }
+    guard status == errSecSuccess, let data = value as? Data, let text = String(data: data, encoding: .utf8) else { throw aiFailure("旧密钥需要系统授权。请点击迁移旧密钥，或重新填写；迁移后不再访问钥匙串。") }
     return text
   }
-  private func saveKey(_ account: String, _ value: String) throws {
-    if value.isEmpty {
-      let status = SecItemDelete(query(account) as CFDictionary)
-      guard status == errSecSuccess || status == errSecItemNotFound else { throw aiFailure("无法移除系统钥匙串中的模型密钥。") }; return
-    }
-    let data = Data(value.utf8), status = SecItemUpdate(query(account) as CFDictionary, [kSecValueData as String: data] as CFDictionary)
-    if status == errSecItemNotFound {
-      var add = query(account); add[kSecValueData as String] = data
-      guard SecItemAdd(add as CFDictionary, nil) == errSecSuccess else { throw aiFailure("系统钥匙串不可用，请取消记住密钥，仅在本次会话使用。") }
-    } else if status != errSecSuccess { throw aiFailure("系统钥匙串不可用，请取消记住密钥，仅在本次会话使用。") }
+  private func validKey(_ secret: String) throws -> String {
+    guard secret.utf16.count <= 16000, !secret.contains("\n"), !secret.contains("\r") else { throw aiFailure("API 密钥格式无效。") }
+    return secret
   }
+  private func write(_ config: AIConfiguration, secret: String) throws {
+    var value = config.json; value["version"] = 2
+    if !secret.isEmpty { value["apiKey"] = try validKey(secret) }
+    try atomicWrite(directory.appendingPathComponent("ai-settings.json"), JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]), permissions: 0o600)
+  }
+  private func read() throws -> StoredAIConfiguration? {
+    let file = directory.appendingPathComponent("ai-settings.json")
+    if !FileManager.default.fileExists(atPath: file.path) { return nil }
+    let value: [String: Any], config: AIConfiguration, version: Int
+    do {
+      guard let decoded = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any], let number = decoded["version"] as? Int, [1, 2].contains(number), decoded["apiKey"] == nil || decoded["apiKey"] is String else { throw aiFailure("invalid") }
+      value = decoded; version = number; config = try AIConfiguration(decoded)
+    } catch { throw aiFailure("模型配置无法读取；原文件已保留，请检查本机配置文件。") }
+    let stored = try validKey(value["apiKey"] as? String ?? "")
+    if version == 2 { return StoredAIConfiguration(config: config, secret: stored, needsMigration: false) }
+    if !stored.isEmpty { try write(config, secret: stored); return StoredAIConfiguration(config: config, secret: stored, needsMigration: false) }
+    let id = account(config)
+    if !legacyAttempted.contains(id) {
+      legacyAttempted.insert(id)
+      let legacy = Result { try legacyReader(id, false) }
+      if case .success(let secret) = legacy {
+        let secret = try validKey(secret ?? "")
+        try write(config, secret: secret)
+        return StoredAIConfiguration(config: config, secret: secret, needsMigration: false)
+      }
+    }
+    return StoredAIConfiguration(config: config, secret: "", needsMigration: true)
+  }
+  private func key(_ record: StoredAIConfiguration) -> String { record.secret.isEmpty ? memoryKeys[account(record.config)] ?? "" : record.secret }
   func settings(_ update: [String: Any]? = nil) throws -> [String: Any] {
     try locked {
       var current = try read()
       if let update {
-        let next = try AIConfiguration(update), nextAccount = account(next), oldAccount = current.map(account)
+        let next = try AIConfiguration(update), nextAccount = account(next), oldAccount = current.map { account($0.config) }
         guard let remember = update["rememberKey"] as? Bool else { throw aiFailure("密钥保存设置无效。") }
-        let entered = update["apiKey"] as? String ?? ""
-        guard entered.utf16.count <= 16000, !entered.contains("\n"), !entered.contains("\r") else { throw aiFailure("API 密钥格式无效。") }
-        let secret = update["clearKey"] as? Bool == true ? "" : !entered.isEmpty ? entered : oldAccount == nextAccount ? try key(nextAccount) : ""
-        if remember { try saveKey(nextAccount, secret) }
-        try atomicWrite(directory.appendingPathComponent("ai-settings.json"), JSONSerialization.data(withJSONObject: next.json, options: [.sortedKeys]))
-        if !remember { try saveKey(nextAccount, "") }
-        memoryKeys[nextAccount] = secret.isEmpty ? nil : secret
-        if let oldAccount, oldAccount != nextAccount { try? saveKey(oldAccount, ""); memoryKeys.removeValue(forKey: oldAccount) }
-        current = next
+        let entered = try validKey(update["apiKey"] as? String ?? ""), secret: String
+        if update["clearKey"] as? Bool == true { secret = "" }
+        else if !entered.isEmpty { secret = entered }
+        else if let old = current, oldAccount == nextAccount {
+          if old.needsMigration {
+            guard update["migrateLegacyKey"] as? Bool == true else { throw aiFailure("请先迁移旧密钥或重新填写。保存完成后将使用本机配置文件。") }
+            secret = try validKey(legacyReader(nextAccount, true) ?? "")
+          } else { secret = key(old) }
+        } else { secret = "" }
+        try write(next, secret: remember ? secret : "")
+        memoryKeys[nextAccount] = remember || secret.isEmpty ? nil : secret
+        if let oldAccount, oldAccount != nextAccount { memoryKeys.removeValue(forKey: oldAccount) }
+        current = StoredAIConfiguration(config: next, secret: remember ? secret : "", needsMigration: false)
       }
-      var value = current?.json ?? ["protocol": "openai", "baseUrl": "", "model": ""]
-      let id = current.map(account), saved = id.map(keyExists) ?? false, transient = id.flatMap { memoryKeys[$0] }?.isEmpty == false
-      value["hasKey"] = saved || transient; value["keyStorage"] = saved ? "system" : transient ? "session" : "none"; value["secureStorage"] = true
+      var value = current?.config.json ?? ["protocol": "openai", "baseUrl": "", "model": ""]
+      let saved = current?.secret.isEmpty == false, transient = current.map { !key($0).isEmpty } ?? false, legacy = current?.needsMigration ?? false
+      value["hasKey"] = saved || transient || legacy
+      value["keyStorage"] = saved ? "file" : transient ? "session" : legacy ? "system" : "none"
+      value["secureStorage"] = false; value["persistentStorage"] = "file"; value["needsKeyMigration"] = legacy
       return value
     }
   }
@@ -159,8 +188,9 @@ final class NativeAIService {
     let (config, secret): (AIConfiguration, String) = try locked {
       if let index = cancelled.firstIndex(of: id) { cancelled.remove(at: index); throw aiFailure("已取消改写。") }
       guard requests[id] == nil, requests.count < 4 else { throw aiFailure("已有模型请求正在处理，请取消或等待完成。") }
-      guard let config = try read() else { throw aiFailure("请先配置模型服务。") }
-      let secret = try key(account(config)); requests[id] = exchange; return (config, secret)
+      guard let record = try read() else { throw aiFailure("请先配置模型服务。") }
+      guard !record.needsMigration else { throw aiFailure("请在模型设置中迁移旧密钥或重新填写一次；之后将使用本机配置文件。") }
+      let secret = key(record); requests[id] = exchange; return (record.config, secret)
     }
     defer { locked { _ = requests.removeValue(forKey: id) } }
     let selected = String(data: try JSONSerialization.data(withJSONObject: ["instruction": instruction.trimmingCharacters(in: .whitespacesAndNewlines), "selection": text]), encoding: .utf8)!

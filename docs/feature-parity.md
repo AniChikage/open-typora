@@ -1,6 +1,6 @@
 # Typora 功能对齐清单
 
-当前交付版本：**0.20.1，macOS arm64 / Windows x64 / Linux x64**。基准为本机 Typora 1.14.10 的菜单、实际交互和官方公开文档。功能存在、自动化通过与完整等价是不同结论；未验证的组合不写成已对齐。当前发布及 GitHub 问题回归范围见[版本化验收记录](verification.md)。
+当前交付版本：**0.20.2，macOS arm64 / Windows x64 / Linux x64**。基准为本机 Typora 1.14.10 的菜单、实际交互和官方公开文档。功能存在、自动化通过与完整等价是不同结论；未验证的组合不写成已对齐。当前发布及 GitHub 问题回归范围见[版本化验收记录](verification.md)。
 
 公开依据：[Markdown](https://support.typora.io/Markdown-Reference/)、[文件管理](https://support.typora.io/File-Management/)、[图片](https://support.typora.io/Images/)、[导出](https://support.typora.io/Export/)、[HTML](https://support.typora.io/HTML/)、[快捷键](https://support.typora.io/Shortcut-Keys/)。REA 的静态证据及覆盖边界见 [research.md](research.md)。
 
@@ -42,13 +42,13 @@
 | 安装更新与旧版本清理 | 已实现并回归 | M 图标保留；验证新包后替换安装版并删除临时回滚包；只保留当前版本归档。用户文档/草稿不属于版本清理对象 |
 | Windows、其他平台与签名 | 部分交付 | Windows x64 提供 NSIS EXE / ZIP，安装验收覆盖编辑、保存、PDF、图片、恢复、单实例与文件关联；Windows 实体候选交互未人工验收。Linux x64 提供 DEB / AppImage，验证安装/卸载、恢复数据、编辑、PDF、插件、背景和第二实例；0.17.4 增加 Ubuntu 22.04 / 24.04 完整 VM 的真实 FUSE 挂载、普通用户启动、沙箱状态、保存/撤销及退出卸载，24.04 使用应用级 userns 规则且保留全局限制，详见 [AppImage 指南](linux-appimage.md)。不同桌面环境未穷尽。Windows/Linux ARM / Intel Mac 未交付；Windows 无代码签名证书，macOS 未公证 |
 
-剩余项为其他输入法及列表/表格/局部代码的完整候选组合、未覆盖的跨应用剪贴板/复杂跨块编辑、第三方主题与图形扩展，以及 Windows 实体输入法，Intel Mac / ARM 等其他平台发布。复杂转换覆盖已列样本和目标格式，无法代表任意格式无损往返。**0.20.1 仍不能标为 Typora 全功能完全等价**；外部图床真实上传仍需独立配置与验收。
+剩余项为其他输入法及列表/表格/局部代码的完整候选组合、未覆盖的跨应用剪贴板/复杂跨块编辑、第三方主题与图形扩展，以及 Windows 实体输入法，Intel Mac / ARM 等其他平台发布。复杂转换覆盖已列样本和目标格式，无法代表任意格式无损往返。**0.20.2 仍不能标为 Typora 全功能完全等价**；外部图床真实上传仍需独立配置与验收。
 
 ## 版本记录
 
 以下记录对应各版本当时的实现和验收范围；历史限制不代表当前版本状态。
 
-0.13.4 修复：缩进命令覆盖完整源码和局部代码编辑器，保留列表行为与独立撤销；Linux DEB 使用无空格安装路径，并增加前一公开 DEB 升级、GIO 与 KDE MIME 关联启动回归用例。初始 CI 验收环境为 Ubuntu 22.04 与 KDE 启动组件；之后 0.13.4 DEB 已在完整 Kubuntu 26.04 / Plasma 6.6.4 / Wayland 中完成 Dolphin 打开及 18 项键盘回归，见[版本化验收记录](verification.md)。该完整桌面检查尚未对 0.20.1 重跑；AppImage/FUSE 不在这份 0.13.4 桌面记录内，当前版本另有 Ubuntu 22.04／24.04 FUSE 验收。
+0.13.4 修复：缩进命令覆盖完整源码和局部代码编辑器，保留列表行为与独立撤销；Linux DEB 使用无空格安装路径，并增加前一公开 DEB 升级、GIO 与 KDE MIME 关联启动回归用例。初始 CI 验收环境为 Ubuntu 22.04 与 KDE 启动组件；之后 0.13.4 DEB 已在完整 Kubuntu 26.04 / Plasma 6.6.4 / Wayland 中完成 Dolphin 打开及 18 项键盘回归，见[版本化验收记录](verification.md)。该完整桌面检查尚未对 0.20.2 重跑；AppImage/FUSE 不在这份 0.13.4 桌面记录内，当前版本另有 Ubuntu 22.04／24.04 FUSE 验收。
 
 0.14.3 重点补充大文件源码性能、主题实时定制、可控打印分页和 Windows 系统预览。大文件保持源码模式；系统预览为只读且有 1 MiB 上限，不加载插件。FUSE 实际挂载仍未验收；完整 Kubuntu 26.04 桌面记录对应 0.13.4 DEB，不作为 0.14.3 的桌面验收结果。
 
@@ -80,3 +80,7 @@
 ## 0.20.1 连续 AI 改写
 
 采纳后侧栏保持打开，显示已应用状态，保留要求并清除已消耗的差异。下一轮使用采纳后的选区书签，也可读取其他选区；两次采纳可分别撤销和重做。原文变化、只读、分屏及输入法组合期间的保护继续生效。
+
+## 0.20.2 macOS 密钥配置文件
+
+记住的密钥改存本机 ai-settings.json，原子替换时强制 0600 权限；设置返回值不携带密钥，取消记住后只留内存。旧钥匙串配置支持无交互尝试迁移，受系统拦截时由用户显式迁移一次或重新填写；迁移后普通改写和重启不再读取钥匙串。Windows/Linux 保留系统加密存储。

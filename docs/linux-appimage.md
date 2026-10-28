@@ -1,10 +1,10 @@
 # Running the Linux AppImage
 
-Use the x64 AppImage from the [0.20.1 release](https://github.com/AniChikage/open-typora/releases/tag/v0.20.1) and verify its SHA-256 checksum. Make it executable, then run it as your ordinary user. The DEB is the recommended Ubuntu installation, with desktop and file associations included.
+Use the x64 AppImage from the [0.20.2 release](https://github.com/AniChikage/open-typora/releases/tag/v0.20.2) and verify its SHA-256 checksum. Make it executable, then run it as your ordinary user. The DEB is the recommended Ubuntu installation, with desktop and file associations included.
 
 ```sh
-chmod +x Open-Typora-0.20.1-linux-x64.AppImage
-./Open-Typora-0.20.1-linux-x64.AppImage
+chmod +x Open-Typora-0.20.2-linux-x64.AppImage
+./Open-Typora-0.20.2-linux-x64.AppImage
 ```
 
 ## FUSE runtime
@@ -18,7 +18,7 @@ sudo apt install libfuse2
 sudo apt install libfuse2t64
 ```
 
-To inspect a real mount, run `./Open-Typora-0.20.1-linux-x64.AppImage --appimage-mount`. While it remains running, inspect the printed directory with `findmnt --target /printed/mountpoint`. Its filesystem type should start with `fuse`. Press Ctrl+C to unmount. This is different from `--appimage-extract`.
+To inspect a real mount, run `./Open-Typora-0.20.2-linux-x64.AppImage --appimage-mount`. While it remains running, inspect the printed directory with `findmnt --target /printed/mountpoint`. Its filesystem type should start with `fuse`. Press Ctrl+C to unmount. This is different from `--appimage-extract`.
 
 ## Ubuntu's user namespace restriction
 
@@ -31,7 +31,7 @@ Save this as `/etc/apparmor.d/open-typora-appimage`, replacing the example with 
 ```text
 abi <abi/4.0>,
 include <tunables/global>
-profile open-typora-appimage "/absolute/path/Open-Typora-0.20.1-linux-x64.AppImage" flags=(unconfined) {
+profile open-typora-appimage "/absolute/path/Open-Typora-0.20.2-linux-x64.AppImage" flags=(unconfined) {
   userns,
 }
 ```

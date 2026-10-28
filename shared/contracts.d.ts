@@ -1,6 +1,6 @@
 export interface AIConfig { protocol: "openai" | "ollama"; baseUrl: string; model: string }
-export interface AISettings extends AIConfig { hasKey: boolean; keyStorage: "system" | "session" | "none"; secureStorage: boolean }
-export interface AISettingsUpdate extends AIConfig { apiKey?: string; clearKey?: boolean; rememberKey: boolean }
+export interface AISettings extends AIConfig { hasKey: boolean; keyStorage: "file" | "system" | "session" | "none"; secureStorage: boolean; persistentStorage?: "file" | "system"; needsKeyMigration?: boolean }
+export interface AISettingsUpdate extends AIConfig { apiKey?: string; clearKey?: boolean; rememberKey: boolean; migrateLegacyKey?: boolean }
 export interface AIRewriteRequest { id: string; instruction: string; text: string }
 export interface WorkspaceLayout { primaryId: string; secondaryId: string; direction: "columns" | "rows"; ratio: number }
 export interface BackgroundAsset { name: string; dataUrl: string }

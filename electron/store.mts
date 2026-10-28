@@ -28,15 +28,15 @@ const within = (base: string, file: string) => {
     !path.isAbsolute(relative)
   );
 };
-export async function atomicWrite(file: string, data: string | Uint8Array, beforeCommit?: () => unknown | Promise<unknown>) {
+export async function atomicWrite(file: string, data: string | Uint8Array, beforeCommit?: () => unknown | Promise<unknown>, permissions?: number) {
   await mkdir(path.dirname(file), { recursive: true });
   const temporary = path.join(
     path.dirname(file),
     `.${path.basename(file)}.${randomUUID()}.tmp`,
   );
   try {
-    let mode = 0o600;
-    try {
+    let mode = permissions ?? 0o600;
+    if (permissions === undefined) try {
       mode = (await stat(file)).mode & 0o777;
     } catch (eCaught) { const e = eCaught as NodeJS.ErrnoException;
       if (e.code !== "ENOENT") throw e;

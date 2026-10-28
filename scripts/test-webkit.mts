@@ -1,5 +1,5 @@
 import { execFileSync, spawn } from "node:child_process";
-import { mkdtemp, mkdir, cp, writeFile, rm, readFile, readdir } from "node:fs/promises";
+import { mkdtemp, mkdir, cp, writeFile, rm, readFile, readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { createServer } from "node:http";
@@ -84,7 +84,7 @@ try {
       code === 0 ? resolve() : reject(new Error(`WebKit tests exited ${code}`)),
     );
   });
-  if (aiOnly) { assert.equal(aiRequests.length,4); assert.deepEqual(aiRequests,["你好","普通","粗体","A"]); assert.equal((await readFile(path.join(directory,"data/ai-settings.json"),"utf8")).includes("owned-fixture-only"),false); console.log("PASS: native AI UI reaches actual URLSession fixture, sends only selected text and never stores a plaintext key"); }
+  if (aiOnly) { assert.equal(aiRequests.length,4); assert.deepEqual(aiRequests,["你好","普通","粗体","A"]); const aiFile=path.join(directory,"data/ai-settings.json"); assert.equal(JSON.parse(await readFile(aiFile,"utf8")).apiKey,"owned-fixture-only"); assert.equal((await stat(aiFile)).mode & 0o777,0o600); console.log("PASS: native AI UI reaches actual URLSession fixture, sends only selected text and persists the owner-only file credential without exposing it through the bridge"); }
   if (!clipboardOnly && !aiOnly) assert.equal(uploads.length, 1, "native PicGo request reaches the owned HTTP fixture once");
   if (!clipboardOnly && !aiOnly) console.log("PASS: native PicGo integration sends owned PNG bytes and accepts the returned URL");
   if (!clipboardOnly && !aiOnly && process.env.OPEN_TYPORA_QA_DIR) {

@@ -49,12 +49,12 @@ func contained(_ base: URL, _ target: URL) -> Bool {
   let prefix = base.standardizedFileURL.path + "/"
   return target.standardizedFileURL.path.hasPrefix(prefix)
 }
-func atomicWrite(_ url: URL, _ data: Data, beforeCommit: (() throws -> Void)? = nil) throws {
+func atomicWrite(_ url: URL, _ data: Data, permissions: UInt16? = nil, beforeCommit: (() throws -> Void)? = nil) throws {
   let fm = FileManager.default
   try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
   let temp = url.deletingLastPathComponent().appendingPathComponent(
     ".\(url.lastPathComponent).\(UUID().uuidString).tmp")
-  let mode =
+  let mode = permissions ??
     (try? fm.attributesOfItem(atPath: url.path)[.posixPermissions] as? NSNumber)?.uint16Value
     ?? 0o600
   let descriptor = Darwin.open(temp.path, O_CREAT | O_EXCL | O_WRONLY, mode_t(mode))

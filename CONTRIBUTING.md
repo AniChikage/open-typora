@@ -64,7 +64,7 @@ Additional suites:
 | `npm run test:indentation` | List/source/local-code indentation and undo | Electron desktop |
 | `npm run test:huge` | Large code/table editing, source bytes, selection and history | Electron desktop |
 | `npm run test:ai` | Model settings, scoped requests, diff review, history, stale results, cancellation, IME guards, read-only and splits | Electron desktop; local HTTP fixtures, no API key |
-| `npm run test:ai-native` | URLSession transport, credentials, protocol errors and limits | macOS; local HTTP fixtures, no API key |
+| `npm run test:ai-native` | URLSession transport, file permissions, restart/session credentials, legacy migration, protocol errors and limits | macOS; local HTTP fixtures, no API key |
 | `npm run test:ai-webkit` | Native bridge, review/apply and history in WKWebView | macOS; local HTTP fixtures, no API key |
 
 Automated desktop suites use isolated temporary application data. To keep screenshots and reports outside the checkout, set `OPEN_TYPORA_QA_DIR` to an absolute output directory. Synthetic composition tests do not replace manual input-method checks.
@@ -103,7 +103,7 @@ After packaging on Windows, `npm run test:windows` installs the EXE into an isol
 
 Read [the architecture](docs/architecture.md) before changing the editor or native bridge. The [feature checklist](docs/feature-parity.md) records supported workflows and remaining differences.
 
-Do not commit generated bundles, test output, credentials, personal documents, or third-party proprietary source/assets. Contributions are licensed under the project's [MIT license](LICENSE); preserve existing third-party notices.
+Do not commit generated bundles, test output, credentials, personal documents, or third-party proprietary source/assets. `ai-settings.json` is ignored because the macOS file can contain a plaintext API key; never attach a real copy to a bug report. Contributions are licensed under the project's [MIT license](LICENSE); preserve existing third-party notices.
 
 ## Publish a release
 
