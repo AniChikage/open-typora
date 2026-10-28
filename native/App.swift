@@ -207,6 +207,13 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
         return
       }
     #endif
+    if name == "aiRewrite" {
+      Task { @MainActor in
+        do { let value = try await owner.ai.rewrite(arg(args, 0, [String: Any].self)); reply(id, ["ok": true, "value": value]) }
+        catch { reply(id, ["ok": false, "error": error.localizedDescription]) }
+      }
+      return
+    }
     if name == "readResource", let address = args.first as? String, let url = URL(string: address), ["http", "https"].contains(url.scheme ?? "") {
       Task { @MainActor in
         do {
@@ -422,6 +429,8 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
   }
   func handle(_ name: String, _ args: [Any]) throws -> Any? {
     switch name {
+    case "aiSettings": return try owner.ai.settings(args.first as? [String: Any])
+    case "aiCancel": owner.ai.cancel(try arg(args, 0, String.self)); return nil
     case "background": return try Interchange.background(owner.directory)
     case "clearBackground": try Interchange.clearBackground(owner.directory); return nil
     case "chooseBackground":
@@ -779,6 +788,7 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
   }
 }
 final class NativeApplication: NSObject, NSApplicationDelegate, NSMenuItemValidation {
+  lazy var ai = NativeAIService(ProcessInfo.processInfo.environment["OPEN_TYPORA_AI_SETTINGS_DIR"].map { URL(fileURLWithPath: $0) } ?? directory)
   lazy var workspace = Workspace(directory)
   var fileOperationRunning = false
   var recentClosedFiles: [(url: URL, group: String?)] = []

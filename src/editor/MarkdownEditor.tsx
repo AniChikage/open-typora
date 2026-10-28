@@ -1,3 +1,5 @@
+import { selectionCurrent } from "./aiReview";
+import type { RewriteSelection } from "./aiReview";
 import { codeSelectionCommand, selectionActions } from "./selectionCommands";
 import { clipboardTable, tableMarkdown, tablePasteBlock } from "./clipboard.ts";
 import { ImageDialog } from "../components/ImageDialog";
@@ -41,6 +43,9 @@ import { ContextMenu } from "../components/ContextMenu";
 import type { ContextMenuEntry } from "../components/ContextMenu";
 export interface EditorHandle {
   view(): EditorView | null;
+  captureRewrite(): RewriteSelection | null;
+  rewriteCurrent(selection: RewriteSelection): boolean;
+  applyRewrite(selection: RewriteSelection, text: string): boolean;
   find(): void;
   jump(line: number): void;
   wrap(before: string, after?: string): void;
@@ -162,6 +167,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
       const richEnabled = editable && menu.rendered && !menu.code;
       const items: ContextMenuEntry[] = [entry("undo", "撤销", !editable || !model.current?.canUndo), entry("redo", "重做", !editable || !model.current?.canRedo), null,
         entry("cut", "剪切", !editable || !selected), entry("copy", "复制", !selected), entry("paste", "粘贴", !editable), entry("paste-plain", "粘贴为纯文本", !editable), entry("copy-markdown", "复制为 Markdown", !selected), entry("select-all", "全选"), null];
+      items.push(entry("ai-rewrite", "AI 改写选区…", !editable || !selected), null);
       if (menu.image) items.push(entry("image-edit", "编辑图片…", !editable), entry("copy-image-path", "复制图片地址"), null);
       if (menu.table) {
         const { row, rows, column, columns } = menu.table;
@@ -520,6 +526,29 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
     useImperativeHandle(
       ref,
       () => ({
+        rewriteCurrent: selection => !!model.current && viewOptions.current.active && !viewOptions.current.readOnly && selectionCurrent(selection, initial.current.id, model.current.text),
+        captureRewrite: () => {
+          const doc = model.current; if (!doc || editingBlocked()) return null;
+          const selection = activeMode.current ? rich.current?.bookmark() : source.current?.state.selection.main;
+          if (!selection) return null;
+          const from = Math.min(selection.anchor, selection.head), to = Math.max(selection.anchor, selection.head);
+          if (from === to) { callbacks.current.onError("请先选中需要改写的文字。"); return null; }
+          doc.selection = { anchor: selection.anchor, head: selection.head }; doc.closeGroup();
+          return { documentId: initial.current.id, source: doc.text, from, to, text: doc.text.slice(from, to) };
+        },
+        applyRewrite: (selection, text) => {
+          const doc = model.current;
+          if (!doc) return false;
+          if (viewOptions.current.readOnly) { callbacks.current.onError("只读模式已开启，请关闭后再应用改写。"); return false; }
+          if (editingBlocked()) return false;
+          if (!viewOptions.current.active || !selectionCurrent(selection, initial.current.id, doc.text)) { callbacks.current.onError("文档已变化，请重新选择文字并生成；这份建议仍可复制。"); return false; }
+          if (text === selection.text) return true;
+          rich.current?.releaseFence(); doc.selection = { anchor: selection.from, head: selection.to }; doc.closeGroup();
+          doc.replace(selection.from, selection.to, text, "ai-rewrite", { anchor: selection.from, head: selection.from + text.length });
+          doc.closeGroup();
+          if (activeMode.current) rich.current?.render(false); else syncSource();
+          publish(); focusEditor(); return true;
+        },
         view: () => source.current,
         composing: isComposing,
         markdown: () => model.current?.toMarkdown() || "",

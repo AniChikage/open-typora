@@ -1,3 +1,7 @@
+export interface AIConfig { protocol: "openai" | "ollama"; baseUrl: string; model: string }
+export interface AISettings extends AIConfig { hasKey: boolean; keyStorage: "system" | "session" | "none"; secureStorage: boolean }
+export interface AISettingsUpdate extends AIConfig { apiKey?: string; clearKey?: boolean; rememberKey: boolean }
+export interface AIRewriteRequest { id: string; instruction: string; text: string }
 export interface WorkspaceLayout { primaryId: string; secondaryId: string; direction: "columns" | "rows"; ratio: number }
 export interface BackgroundAsset { name: string; dataUrl: string }
 export interface DocumentRecord {
@@ -61,6 +65,9 @@ export interface Command {
 }
 export interface Host {
   native: boolean;
+  aiSettings(update?: AISettingsUpdate): Promise<AISettings>;
+  aiRewrite(request: AIRewriteRequest): Promise<{ text: string; model: string }>;
+  aiCancel(id: string): Promise<unknown>;
   cancelClose(): Promise<unknown>;
   windowAction(action: string): Promise<unknown>;
   imageAction(id: string, sources: string[], action: string, options?: Record<string, unknown>): Promise<Record<string, string> | null>;

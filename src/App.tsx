@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { AISettingsDialog } from "./components/AISettingsDialog";
+import { AIReviewPanel } from "./components/AIReviewPanel";
+import type { RewriteSelection } from "./editor/aiReview";
+import "./ai.css";
 import { FilePlus2, FolderOpen, X, AlertCircle } from "lucide-react";
 import { useDocuments } from "./useDocuments";
 import { EncodingDialog, encodingNames } from "./components/EncodingDialog";
@@ -54,8 +58,16 @@ export default function App() {
   const [readOnly, setReadOnly] = useState(false);
   const pluginRuntime = useRef<PluginRuntime | null>(null);
   const [typewriter, setTypewriter] = useState(false);
-  const [dialog, setDialog] = useState<"preferences" | "plugins" | "quick-open" | "statistics" | "recent" | "global-search" | "encoding" | InsertKind | null>(null);
+  const [dialog, setDialog] = useState<"ai-settings" | "preferences" | "plugins" | "quick-open" | "statistics" | "recent" | "global-search" | "encoding" | InsertKind | null>(null);
   const [fileOperation, setFileOperation] = useState<FileOperation | null>(null);
+  const [aiSelection, setAISelection] = useState<{ selection: RewriteSelection; id: string } | null>(null);
+  const [aiSettingsRevision, setAISettingsRevision] = useState(0);
+  function startRewrite() {
+    if (!host.native) { session.setMessage("AI 改写请使用桌面应用。"); return; }
+    if (composing()) { session.setMessage("请先完成当前输入法组合输入。"); return; }
+    const selection = editor()?.captureRewrite();
+    if (selection) setAISelection({ selection, id: crypto.randomUUID() });
+  }
   const [selectedText, setSelectedText] = useState("");
   const [selection, setSelection] = useState("");
   const [countUnit, setCountUnit] = useState<"characters" | "words">(() => localStorage.getItem("open-typora-count-unit") === "words" ? "words" : "characters");
@@ -232,7 +244,7 @@ export default function App() {
   commands.current = ({ action, document: opened, anchor, line, message }) => {
     if (action === "newWindow" && window.desktop?.windowAction) { void host.windowAction(action).catch((error: Error) => session.setMessage(error.message)); return; }
     const context = commandsByAction.get(action)?.context;
-    if (readOnly && ((context && context !== "document") || ["delete-word", "pagebreak", "indent", "outdent", "undo", "redo", "paste-plain", "image", "table", "link", "reference-link", "footnote", "copy-all-images", "move-all-images", "upload-all-images"].includes(action))) { session.setMessage("只读模式已开启，请先在插件管理中关闭或切换只读效果。"); return; }
+    if (readOnly && ((context && context !== "document") || ["ai-rewrite", "delete-word", "pagebreak", "indent", "outdent", "undo", "redo", "paste-plain", "image", "table", "link", "reference-link", "footnote", "copy-all-images", "move-all-images", "upload-all-images"].includes(action))) { session.setMessage("只读模式已开启，请先在插件管理中关闭或切换只读效果。"); return; }
     if (context && !active) return;
     if (["rich", "table"].includes(context || "") && !editor()?.richMode()) return;
     if (action === "notice") { if (message) session.setMessage(message); }
@@ -242,6 +254,8 @@ export default function App() {
     else if (action === "open") void session.open();
     else if (action === "folder") void session.openFolder();
     else if (action === "save") void session.save();
+    else if (action === "ai-rewrite") startRewrite();
+    else if (action === "ai-models") setDialog("ai-settings");
     else if (action === "encoding") setDialog("encoding");
     else if (action === "saveAs") void session.save(true);
     else if (action === "close") void session.close();
@@ -416,9 +430,15 @@ export default function App() {
           </div>
         ) : (
           <>
+            <div className={"writing-content" + (aiSelection ? " with-ai" : "")}>
             <EditorWorkspace documents={session.documents} activeId={session.activeId} layout={session.workspace} modes={modes}
               preferences={preferences} readOnly={readOnly} typewriter={typewriter} select={selectDocument} register={registerEditor} change={changeDocument} error={session.setMessage} cursor={cursorDocument} selection={selectionDocument} compositionEnd={compositionDocument} mode={modeDocument} closePane={closePane} command={commandDocument} tabAction={tabAction} autosave={session.autosave} composing={composing}
               create={() => void session.create()} close={id => void session.close(id)} reorder={session.reorder} split={direction => void session.split(direction)} swap={session.swapPanes} resize={session.resizeWorkspace} />
+            {aiSelection && <AIReviewPanel key={aiSelection.id} selection={aiSelection.selection} documentName={session.documents.find(document => document.id === aiSelection.selection.documentId)?.name || "已关闭文档"}
+              current={!!editor()?.rewriteCurrent(aiSelection.selection)} composing={composing} settingsRevision={aiSettingsRevision}
+              settings={() => setDialog("ai-settings")} recapture={startRewrite} close={() => setAISelection(null)} notify={session.setMessage}
+              apply={text => { const target = editor(); if (!target) return false; return target.applyRewrite(aiSelection.selection, text); }} />}
+            </div>
             <article
               className="print-document"
               ref={printDocument}
@@ -449,10 +469,11 @@ export default function App() {
         </div>
       )}
       {fileOperation && <FileOperationDialog operation={fileOperation} files={session.files} folder={session.folder} run={session.fileOperation} close={() => setFileOperation(null)} />}
+      {dialog === "ai-settings" && <AISettingsDialog saved={() => setAISettingsRevision(value => value + 1)} close={closeDialog} />}
       {dialog === "encoding" && active && <EncodingDialog key={active.id} record={active} change={session.changeEncoding} close={closeDialog} />}
       {dialog === "recent" && <RecentDialog entries={session.recent} action={session.recentAction} close={closeDialog} />}
       {dialog === "global-search" && <GlobalSearch folder={session.folder} close={closeDialog} open={async match => { const record = await session.openToken(match.token); if (record) requestAnimationFrame(() => editors.current.get(record.id)?.jump(match.line)); }} />}
-      {dialog === "preferences" && <PreferencesDialog value={preferences} change={changePreferences} theme={theme} changeTheme={setTheme} themes={themes} installTheme={installTheme} customization={themeCustomization} customize={customizeTheme} resetTheme={resetTheme} saveTheme={saveTheme} background={background} chooseBackground={chooseBackground} clearBackground={clearBackground} plugins={() => setDialog("plugins")} close={closeDialog} />}
+      {dialog === "preferences" && <PreferencesDialog value={preferences} change={changePreferences} theme={theme} changeTheme={setTheme} themes={themes} installTheme={installTheme} customization={themeCustomization} customize={customizeTheme} resetTheme={resetTheme} saveTheme={saveTheme} background={background} chooseBackground={chooseBackground} clearBackground={clearBackground} plugins={() => setDialog("plugins")} models={() => setDialog("ai-settings")} close={closeDialog} />}
       {dialog === "plugins" && <PluginsDialog definitions={pluginDefinitions} preferences={pluginPreferences} states={pluginStates} toggle={(id, enabled) => setPluginPreferences(previous => ({ ...previous, [id]: { ...previous[id], enabled } }))} configure={(id, config) => setPluginPreferences(previous => ({ ...previous, [id]: { ...previous[id], config } }))} invoke={async (id,action) => { await pluginRuntime.current?.invoke(id,action); }} actions={id => pluginRuntime.current?.actions(id) || []} install={installPlugin} remove={removePlugin} close={closeDialog} />}
       {dialog === "quick-open" && <QuickOpen documents={session.documents} files={session.files} recent={session.recent} openRecent={path => session.recentAction("open", path)} select={session.setActiveId} open={session.openToken} close={closeDialog} />}
       {dialog && ["table", "link", "reference-link", "footnote"].includes(dialog) && <InsertDialog kind={dialog as InsertKind} selected={selectedText} close={closeDialog} submit={value => {

@@ -18,6 +18,7 @@ try {
     "native/Workspace.swift",
     "native/Interchange.swift",
     "native/ImageActions.swift",
+    "native/AI.swift",
       "native/StoreTests.swift",
       "tests/WindowChromeTests.swift",
       "native/App.swift",

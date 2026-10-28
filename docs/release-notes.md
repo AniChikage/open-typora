@@ -1,24 +1,24 @@
-Open Typora 0.19.0 adds spreadsheet clipboard paste (Issue #5).
+Open Typora 0.20.0 adds optional AI selection editing with reviewable changes.
 
 This is an independent, unofficial project, unaffiliated with Typora. If you can afford it, please [buy Typora](https://store.typora.io/) and support its official developers.
 
 ## Downloads
 
-- macOS 14+, Apple Silicon: `Open-Typora-0.19.0-arm64.dmg` or ZIP.
-- Windows 10/11 x64: `Open-Typora-0.19.0-windows-x64-Setup.exe` or ZIP.
-- Linux x64: `Open-Typora-0.19.0-linux-x64.deb` or AppImage.
+- macOS 14+, Apple Silicon: `Open-Typora-0.20.0-arm64.dmg` or ZIP.
+- Windows 10/11 x64: `Open-Typora-0.20.0-windows-x64-Setup.exe` or ZIP.
+- Linux x64: `Open-Typora-0.20.0-linux-x64.deb` or AppImage.
 
 SHA-256 checksums are included. macOS is locally signed, not notarized; Windows is unsigned.
 
 ## Changes
 
-- Copy a cell range from Excel or WPS and paste it into a document to create an editable Markdown table. Both live editing and source mode recognize HTML tables and tab-separated text. The copied first row becomes the Markdown header.
-- Spreadsheet HTML takes precedence over the screenshot that Office applications also place on the clipboard. Plain image paste keeps its existing behavior.
-- Source-mode paste recovers table formats from the native clipboard when WebKit exposes only Office's PNG alternative. A delayed clipboard read cannot overwrite text or a selection changed in the meantime.
-- Blank cells, literal pipes, quoted tabs and multiline cell values retain their positions. Merged HTML cells expand into a rectangular grid with empty covered cells, since Markdown tables do not support merged cells.
-- Pasting into an existing live table uses the same parser. A paste remains one undo/redo transaction; code fences retain literal spreadsheet text, and Paste as Plain Text bypasses table conversion.
-- The old 100-row/30-column grid-paste restriction is removed. Bulk expansion uses a one-million-cell resource budget; existing large tables can still receive smaller edits without reconstruction.
-- Pasting into a distant virtualized table row now uses its actual source row, preventing writes to an earlier visible row. A range that fits the existing dimensions updates only the affected lines.
-- Regression coverage includes native WebKit, the real desktop clipboard, file/recovery bytes and the Windows/Linux installer acceptance workflows.
+- Configure your own OpenAI-compatible chat API, OpenRouter, LM Studio or native Ollama service. No hosted model, subscription or API key is bundled.
+- Rewrite a selection from live editing or source mode. Review the original and suggestion for each change, keep individual original passages, and explicitly apply the reviewed result as one undoable edit.
+- Paragraphs, bold text, list items, table cells and local code selections use the existing Markdown bookmarks and transaction history. Generation alone never modifies a document.
+- Delayed proposals cannot overwrite text changed while the request was pending, or write into a different tab or split pane. Read-only plugins block AI edits; cancel stops the request and ignores late results.
+- Chinese composition guards cover capture, prompt submission and applying edits. Incoming suggestions do not move editor focus. Escape during IME candidate input keeps the settings dialog open.
+- Remembered keys use the macOS Keychain or Electron's system-backed encryption. Session-only keys are supported; an insecure Linux storage backend cannot persist a key. Saved keys are never returned to the renderer, and changing endpoints does not carry the old key over.
+- Requests refuse redirects, enforce time/size budgets, reject truncated output and show safe authentication/rate-limit errors without echoing provider error bodies.
+- Adds deterministic HTTP, native URLSession, WebKit and installed Windows/Linux AI acceptance. Physical input methods and actual model inference remain separate tests from those fixtures.
 
-See [clipboard behavior](https://github.com/AniChikage/open-typora/blob/main/docs/clipboard.md) for supported inputs and boundaries. This release does not claim complete Typora feature parity or every Office/WPS, IME, or Linux desktop combination. Updates preserve documents, preferences and recovery data.
+Read the [AI setup, data scope and limits](https://github.com/AniChikage/open-typora/blob/main/docs/ai.md). Model output still needs human review. This release does not claim complete Typora feature parity. Updates preserve documents, preferences and recovery data.

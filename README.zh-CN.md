@@ -20,10 +20,11 @@
 
 Open Typora 是一款开源 Markdown 编辑器，受 Typora 的行内编辑体验启发。直接修改排版后的正文，需要时切换源码，文档以普通 `.md` 文件保存在自己的文件夹中。
 
-**项目状态：**当前为早期开发版本 **0.19.0**，发布目标为 **macOS 14+、Apple Silicon**、**Windows 10/11 x64** 和 **Linux x64**，界面目前为简体中文。本项目独立实现，与 Typora 无隶属关系；功能和交互仍在持续完善。
+**项目状态：**当前为早期开发版本 **0.20.0**，发布目标为 **macOS 14+、Apple Silicon**、**Windows 10/11 x64** 和 **Linux x64**，界面目前为简体中文。本项目独立实现，与 Typora 无隶属关系；功能和交互仍在持续完善。
 
 ## 功能
 
+- **可选 AI 编辑**：接入自定义 OpenAI 兼容 API、OpenRouter、LM Studio 或 Ollama，改写选区、逐项审阅差异，并作为一次修改应用与撤销；[配置、隐私与边界](docs/ai.md)。
 - **即时渲染编辑**：标题、行内格式、列表、任务、表格、链接、脚注和 YAML 前言；代码与公式支持局部编辑，也可切换完整源码。
 - **电子表格粘贴**：从 Excel/WPS 复制选区，在正文或源码中生成 Markdown 表格，保留空单元格、带引号的换行和一次撤销。见 [剪贴板说明](docs/clipboard.md)。
 - **多标签与分屏**：重排和键盘切换文档标签，两篇文档左右／上下对照编辑，两侧独立使用源码或即时渲染模式；重启后恢复布局；标签页右键提供批量关闭、路径复制、重命名和分屏，正文与表格也可通过右键编辑。
@@ -57,18 +58,18 @@ Open Typora 是一款开源 Markdown 编辑器，受 Typora 的行内编辑体�
 
 | 平台 | 安装包 | 其他方式 |
 | --- | --- | --- |
-| Windows 10/11 · x64 | **[下载 Setup.exe](https://github.com/AniChikage/open-typora/releases/download/v0.19.0/Open-Typora-0.19.0-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.19.0/Open-Typora-0.19.0-windows-x64.zip) |
-| macOS 14+ · Apple Silicon | **[下载 DMG](https://github.com/AniChikage/open-typora/releases/download/v0.19.0/Open-Typora-0.19.0-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.19.0/Open-Typora-0.19.0-arm64.zip) |
-| Linux · x64 | **[下载 DEB](https://github.com/AniChikage/open-typora/releases/download/v0.19.0/Open-Typora-0.19.0-linux-x64.deb)** | [AppImage](https://github.com/AniChikage/open-typora/releases/download/v0.19.0/Open-Typora-0.19.0-linux-x64.AppImage) |
+| Windows 10/11 · x64 | **[下载 Setup.exe](https://github.com/AniChikage/open-typora/releases/download/v0.20.0/Open-Typora-0.20.0-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.20.0/Open-Typora-0.20.0-windows-x64.zip) |
+| macOS 14+ · Apple Silicon | **[下载 DMG](https://github.com/AniChikage/open-typora/releases/download/v0.20.0/Open-Typora-0.20.0-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.20.0/Open-Typora-0.20.0-arm64.zip) |
+| Linux · x64 | **[下载 DEB](https://github.com/AniChikage/open-typora/releases/download/v0.20.0/Open-Typora-0.20.0-linux-x64.deb)** | [AppImage](https://github.com/AniChikage/open-typora/releases/download/v0.20.0/Open-Typora-0.20.0-linux-x64.AppImage) |
 
-[SHA-256 校验文件](https://github.com/AniChikage/open-typora/releases/download/v0.19.0/SHA256SUMS.txt) · [所有版本](https://github.com/AniChikage/open-typora/releases)
+[SHA-256 校验文件](https://github.com/AniChikage/open-typora/releases/download/v0.20.0/SHA256SUMS.txt) · [所有版本](https://github.com/AniChikage/open-typora/releases)
 
 ### 安装 Linux 版
 
 以 Ubuntu 22.04 x64 为验收基线，下载 DEB 后运行：
 
 ```sh
-sudo apt install ./Open-Typora-0.19.0-linux-x64.deb
+sudo apt install ./Open-Typora-0.20.0-linux-x64.deb
 ```
 
 安装后可从桌面启动器打开，并关联 Markdown 文件。`sudo apt remove open-typora` 卸载保留文档和恢复数据。
@@ -87,7 +88,7 @@ Windows 版目前**没有代码签名证书**，系统可能显示未知发布�
 
 ### 安装 macOS 版
 
-1. 从 [Releases](https://github.com/AniChikage/open-typora/releases/latest) 下载 **[Open-Typora-0.19.0-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.19.0/Open-Typora-0.19.0-arm64.dmg)**。
+1. 从 [Releases](https://github.com/AniChikage/open-typora/releases/latest) 下载 **[Open-Typora-0.20.0-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.20.0/Open-Typora-0.20.0-arm64.dmg)**。
 2. 打开 DMG，把 **Open Typora** 拖入 **Applications（应用程序）**。
 3. 从应用程序中启动 Open Typora。
 

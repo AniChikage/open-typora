@@ -1,3 +1,4 @@
+import { imeKey } from "../editor/composition";
 import { useLayoutEffect, useRef } from "react";
 import type { ReactNode } from "react";
 export function Dialog({ title, close, children }: { title: string; close(): void; children: ReactNode }) {
@@ -12,6 +13,7 @@ export function Dialog({ title, close, children }: { title: string; close(): voi
   }, []);
   return <div className="dialog-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) closing.current(); }}>
     <section ref={root} className="utility-dialog" role="dialog" aria-modal="true" aria-label={title} onKeyDown={event => {
+      if (imeKey(event.nativeEvent)) return;
       if (event.key === "Escape") { event.stopPropagation(); closing.current(); }
       if (event.key !== "Tab") return;
       const controls = [...root.current!.querySelectorAll<HTMLElement>('input:not([disabled]),textarea:not([disabled]),select:not([disabled]),button:not([disabled]),summary,a[href]')].filter(control => control.getClientRects().length > 0);

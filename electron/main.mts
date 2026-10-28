@@ -1,6 +1,7 @@
 import type { IpcRequests, Command, PathChange } from "../shared/contracts.js";
 import type { IpcMainInvokeEvent } from "electron";
 type IpcHandlers = { [K in keyof IpcRequests]: (event: IpcMainInvokeEvent, ...args: Parameters<IpcRequests[K]>) => Awaited<ReturnType<IpcRequests[K]>> | Promise<Awaited<ReturnType<IpcRequests[K]>>> };
+import { AIService } from "./ai.mjs";
 import { renderPdf } from "./pdf.mjs";
 import { previewSettings } from "./windows-preview.mjs";
 import {
@@ -14,6 +15,7 @@ import {
   shell,
   session,
   clipboard,
+  safeStorage,
 } from "electron";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -82,7 +84,11 @@ const handshakes = new Map<string, (value: boolean) => void>();
 ipcMain.on("workspace:prepared", (event, id, value) => { if (event.sender !== window?.webContents) return; handshakes.get(id)?.(value); });
 function prepareOperation(phase: string, change: PathChange) { return new Promise<boolean>((resolve, reject) => { const id = randomUUID(), timeout = setTimeout(() => { handshakes.delete(id); reject(new Error("文件操作等待超时。")); }, 30000); handshakes.set(id, value => { clearTimeout(timeout); handshakes.delete(id); resolve(value); }); window!.webContents.send("workspace:operation", id, phase, change); }); }
 let operationRunning = false;
+let ai: AIService;
 const handlers: IpcHandlers = {
+  aiSettings: (_, update) => ai.settings(update),
+  aiRewrite: (_, request) => ai.rewrite(request),
+  aiCancel: (_, id) => ai.cancel(id),
   background: () => readBackground(store.dataDir),
   clearBackground: () => clearBackground(store.dataDir),
   chooseBackground: async () => {
@@ -303,6 +309,10 @@ app
   .then(async () => {
     if (process.platform !== "darwin" && !app.hasSingleInstanceLock()) return;
     store = new DocumentStore(app.getPath("userData"));
+    ai = new AIService(process.env.OPEN_TYPORA_AI_SETTINGS_DIR || store.dataDir, {
+      available: () => safeStorage.isEncryptionAvailable() && (process.platform !== "linux" || safeStorage.getSelectedStorageBackend() !== "basic_text"),
+      encrypt: text => safeStorage.encryptString(text), decrypt: bytes => safeStorage.decryptString(bytes),
+    });
     workspace = new Workspace(app.getPath("userData"));
     protocol.handle("opentypora", async request => {
       try {

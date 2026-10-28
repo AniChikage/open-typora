@@ -1,0 +1,36 @@
+.writing-content { display:flex; flex:1; min-width:0; min-height:0; position:relative; }
+.ai-review-panel { padding-bottom:32px; display:flex; flex-direction:column; width:370px; min-width:300px; max-width:44%; min-height:0; flex-shrink:0; border-left:1px solid var(--border); background:var(--paper); color:var(--ink); z-index:3; font-size:13px; }
+.ai-panel-heading { display:flex; align-items:center; gap:5px; min-height:42px; padding:5px 12px; border-bottom:1px solid var(--border); flex-shrink:0; }
+.ai-panel-heading h2 { font-size:14px; font-weight:600; margin:0; flex:1; }
+.ai-panel-body { overflow:auto; min-height:0; flex:1; padding:14px; }
+.ai-target { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin:0 0 6px; }
+.ai-review-panel pre { white-space:pre-wrap; overflow-wrap:anywhere; tab-size:4; font:12px/1.7 var(--monospace,monospace); margin:5px 0 12px; max-height:240px; overflow:auto; padding:9px; border:1px solid var(--border); border-radius:4px; }
+.ai-original { margin:14px 0; }
+.ai-original summary { cursor:pointer; color:var(--muted); }
+.ai-instruction, .ai-settings > label { display:flex; flex-direction:column; gap:7px; margin:12px 0 7px; font-size:13px; font-weight:500; }
+.ai-instruction textarea, .ai-settings input:not([type=checkbox]), .ai-settings select { width:100%; padding:8px 9px; border:1px solid var(--border); background:var(--paper); color:var(--ink); border-radius:4px; font:inherit; }
+.ai-instruction textarea { line-height:1.6; resize:vertical; min-height:76px; max-height:200px; }
+.ai-settings .checkbox-option { flex-direction:row; align-items:center; }
+.ai-presets, .ai-generate, .ai-diff-heading, .ai-panel-footer { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.ai-presets button, .ai-generate button, .ai-diff-heading button, .ai-panel-footer button, .ai-stale button { padding:6px 9px; border:1px solid var(--border); border-radius:4px; min-height:31px; font-size:12px; }
+.ai-presets { margin:10px 0; }
+.ai-presets button { color:var(--muted); background:var(--sidebar); }
+.ai-generate { justify-content:space-between; margin:14px 0; }
+.ai-generate > span { max-width:60%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ai-diff { margin-top:20px; }
+.ai-diff-heading { margin-bottom:12px; gap:6px; }
+.ai-diff-heading h3 { font-size:13px; font-weight:600; margin:0 auto 0 0; }
+.ai-diff-heading button { min-height:26px; padding:4px 6px; font-size:11px; }
+.ai-change { border-top:1px solid var(--border); padding:10px 0 2px; }
+.ai-change .checkbox-option { margin:0 0 10px; font-weight:500; }
+.ai-diff-label { font-size:11px; color:var(--muted); }
+.ai-change .ai-removed { border-left:3px solid #af5f57; background:color-mix(in srgb,#af5f57 7%,var(--paper)); }
+.ai-change .ai-added { border-left:3px solid #4a7c5f; background:color-mix(in srgb,#4a7c5f 7%,var(--paper)); }
+.ai-change.rejected pre { opacity:.7; }
+.ai-panel-footer { justify-content:flex-end; padding:12px; border-top:1px solid var(--border); flex-shrink:0; }
+.ai-stale { border-left:3px solid var(--accent); background:var(--sidebar); padding:9px; line-height:1.7; margin:12px 0; }
+.ai-stale button { display:block; margin-top:7px; background:var(--paper); }
+.ai-status { color:var(--muted); font-size:12px; line-height:1.7; }
+.ai-review-panel button:focus-visible, .ai-review-panel input:focus-visible, .ai-review-panel textarea:focus-visible, .ai-settings input:focus-visible, .ai-settings select:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+@media(max-width:1050px) { .writing-content.with-ai { flex-direction:column; } .ai-review-panel { width:100%; max-width:100%; flex-basis:45%; min-height:210px; border-left:0; border-top:1px solid var(--border); } }
+@media print { .ai-review-panel { display:none!important; } .writing-content { display:block; } }

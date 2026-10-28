@@ -26,6 +26,7 @@ execFileSync(
     "native/Workspace.swift",
     "native/Interchange.swift",
     "native/ImageActions.swift",
+    "native/AI.swift",
     "native/App.swift",
     "native/PDFExporter.swift",
     "-o",

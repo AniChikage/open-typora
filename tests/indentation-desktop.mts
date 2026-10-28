@@ -12,7 +12,7 @@ const env: Record<string, string>={...process.env,OPEN_TYPORA_DATA_DIR:path.join
 let app!: import("playwright").ElectronApplication, page!: import("playwright").Page;const errors: string[]=[],checks: string[]=[];const mod=process.platform==='darwin'?'Meta':'Control';
 try{
  app=await electron.launch({...(process.env.OPEN_TYPORA_EXECUTABLE?{executablePath:process.env.OPEN_TYPORA_EXECUTABLE,args:[]}:{args:[process.cwd()]}),env,timeout:30000});
- page=await app.firstWindow();page.on('pageerror',error=>errors.push(error.message));
+ page=await app.firstWindow();page.setDefaultTimeout(10000);page.on('pageerror',error=>errors.push(error.message));
  await expect(page.getByRole('tab',{name:'欢迎.md',exact:true})).toBeVisible({timeout:20000});
  const menu=async (name: string)=>{await page.getByRole('button',{name:'更多操作',exact:true}).click();await page.getByRole('menuitem',{name,exact:true}).click();};
  const open=async (file: string)=>{await app.evaluate(({dialog},file: string)=>{dialog.showOpenDialog=async()=>({canceled:false,filePaths:[file]});},file);await menu('打开文件');await expect(page.getByRole('tab',{name:path.basename(file),exact:true})).toHaveAttribute('aria-selected','true');};

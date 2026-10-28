@@ -1,4 +1,5 @@
 import {
+  Sparkles,
   PanelLeft,
   MoreHorizontal,
   Check,
@@ -84,6 +85,7 @@ export function Toolbar(props: Props) {
         >
           <Code2 size={16} />
         </button>
+        <button className="icon-button" aria-label="AI 改写选区" title="AI 改写选区" disabled={props.disabled} onPointerDown={event => event.preventDefault()} onClick={() => props.command("ai-rewrite")}><Sparkles size={16} /></button>
         <div className="menu-container" ref={root}>
           <button
             className="icon-button"

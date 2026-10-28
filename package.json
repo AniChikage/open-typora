@@ -1,6 +1,6 @@
 {
   "name": "open-typora",
-  "version": "0.19.0",
+  "version": "0.20.0",
   "description": "A local Markdown writing space with live rendering and lossless source editing.",
   "private": true,
   "type": "module",
@@ -46,7 +46,10 @@
     "predev": "npm run build:runtime",
     "predev:app": "npm run build:runtime",
     "predev:demo": "npm run build:runtime",
-    "prestart": "npm run build"
+    "prestart": "npm run build",
+    "test:ai": "node tests/ai-desktop.mts",
+    "test:ai-native": "npm run build:runtime && node scripts/test-ai-native.mts",
+    "test:ai-webkit": "npm run build && node scripts/test-webkit.mts --ai"
   },
   "dependencies": {
     "@codemirror/autocomplete": "6.20.3",

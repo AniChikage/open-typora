@@ -7,13 +7,14 @@ import { ThemeCustomizer } from "./ThemeCustomizer";
 import type { ThemeCustomization } from "../themeCustomization";
 import { BackgroundSettings } from "./BackgroundSettings";
 import type { BackgroundAsset } from "../background";
-export function PreferencesDialog({ value, change, theme, changeTheme, themes, installTheme, customization, customize, resetTheme, saveTheme, background, chooseBackground, clearBackground, plugins, close }: { value: Preferences; change(next: Preferences): void; theme: string; changeTheme(theme: string): void; themes: { id: string; name: string }[]; installTheme(): Promise<void>; customization: ThemeCustomization; customize(value: ThemeCustomization): void; resetTheme(): void; saveTheme(): Promise<void>; background: BackgroundAsset | null; chooseBackground(): Promise<void>; clearBackground(): Promise<void>; plugins(): void; close(): void }) {
+export function PreferencesDialog({ value, change, theme, changeTheme, themes, installTheme, customization, customize, resetTheme, saveTheme, background, chooseBackground, clearBackground, plugins, models, close }: { value: Preferences; change(next: Preferences): void; theme: string; changeTheme(theme: string): void; themes: { id: string; name: string }[]; installTheme(): Promise<void>; customization: ThemeCustomization; customize(value: ThemeCustomization): void; resetTheme(): void; saveTheme(): Promise<void>; background: BackgroundAsset | null; chooseBackground(): Promise<void>; clearBackground(): Promise<void>; plugins(): void; models(): void; close(): void }) {
   const [conversion, setConversion] = useState<{ pandoc: string; word: boolean; libreOffice?: string }>({ pandoc: "", word: false }), [error, setError] = useState("");
   const [preview, setPreview] = useState({supported:false,available:false,enabled:false});
   useEffect(() => { void host.previewSettings().then(setPreview).catch(error => setError(error.message)); }, []);
   useEffect(() => { void host.conversionSettings().then(setConversion).catch(e => setError(e.message)); }, []);
   const options = [["imageAutoUpload", "插入后通过 PicGo 自动上传"], ["remoteImages", "显示远程图片"], ["imagePrefix", "相对图片路径使用 ./ 前缀"], ["imageEscape", "自动转义图片路径"], ["spellcheck", "拼写检查"], ["autoPair", "自动配对括号与引号"], ["highlight", "高亮：==文字=="], ["subscript", "下标：H~2~O"], ["superscript", "上标：X^2^"], ["emoji", "Emoji：:smile:"], ["inlineMath", "行内公式：$x^2$"]] as const;
   return <Dialog title="偏好设置" close={close}>
+    <fieldset><legend>AI 改写</legend><p className="dialog-note">使用自定义 API 或本地模型改写选区，审阅差异后再应用。</p><button onClick={models}>模型设置…</button></fieldset>
     <ThemePicker value={theme} change={changeTheme} custom={themes} install={async () => { try { await installTheme(); } catch (error) { setError((error as Error).message); } }} />
     <ThemeCustomizer value={customization} change={customize} reset={resetTheme} save={saveTheme} />
     <BackgroundSettings asset={background} value={value} change={change} choose={chooseBackground} clear={clearBackground} />
