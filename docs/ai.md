@@ -37,6 +37,7 @@ AI capture, apply and keyboard submission are guarded during IME composition. Th
 
 - macOS stores remembered keys in the system Keychain. Windows/Linux use Electron's system-backed encryption; insecure Linux `basic_text` storage is refused.
 - If secure storage is unavailable, uncheck **使用系统安全存储记住密钥** to use a key only until the app exits. Session keys are not written to disk. Local servers without authentication need no key.
+- A locally signed macOS update can require renewed Keychain authorization. If access is refused, approve the app in the system prompt or re-enter the key in model settings; never put a key in chat or a bug report. See [Apple's Keychain access help](https://support.apple.com/guide/keychain-access/kyca1243/mac).
 - Settings return only key-presence/storage flags to the interface. The password field is cleared after saving. Reopening settings does not reveal a saved key. Changing the service endpoint does not reuse its previous key.
 - Base URLs cannot contain passwords, query strings or fragments. HTTP redirects are refused so a model key and selected text are not forwarded to another endpoint by a redirect.
 - Selected text is sent to the service you configure. Use your own public test text when checking a free provider's behavior. A local server keeps the request local only if its own configuration does so.
