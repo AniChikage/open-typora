@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { AISettingsDialog } from "./components/AISettingsDialog";
 import { AIReviewPanel } from "./components/AIReviewPanel";
 import type { RewriteSelection } from "./editor/aiReview";
@@ -269,7 +270,10 @@ export default function App() {
     else if (action === "quit") void session.quit();
     else if (action === "close-window") void session.closeWindow();
     else if (action === "pagebreak") editor()?.insert("\n\n<!-- pagebreak -->\n\n");
-    else if (action === "source") setRendered((value) => !value);
+    else if (action === "source") {
+      // Commit source-session history before a following undo/redo command.
+      flushSync(() => setRendered((value) => !value));
+    }
     else if (action === "next-tab" || action === "previous-tab") session.nextTab(action === "previous-tab");
     else if (action === "split-right" || action === "split-down") void session.split(action === "split-right" ? "columns" : "rows");
     else if (action === "other-pane") session.otherPane();

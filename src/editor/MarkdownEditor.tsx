@@ -660,7 +660,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
         source.current = null;
       };
     }, []);
-    useEffect(() => {
+    useLayoutEffect(() => {
       requested.current = rendered;
       setMode(rendered);
     }, [rendered]);
