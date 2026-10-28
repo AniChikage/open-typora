@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="README.md">English</a> · 简体中文<br>
-  <a href="https://open-typora.comicyueyu.chatgpt.site">在线试玩</a> · <a href="https://github.com/AniChikage/open-typora/releases/latest">下载安装包</a> · <a href="#功能">功能</a> · <a href="CONTRIBUTING.md">参与贡献</a> · <a href="LICENSE">MIT 许可证</a>
+  <a href="https://open-typora.comicyueyu.chatgpt.site">在线试玩</a> · <a href="https://github.com/AniChikage/open-typora/releases/latest">下载安装包</a> · <a href="#功能">功能</a> · <a href="#使用文档">使用文档</a> · <a href="CONTRIBUTING.md">参与贡献</a> · <a href="LICENSE">MIT 许可证</a>
 </p>
 
 > [!IMPORTANT]
@@ -24,11 +24,11 @@ Open Typora 是一款开源 Markdown 编辑器，受 Typora 的行内编辑体�
 
 ## 功能
 
-- **可选 AI 编辑**：接入自定义 OpenAI 兼容 API、OpenRouter、LM Studio 或 Ollama，改写选区、逐项审阅差异，并作为一次修改应用与撤销；[配置、隐私与边界](docs/ai.md)。
+- **可选 AI 编辑**：接入自定义 OpenAI 兼容 API、OpenRouter、LM Studio 或 Ollama，改写选区、逐项审阅差异，并作为一次修改应用与撤销；[配置、隐私与边界](docs/ai.zh-CN.md)。
 - **即时渲染编辑**：标题、行内格式、列表、任务、表格、链接、脚注和 YAML 前言；代码与公式支持局部编辑，也可切换完整源码。
 - **电子表格粘贴**：从 Excel/WPS 复制选区，在正文或源码中生成 Markdown 表格，保留空单元格、带引号的换行和一次撤销。见 [剪贴板说明](docs/clipboard.md)。
 - **多标签与分屏**：重排和键盘切换文档标签，两篇文档左右／上下对照编辑，两侧独立使用源码或即时渲染模式；重启后恢复布局；标签页右键提供批量关闭、路径复制、重命名和分屏，正文与表格也可通过右键编辑。
-- **编辑性能**：按首次查看初始化，输入时复用未改变的文档块；大文件使用虚拟化源码、差量撤销和后台大纲统计；[查看实测与边界](docs/performance.md)。
+- **编辑性能**：按首次查看初始化，输入时复用未改变的文档块；大文件保留所见即所得编辑，正文、代码块和大表格按视口渲染，使用增量解析、差量撤销和后台大纲统计；[查看实测与边界](docs/performance.md)。
 - **专注写作**：大纲导航、专注和打字机模式、字数统计、查找替换，六套内置主题与本地 CSS 主题。
 - **主题定制**：每套主题单独设置字体、行距、宽度与颜色，实时 CSS、打印专用 CSS 和主题导出；[使用说明](docs/themes.md)。
 - **自定义背景**：选择本地图片，预览不透明度、模糊、显示方式和位置；重启后保留，正文与源码模式共用，导出不带个人背景。
@@ -37,7 +37,6 @@ Open Typora 是一款开源 Markdown 编辑器，受 Typora 的行内编辑体�
 - **图片、公式与图表**：本地图片与粘贴插图、路径和尺寸设置、离线 MathJax、Mermaid 和 [sequence/flow 常用语法](docs/diagrams.md)；可选配置 PicGo Server 上传图片。
 - **多种文本编码**：UTF-8、UTF-16 LE/BE、GB18030、GBK、Big5、Shift JIS 和 Windows-1252；保留 BOM 与换行，阻止会丢失字符的保存。
 - **导入与导出**：内置 HTML、PDF 导出，支持手动分页、标题另起一页、续页表头与孤行控制；[分页说明](docs/printing.md)。通过 [Pandoc](https://pandoc.org/) 支持 DOCX、ODT、RTF、EPUB 等格式。
-
 - **Windows Markdown 预览**：可选启用原生预览处理器，在 Everything 和资源管理器中预览，需要 Microsoft Edge WebView2 Runtime；[设置与限制](docs/windows-preview.md)。
 
 具体覆盖范围与已知差异见[功能清单](docs/feature-parity.md)。
@@ -52,7 +51,7 @@ Open Typora 是一款开源 Markdown 编辑器，受 Typora 的行内编辑体�
 
 **[打开网页试玩](https://open-typora.comicyueyu.chatgpt.site)**，直接编辑示例、切换正文与源码、打开 UTF-8 Markdown 文件，并下载修改结果。试玩与桌面版复用同一套编辑内核。
 
-文档只保留在当前标签页内存中，不上传或持久保存内容；刷新会清空修改，请先下载保留。试玩导入上限为 1 MB，阻止加载外部嵌入媒体。文件夹、自动恢复、其他编码和 PDF／HTML 导出请使用桌面版。
+文档只保留在当前标签页内存中，不上传或持久保存内容；刷新会清空修改，请先下载保留。试玩导入上限为 1 MB，阻止加载外部嵌入媒体。文件夹、自动恢复、其他编码、PDF／HTML 导出、插件与 AI 编辑请使用桌面版。试玩不接收模型密钥，也不请求模型服务。
 
 ### 下载
 
@@ -115,7 +114,7 @@ node scripts/install.mts
 
 替换前请先退出正在运行的 Open Typora。安装器保留应用数据，验证新应用后删除旧应用；构建同时在 `release/native/` 生成 ZIP 包；`npm run package:release` 另外生成 DMG 和校验文件。
 
-在 Windows x64 上完成同样的克隆和依赖安装后，执行：
+Windows x64 还需安装 **Visual Studio 2022 Build Tools**（选择 **使用 C++ 的桌面开发** 工作负载）和 **PowerShell 7**（`pwsh`）。构建会使用固定版本的 WebView2 SDK 编译原生预览处理器。完成同样的克隆和依赖安装后，执行：
 
 ```sh
 npm run package:win
@@ -136,6 +135,8 @@ Linux x64 上运行 `npm run package:linux`，DEB 与 AppImage 输出至 `releas
 | 新建文档 | `⌘N` | `Ctrl+N` |
 | 打开文件 | `⌘O` | `Ctrl+O` |
 | 保存 | `⌘S` | `Ctrl+S` |
+| 撤销 / 重做 | `⌘Z` / `⌘⇧Z` | `Ctrl+Z` / `Ctrl+Shift+Z` |
+| AI 改写选区 | `⌘⇧R` | `Ctrl+Shift+R` |
 | 切换源码 | `⌘/` | `Ctrl+/` |
 | 文档内查找 | `⌘F` | `Ctrl+F` |
 | 搜索文件夹 | `⌘⇧F` | `Ctrl+Shift+F` |
@@ -144,6 +145,15 @@ Linux x64 上运行 `npm run package:linux`，DEB 与 AppImage 输出至 `releas
 | 选行 / 表格行 | `⌘L` | `Ctrl+L` |
 | 格式范围 / 单元格 | `⌘E` | `Ctrl+E` |
 | 跳回选区 | `⌘J` | `Ctrl+J` |
+
+### 配置 AI 编辑（可选）
+
+1. 打开 **编辑 → 模型设置…**，或 **偏好设置 → AI 改写 → 模型设置…**。
+2. 自定义兼容 API、OpenRouter 或 LM Studio 选择 **OpenAI 兼容 API / LM Studio**；Ollama 选择 **Ollama 原生接口**。填写服务地址、准确的模型名称，以及服务要求的 API 密钥。本地模型服务需要自行启动。
+3. 点击 **保存并测试连接**。测试只发送公开文本 `你好` 和固定测试要求，不发送当前文档；也可以只保存设置。
+4. 选中文字，按 **⌘⇧R**／**Ctrl+Shift+R**，填写要求并点击 **生成改写**。逐项核对差异，再点击 **应用 … 处修改**。生成不会改动或保存文档，应用后可以一次撤销。
+
+应用不附带模型或 API 订阅，只把选区、要求和固定的保留原意指令发送给你配置的服务。密钥可使用系统安全存储，也可仅在本次会话使用。地址示例、本地模型、密钥、报错和限制见 [AI 使用指南](docs/ai.zh-CN.md)。
 
 ## 开发
 
@@ -164,9 +174,24 @@ npm test                  # 编辑内核与文件层单元测试
 npm run build             # 类型检查与前端生产构建
 npm run test:native       # macOS 文件系统测试
 npm run test:webkit       # 原生 WebKit 集成测试，需要 Pandoc
+npm run test:ai           # Electron AI 界面与本地 HTTP 夹具，不需 API 密钥
+npm run test:ai-native    # macOS 模型传输与凭据测试
+npm run test:ai-webkit    # 原生 WebKit AI 审阅与历史测试
 ```
 
 其他桌面测试、数据隔离与构建说明见[贡献指南](CONTRIBUTING.md)；文档模型、撤销历史和原生桥见[架构文档](docs/architecture.md)。
+
+## 使用文档
+
+| 指南 | 内容 |
+| --- | --- |
+| [AI 编辑](docs/ai.zh-CN.md) | 自定义 API、本地模型、差异审阅和发送的数据 |
+| [插件](docs/plugins.md) · [主题](docs/themes.md) | 插件接口、CSS、背景和兼容范围 |
+| [电子表格粘贴](docs/clipboard.md) | Excel/WPS 表格、纯文本和剪贴板限制 |
+| [编辑性能](docs/performance.md) | 大文件、代码块、表格和实测边界 |
+| [打印分页](docs/printing.md) · [Windows 预览](docs/windows-preview.md) · [Linux AppImage](docs/linux-appimage.md) | 分页、Everything／资源管理器及 FUSE 配置 |
+| [功能清单](docs/feature-parity.md) · [验收记录](docs/verification.md) | 已实现流程、问题回归和各版本测试范围 |
+| [编辑架构](docs/architecture.md) · [贡献指南](CONTRIBUTING.md) | 编辑模型、原生宿主、开发和发布检查 |
 
 ## 当前限制
 
@@ -174,7 +199,9 @@ npm run test:webkit       # 原生 WebKit 集成测试，需要 Pandoc
 - 没有 BOM 的传统编码需要手动选择。
 - 正文和源码具有独立撤销历史；返回正文时，源码修改合并为一次事务。
 - 格式转换可能改变排版或不支持的文档结构；部分 RTF 图片格式会明确拒绝。导入时请保留原文件。
-- Windows/Linux 的旧 DOC/RTF 导入依赖 Pandoc 和 LibreOffice；嵌入的 WMF/EMF 图片需先转换为 PNG/JPEG。Windows/Linux 实体输入法候选交互仍需人工验收，自动输入文本不能替代该检查。
+- Windows/Linux 的旧 DOC/RTF 导入依赖 Pandoc 和 LibreOffice；嵌入的 WMF/EMF 图片需先转换为 PNG/JPEG。
+- 0.20.0 的实体输入法实测覆盖 macOS 搜狗拼音，包括 AI 要求、正文各编辑位置及撤销重做；其他实体输入法与 Windows/Linux 候选窗仍需人工验收。自动化组合输入单独记录，见[版本化验收记录](docs/verification.md)。
+- AI 需要自行配置模型服务，输出需要人工审阅；本版仅处理选区，未提供全文件夹代理、联网浏览或工具调用。Ollama 使用可控服务完成协议测试，真实模型验收使用自定义 API，未运行本地模型权重。
 - 第三方主题、嵌入媒体、输入法和图床服务存在兼容性差异，具体工作流请先查阅[功能清单](docs/feature-parity.md)。
 
 ## 参与贡献

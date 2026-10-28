@@ -8,7 +8,7 @@
 
 <p align="center">
   English · <a href="README.zh-CN.md">简体中文</a><br>
-  <a href="https://open-typora.comicyueyu.chatgpt.site">Try in your browser</a> · <a href="https://github.com/AniChikage/open-typora/releases/latest">Download</a> · <a href="#features">Features</a> · <a href="CONTRIBUTING.md">Contributing</a> · <a href="LICENSE">MIT License</a>
+  <a href="https://open-typora.comicyueyu.chatgpt.site">Try in your browser</a> · <a href="https://github.com/AniChikage/open-typora/releases/latest">Download</a> · <a href="#features">Features</a> · <a href="#documentation">Docs</a> · <a href="CONTRIBUTING.md">Contributing</a> · <a href="LICENSE">MIT License</a>
 </p>
 
 > [!IMPORTANT]
@@ -37,7 +37,6 @@ Open Typora is an open-source Markdown editor inspired by Typora's inline editin
 - **Images, math, and diagrams** — local and pasted images, path and size controls, offline MathJax, Mermaid, and a [legacy sequence/flow subset](docs/diagrams.md). Optional image uploads use a configured PicGo Server.
 - **More than UTF-8** — UTF-16 LE/BE, GB18030, GBK, Big5, Shift JIS, and Windows-1252. Preserve BOM and line endings; reject saves that would lose characters.
 - **Import and export** — built-in HTML and PDF export with manual/chapter breaks, repeated table headers and widow/orphan controls; [pagination guide](docs/printing.md). Additional formats such as DOCX, ODT, RTF, and EPUB through [Pandoc](https://pandoc.org/).
-
 - **Windows Markdown preview** — an opt-in native preview handler for Everything and File Explorer. Requires Microsoft Edge WebView2 Runtime. [Setup and limits](docs/windows-preview.md).
 
 See the [feature checklist](docs/feature-parity.md) for coverage and known differences.
@@ -52,7 +51,7 @@ Trying the preview? [Report a problem](https://github.com/AniChikage/open-typora
 
 **[Open the web demo](https://open-typora.comicyueyu.chatgpt.site)** to edit a sample, switch between live and source modes, open a UTF-8 Markdown file, and download your work. It uses the same editing kernel as the desktop app.
 
-The demo keeps documents in the current tab's memory; it does not upload or persist their contents. Refreshing clears edits, so download a copy before leaving. Imports are limited to 1 MB and external embedded media are blocked. Local folders, recovery, other encodings, and PDF / HTML export are available in the desktop app.
+The demo keeps documents in the current tab's memory; it does not upload or persist their contents. Refreshing clears edits, so download a copy before leaving. Imports are limited to 1 MB and external embedded media are blocked. Local folders, recovery, other encodings, PDF / HTML export, plugins and AI editing require the desktop app. The demo does not accept model keys or call model services.
 
 ### Downloads
 
@@ -136,6 +135,8 @@ Open a Markdown file or a folder, or try [the example document](examples/a-quiet
 | New document | `⌘N` | `Ctrl+N` |
 | Open a file | `⌘O` | `Ctrl+O` |
 | Save | `⌘S` | `Ctrl+S` |
+| Undo / redo | `⌘Z` / `⌘⇧Z` | `Ctrl+Z` / `Ctrl+Shift+Z` |
+| AI rewrite selection | `⌘⇧R` | `Ctrl+Shift+R` |
 | Toggle source view | `⌘/` | `Ctrl+/` |
 | Find in the document | `⌘F` | `Ctrl+F` |
 | Search the folder | `⌘⇧F` | `Ctrl+Shift+F` |
@@ -144,6 +145,15 @@ Open a Markdown file or a folder, or try [the example document](examples/a-quiet
 | Select line / table row | `⌘L` | `Ctrl+L` |
 | Select scope / table cell | `⌘E` | `Ctrl+E` |
 | Jump to selection | `⌘J` | `Ctrl+J` |
+
+### Set up AI editing (optional)
+
+1. Open **编辑 → 模型设置…** (Edit → Model settings), or **偏好设置 → AI 改写 → 模型设置…**.
+2. Choose **OpenAI 兼容 API / LM Studio** for a compatible API, OpenRouter or LM Studio; choose **Ollama 原生接口** for Ollama. Enter the service base URL, exact model ID and API key if needed. Start local servers separately.
+3. Click **保存并测试连接** (Save and test). This sends only the public sample `你好` and a fixed test instruction, rather than your open document. You can also save without testing.
+4. Select text, press **⌘⇧R** / **Ctrl+Shift+R**, enter an instruction and click **生成改写**. Review each change before choosing **应用 … 处修改**. Generating a proposal does not modify or save the document; applying it is one undoable edit.
+
+No model or API subscription is bundled. Only your selection, instruction and a fixed preservation instruction are sent to the configured service. Remembered keys use system secure storage; session-only keys are also supported. See the [AI guide](docs/ai.md) for endpoint examples, local models, credentials, errors and limits.
 
 ## Development
 
@@ -164,9 +174,24 @@ npm test                  # Editor and file-layer unit tests
 npm run build             # Type checking and production frontend build
 npm run test:native       # macOS filesystem tests
 npm run test:webkit       # Native WebKit integration tests; requires Pandoc
+npm run test:ai           # Electron AI UI with local HTTP fixtures; no API key
+npm run test:ai-native    # macOS model transport and credential tests
+npm run test:ai-webkit    # Native WebKit AI review and history tests
 ```
 
 More editor and desktop suites, test isolation, and build details are in [CONTRIBUTING.md](CONTRIBUTING.md). See [the architecture](docs/architecture.md) for the document model, editing history, and native bridge.
+
+## Documentation
+
+| Guide | What it covers |
+| --- | --- |
+| [AI editing](docs/ai.md) | Custom APIs, local models, reviewing changes and data sent |
+| [Plugins](docs/plugins.md) · [Themes](docs/themes.md) | Supported plugin APIs, CSS, backgrounds and compatibility limits |
+| [Spreadsheet paste](docs/clipboard.md) | Excel/WPS tables, plain text and clipboard limits |
+| [Performance](docs/performance.md) | Large documents, code blocks, tables and measured limits |
+| [Printing](docs/printing.md) · [Windows preview](docs/windows-preview.md) · [Linux AppImage](docs/linux-appimage.md) | Pagination, Everything/File Explorer and FUSE setup |
+| [Feature checklist](docs/feature-parity.md) · [Verification record](docs/verification.md) | Implemented workflows, issue regressions and version-specific test coverage |
+| [Architecture](docs/architecture.md) · [Contributing](CONTRIBUTING.md) | Editing model, native hosts, development and release checks |
 
 ## Current limitations
 
@@ -174,7 +199,9 @@ More editor and desktop suites, test isolation, and build details are in [CONTRI
 - Legacy encodings without a BOM require an explicit encoding choice.
 - Rich editing and source editing have separate undo histories; changes made in source mode join the rich history as one transaction when returning.
 - Format conversion can change layout or unsupported document structures. Some RTF image formats are rejected explicitly. Keep the original file when importing.
-- Windows/Linux DOC/RTF import requires both Pandoc and LibreOffice. Embedded WMF/EMF images need conversion to PNG/JPEG first. Physical input-method candidates on Windows/Linux still need manual acceptance; automated text input is not equivalent to that check.
+- Windows/Linux DOC/RTF import requires both Pandoc and LibreOffice. Embedded WMF/EMF images need conversion to PNG/JPEG first.
+- Physical IME checks for 0.20.0 cover Sogou Pinyin on macOS, including AI instructions, rich-text locations and undo/redo. Other physical IMEs and Windows/Linux candidate windows still need manual acceptance; synthetic composition is separate. See the [versioned verification record](docs/verification.md).
+- AI requires your own service and human review of the result. This release edits selections; it does not include whole-folder agents, browsing or tool calling. Ollama protocol tests use a controlled server; the real-model acceptance used a custom API, not local model weights.
 - Third-party themes, embedded media, input methods, and image-host integrations vary in compatibility. Consult the [checklist](docs/feature-parity.md) before depending on a specific workflow.
 
 ## Contributing

@@ -1,6 +1,6 @@
 # Themes and plugin compatibility
 
-Open Typora 0.18.0 includes six original themes and a compatibility host for a subset of [obgnail/typora_plugin](https://github.com/obgnail/typora_plugin). This is an independent integration, with no affiliation to Typora or the plugin authors. It does not load the complete Typora plugin distribution.
+Open Typora 0.20.0 includes six original themes and a compatibility host for a subset of [obgnail/typora_plugin](https://github.com/obgnail/typora_plugin). This is an independent integration, with no affiliation to Typora or the plugin authors. It does not load the complete Typora plugin distribution.
 
 ## Included community plugins
 
@@ -9,13 +9,13 @@ Open **View → Plugin Manager** (显示 → 插件管理), or use **Preferences
 | Plugin | Upstream file | Adapted behavior | Default shortcut |
 | --- | --- | --- | --- |
 | Fold lists / 列表折叠 | `collapse_list.js` | Click the triangle beside a list to show only its first item; optional per-document session state survives editor DOM refreshes | — |
-| Read-only / 只读模式 | `read_only.js` | Locks live editing, source, local code editors, undo and editing commands; document navigation and copying remain available | Mod+Alt+R |
+| Read-only / 只读模式 | `read_only.js` | Locks live editing, source, local code editors, undo, AI apply and editing commands; document navigation and copying remain available | Mod+Alt+R |
 | No images / 无图阅读 | `no_image.js` | Hides inline images; hover reveals them | Mod+Alt+I |
 | Paragraph focus / 段落聚焦 | `blur.js` | Blurs other top-level blocks; hover restores clarity | Mod+Alt+Shift+B |
 | Static markers / 常显语法标记 | `static_markers.js` | Keeps supported inline metadata visible, including emphasis and code delimiters | Mod+Alt+M |
 | Dark inversion / 反色夜间模式 | `dark.js` | Applies the upstream root inversion filter in a light OS appearance | Mod+Alt+D |
 
-Mod means Command on macOS and Control on Windows. Reserved editor shortcuts and collisions with other loaded plugins are rejected. Use **Plugin settings** to adjust the JSON configuration, including `HOTKEY`. A loading failure displays its cause and releases resources owned through the compatibility API.
+Mod means Command on macOS and Control on Windows/Linux. AI rewrite uses Mod+Shift+R, leaving the bundled read-only plugin's Mod+Alt+R shortcut intact. Reserved editor shortcuts and collisions with other loaded plugins are rejected. Use **Plugin settings** to adjust the JSON configuration, including `HOTKEY`. A loading failure displays its cause and releases resources owned through the compatibility API.
 
 The six upstream files are included unchanged under `third-party/typora-plugins`, pinned to commit `4a856129a9dbefaa963bfba4aacd3e5484bde60a`, with their MIT license and provenance. They are compiled as ordinary modules; the host does not use `eval` or enable `unsafe-eval`. Runtime adapters normalize a small set of DOM selectors and upstream CSS transition units.
 
@@ -60,7 +60,7 @@ module.exports = { plugin: InsertDate }
 
 Preferences contains **简白, 暖纸, 青墨, 石墨, 深海, 松夜** with immediate previews. Warm paper and forest use serif document fonts; the other themes use a sans-serif writing face. Font availability follows the operating system. Theme selection persists locally and is included in exported HTML/PDF styles.
 
-Custom CSS installation on macOS and Windows supports local CSS imports plus referenced fonts and images. Resources are embedded, with depth/size limits and checks against directory traversal and symlink escapes. Remote resources must be downloaded first. Basic `#write`, `#typora-sidebar` and `.md-fences` selectors are adapted, along with common palette variables. This is **partial Typora theme compatibility**; no claim is made that every third-party theme renders identically.
+Custom CSS installation on macOS, Windows and Linux supports local CSS imports plus referenced fonts and images. Resources are embedded, with depth/size limits and checks against directory traversal and symlink escapes. Remote resources must be downloaded first. Basic `#write`, `#typora-sidebar` and `.md-fences` selectors are adapted, along with common palette variables. This is **partial Typora theme compatibility**; no claim is made that every third-party theme renders identically.
 
 ### Personal background images
 
@@ -72,4 +72,4 @@ Personal backgrounds are excluded from exported HTML, PDF and converted document
 
 ## Verification scope
 
-Installed-application acceptance exercises all six pinned community plugins individually and together, computed styles, tab/split folding, live/source read-only behavior, restart persistence and disable cleanup. Tests execute the pinned upstream sources, exercise lifecycle cleanup, failed dependencies, real DOM effects, read-only guards, installation integrity and theme assets. The native WebKit suite additionally imports an installed CommonJS module under the actual script policy and checks an undoable document edit. UI acceptance and platform-specific limitations are recorded in the feature checklist. Passing these checks does not establish compatibility with all Typora plugins, themes, IMEs or operating systems.
+Installed-application acceptance exercises all six pinned community plugins individually and together, computed styles, tab/split folding, live/source read-only behavior, restart persistence and disable cleanup. Tests execute the pinned upstream sources, exercise lifecycle cleanup, failed dependencies, real DOM effects, read-only guards, installation integrity and theme assets. The native WebKit suite additionally imports an installed CommonJS module under the actual script policy and checks an undoable document edit. AI acceptance also checks that read-only mode blocks an AI edit. UI acceptance and platform-specific limitations are recorded in the [feature checklist](feature-parity.md) and [versioned verification](verification.md). Passing these checks does not establish compatibility with all Typora plugins, themes, IMEs or operating systems.

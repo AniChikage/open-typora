@@ -1,10 +1,12 @@
 # AI selection editing
 
+English · [简体中文](ai.zh-CN.md)
+
 AI editing is optional and available in the desktop app. You bring a model service; Open Typora does not include a paid subscription or a hosted model.
 
 ## Connect a model
 
-Open **Edit → 模型设置…**, or **Preferences → AI**. Enter the protocol, base URL, exact model ID and, if required, an API key. **保存并测试连接** saves the configuration and sends the public text `你好` with a short connection-test instruction. Opening settings or a document does not contact a model.
+Open **编辑 → 模型设置…** (Edit → Model settings), or **偏好设置 → AI 改写 → 模型设置…** (Preferences → AI editing → Model settings). Enter the protocol, base URL, exact model ID and, if required, an API key. **保存并测试连接** saves the configuration and sends the public text `你好` with a short connection-test instruction. Opening settings or a document does not contact a model.
 
 | Service | Interface | Example base URL |
 | --- | --- | --- |
@@ -15,7 +17,7 @@ Open **Edit → 模型设置…**, or **Preferences → AI**. Enter the protocol
 
 The compatible interface uses non-streaming `POST /chat/completions`; a root URL gets `/v1/chat/completions`. Custom path prefixes and complete endpoint URLs are preserved. The Ollama interface uses non-streaming `POST /api/chat`. Select a model actually installed in the local server or available to your provider account. Local servers must be running separately; an optional local API key can be left empty if the server permits it.
 
-For OpenRouter, choose a currently available `:free` model or `openrouter/free` to use free inference. Free endpoints still require your own OpenRouter key and have provider limits. `openrouter/free` chooses among free models, so use a fixed free model ID for repeatable quality comparisons. Open Typora sends the configured model ID and does not substitute a paid model. Check [OpenRouter's current catalog](https://openrouter.ai/models?max_price=0) and [limits](https://openrouter.ai/docs/api/reference/limits).
+For OpenRouter, copy an exact model ID from its [current catalog](https://openrouter.ai/models), and use your own OpenRouter key. Availability, pricing and [request limits](https://openrouter.ai/docs/api/reference/limits) are controlled by the provider. Open Typora sends the configured model ID without substituting another model.
 
 Other proprietary API formats are not supported unless the service offers an OpenAI-compatible chat endpoint. This release does not include tool calling, browsing or a whole-folder agent.
 
@@ -50,8 +52,22 @@ One request accepts up to **200,000 UTF-16 code units** of selected text and **8
 
 Truncated responses and empty results cannot be applied. Authentication, endpoint and rate-limit failures leave the document unchanged; provider error bodies are not echoed into the editor. A failed connection test saves the valid configuration but reports the request failure so it can be corrected.
 
+## Troubleshooting
+
+| Symptom | What to check |
+| --- | --- |
+| Connection test fails | Match the interface and URL to your service, use its exact model ID, and check the key and provider quota. A valid configuration stays saved even when the test request fails. |
+| Local server cannot be reached | Start LM Studio or Ollama separately, load a model and verify the host and port. Open Typora does not install or start a local model server. |
+| A saved key is unavailable after a macOS update | Allow Keychain access for the installed app, or re-enter the key in model settings. Do not include it in an issue. |
+| Apply is disabled | Finish any IME candidate input, leave read-only mode, and return to the unchanged original document and pane. If the text changed, select it again and generate a new proposal. |
+| Empty, truncated or oversized output | Narrow the selection or requested change and check the model's context/output limits. The rejected result has not changed your document. |
+
+For a bug report, include the app and OS versions, interface type, non-secret error text, and a public minimal sample. Remove API keys, private endpoints and document contents you cannot share.
+
 ## Verification
 
 `npm run test:ai` exercises the actual Electron UI and owned HTTP server: configuration, scoped requests, per-change review, Markdown containers, local code/source editing, save bytes, undo/redo, stale results, cancellation, composition guards, read-only plugins and split panes. It does not simulate model intelligence or an OS candidate window.
 
 On macOS, `npm run test:ai-native` tests the actual URLSession transport and `npm run test:ai-webkit` tests the native bridge and WebKit review flow. These deterministic fixtures need no third-party key. Windows/Linux installers run the AI UI acceptance against their packaged executable. Physical input-method and real-provider tests are separate from those fixtures.
+
+The [0.20.0 verification record](verification.md) separately records a real custom-API rewrite and manual Sogou Pinyin acceptance on macOS. Ollama was tested at the protocol level; this release did not run local model weights. Other model services and physical input methods are not exhaustively verified.

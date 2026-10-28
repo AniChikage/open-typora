@@ -11,12 +11,13 @@ Search [existing issues](https://github.com/AniChikage/open-typora/issues) first
 - A minimal Markdown document and a screenshot when they help explain the problem.
 - For input problems: input method, rich/source mode, editing location, and the key sequence.
 - For import/export problems: source format, target format, and Pandoc version.
+- For AI problems: interface type, non-secret error text, and a public selection/instruction that reproduces the issue. Distinguish a connection failure, generated output and an editor/apply problem; remove keys and private endpoints.
 
 Remove personal information and credentials from examples. For a behavior comparison, describe the observed behavior and reference public documentation where possible.
 
 ## Set up development
 
-Use Node.js 26 and npm. Native builds require macOS 14+ and Xcode Command Line Tools. Install Pandoc for the complete conversion and WebKit test suites.
+Use Node.js 26 and npm. The macOS host needs macOS 14+ and Xcode Command Line Tools. Windows packaging needs Windows x64, Visual Studio 2022 Build Tools with Desktop development with C++, and PowerShell 7 (`pwsh`); Linux packaging uses Ubuntu 22.04 x64. Install Pandoc for the complete conversion and WebKit test suites. See the [source-build instructions](README.md#build-from-source).
 
 ```sh
 git clone https://github.com/AniChikage/open-typora.git
@@ -59,8 +60,16 @@ Additional suites:
 | `npm run test:clipboard-native` | Actual AppKit clipboard → native WebKit source/live tables, exact saves and undo | macOS; no Pandoc required |
 | `npm run test:spreadsheet` | Office/WPS clipboard HTML/TSV, live/source/code paste, exact saves and undo | Electron desktop |
 | `npm run test:encoding` | Encoding conversion, save protection, composition, and image paste | macOS desktop |
+| `npm run test:menus` | Tab, text and table context menus; grouped closing and split targets | Electron desktop |
+| `npm run test:indentation` | List/source/local-code indentation and undo | Electron desktop |
+| `npm run test:huge` | Large code/table editing, source bytes, selection and history | Electron desktop |
+| `npm run test:ai` | Model settings, scoped requests, diff review, history, stale results, cancellation, IME guards, read-only and splits | Electron desktop; local HTTP fixtures, no API key |
+| `npm run test:ai-native` | URLSession transport, credentials, protocol errors and limits | macOS; local HTTP fixtures, no API key |
+| `npm run test:ai-webkit` | Native bridge, review/apply and history in WKWebView | macOS; local HTTP fixtures, no API key |
 
 Automated desktop suites use isolated temporary application data. To keep screenshots and reports outside the checkout, set `OPEN_TYPORA_QA_DIR` to an absolute output directory. Synthetic composition tests do not replace manual input-method checks.
+
+For AI changes, keep deterministic acceptance on the owned HTTP fixtures. Never require contributors to supply a paid key or send their documents to a provider. Check the request payload, unchanged source during generation, partial acceptance, one-step undo/redo, stale/cancelled responses, read-only guards, split targets and composition. Record any real-provider or physical-IME check separately, with its app version and environment; see the [AI guide](docs/ai.md) and [versioned verification](docs/verification.md).
 
 ## Build and install
 
@@ -88,7 +97,7 @@ After packaging on Windows, `npm run test:windows` installs the EXE into an isol
 | `src/components/` | Dialogs and navigation |
 | `native/` | AppKit/WebKit host, files, images, and conversion |
 | `electron/` | Windows/Linux release host, development, and desktop regression |
-| `shared/` | Commands and starter documents shared by the hosts |
+| `shared/` | Commands, bridge contracts, AI validation and starter documents shared by the hosts |
 | `tests/` | Unit, native, and desktop integration tests |
 | `design/` | Original icon and design sources |
 
@@ -98,6 +107,6 @@ Do not commit generated bundles, test output, credentials, personal documents, o
 
 ## Publish a release
 
-Set the package version, commit the change, and push a matching `v<version>` tag. The [release workflow](.github/workflows/release.yml) builds on Apple Silicon macOS, Windows x64 and Ubuntu 22.04 x64 runners. All three builds and required tests must pass before publication. Windows is installed and uninstalled; Linux tests the installed DEB and extracted AppImage payload, including recovery preservation on uninstall. The publisher verifies combined checksums before publishing DMG, EXE, two ZIPs, DEB, AppImage and `SHA256SUMS.txt`. Published assets are never overwritten by a rerun.
+Set the package version, commit the change, and push a matching `v<version>` tag. The [release workflow](.github/workflows/release.yml) builds on Apple Silicon macOS, Windows x64 and Ubuntu 22.04 x64 runners. All three builds, the Windows preview build, real FUSE acceptance on Ubuntu 22.04/24.04, and required tests must pass before publication. Windows is installed and uninstalled; Linux tests the installed DEB and extracted AppImage payload, including recovery preservation on uninstall. The publisher verifies combined checksums before publishing DMG, EXE, two ZIPs, DEB, AppImage and `SHA256SUMS.txt`. Published assets are never overwritten by a rerun.
 
-Main and `codex/**` branch changes run macOS, Windows and Linux acceptance without publishing. The native clipboard suite uses the system clipboard; CI runs it on a separate macOS desktop. Update `docs/release-notes.md` for each version. Linux builds use `npm run package:linux`; in an isolated Ubuntu x64 environment, `xvfb-run -a node tests/linux-install.mts` installs/removes the DEB with sudo and runs both packaged payloads. Never run that installer test against your ordinary Linux installation.
+Main and `codex/**` branch changes run macOS, Windows and Linux acceptance without publishing. The native clipboard suite uses the system clipboard; CI runs it on a separate macOS desktop. Update `docs/release-notes.md` for each version, both READMEs and current setup examples when the download version changes, and `docs/verification.md` with the actual coverage. Keep historical benchmark and test versions intact. Linux builds use `npm run package:linux`; in an isolated Ubuntu x64 environment, `xvfb-run -a node tests/linux-install.mts` installs/removes the DEB with sudo and runs both packaged payloads. Never run that installer test against your ordinary Linux installation.
