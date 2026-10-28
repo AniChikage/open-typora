@@ -13,7 +13,7 @@ SHA-256 checksums are included. macOS is locally signed, not notarized; Windows 
 ## Changes
 
 - macOS remembered keys use plaintext `ai-settings.json` with owner-only read/write permissions (`0600`), rather than Keychain. Normal settings, rewrites and restarts use the file. The settings screen explains the storage mode; saved keys remain hidden from the renderer.
-- Legacy macOS keys first attempt a noninteractive import. If authorization is required, explicitly migrate the old key once or re-enter it. After migration the app stops querying Keychain.
+- Legacy macOS keys are not read automatically. Explicitly migrate the old key once or re-enter it; services without authentication can clear the current key and save. After migration the app stops querying Keychain.
 - Session-only mode removes the persisted key. Clearing a key and changing the endpoint retain their existing behavior; manual configuration edits take effect without a stale persisted-key cache.
 - The Mac Electron development host uses the same file policy. Windows/Linux retain system-backed encryption.
 - Adds restart, permission, migration, session, endpoint and bridge-metadata regressions. Existing selection rewriting, retained review, IME guards and undo/redo acceptance continue to run.

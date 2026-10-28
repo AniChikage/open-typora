@@ -1,6 +1,5 @@
 import Foundation
 import Security
-import LocalAuthentication
 import CryptoKit
 
 private let aiKeyService = "org.opentypora.desktop.ai"
@@ -89,21 +88,15 @@ final class NativeAIService {
   private let state = NSLock()
   private var cancelled = [String]()
   private var memoryKeys = [String: String](), requests = [String: AIHTTPExchange]()
-  private var legacyAttempted = Set<String>()
-  private let legacyReader: (String, Bool) throws -> String?
-  init(_ directory: URL, legacyReader: ((String, Bool) throws -> String?)? = nil) {
+  private let legacyReader: (String) throws -> String?
+  init(_ directory: URL, legacyReader: ((String) throws -> String?)? = nil) {
     self.directory = directory
-    self.legacyReader = legacyReader ?? { try NativeAIService.readLegacyKey($0, interactive: $1) }
+    self.legacyReader = legacyReader ?? { try NativeAIService.readLegacyKey($0) }
   }
   private func locked<T>(_ work: () throws -> T) rethrows -> T { state.lock(); defer { state.unlock() }; return try work() }
   private func account(_ config: AIConfiguration) -> String { SHA256.hash(data: Data((directory.standardizedFileURL.path + "\n" + config.format + "\n" + config.endpoint.absoluteString).utf8)).map { String(format: "%02x", $0) }.joined() }
-  private static func readLegacyKey(_ account: String, interactive: Bool) throws -> String? {
+  private static func readLegacyKey(_ account: String) throws -> String? {
     var query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: aiKeyService, kSecAttrAccount as String: account, kSecReturnData as String: true, kSecMatchLimit as String: kSecMatchLimitOne]
-    if !interactive {
-      let context = LAContext(); context.interactionNotAllowed = true
-      query[kSecUseAuthenticationContext as String] = context
-      query[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
-    }
     var value: CFTypeRef?
     let status = SecItemCopyMatching(query as CFDictionary, &value)
     if status == errSecItemNotFound { return nil }
@@ -130,16 +123,8 @@ final class NativeAIService {
     let stored = try validKey(value["apiKey"] as? String ?? "")
     if version == 2 { return StoredAIConfiguration(config: config, secret: stored, needsMigration: false) }
     if !stored.isEmpty { try write(config, secret: stored); return StoredAIConfiguration(config: config, secret: stored, needsMigration: false) }
-    let id = account(config)
-    if !legacyAttempted.contains(id) {
-      legacyAttempted.insert(id)
-      let legacy = Result { try legacyReader(id, false) }
-      if case .success(let secret) = legacy {
-        let secret = try validKey(secret ?? "")
-        try write(config, secret: secret)
-        return StoredAIConfiguration(config: config, secret: secret, needsMigration: false)
-      }
-    }
+    // Legacy file-based keychains can ignore per-query UI suppression.
+    // Read an old key only after an explicit migration action.
     return StoredAIConfiguration(config: config, secret: "", needsMigration: true)
   }
   private func key(_ record: StoredAIConfiguration) -> String { record.secret.isEmpty ? memoryKeys[account(record.config)] ?? "" : record.secret }
@@ -155,7 +140,7 @@ final class NativeAIService {
         else if let old = current, oldAccount == nextAccount {
           if old.needsMigration {
             guard update["migrateLegacyKey"] as? Bool == true else { throw aiFailure("请先迁移旧密钥或重新填写。保存完成后将使用本机配置文件。") }
-            secret = try validKey(legacyReader(nextAccount, true) ?? "")
+            secret = try validKey(legacyReader(nextAccount) ?? "")
           } else { secret = key(old) }
         } else { secret = "" }
         try write(next, secret: remember ? secret : "")

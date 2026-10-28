@@ -29,7 +29,7 @@ import Foundation
     catch { try check(error.localizedDescription.contains("已取消"), "native in-flight cancellation aborts URLSession") }
     let fileDirectory = directory.appendingPathComponent("file-store")
     var forbiddenLegacyCalls = 0
-    let noLegacy: (String, Bool) throws -> String? = { _, _ in forbiddenLegacyCalls += 1; throw NSError(domain: "UnexpectedLegacyAccess", code: 1) }
+    let noLegacy: (String) throws -> String? = { _ in forbiddenLegacyCalls += 1; throw NSError(domain: "UnexpectedLegacyAccess", code: 1) }
     let fileService = NativeAIService(fileDirectory, legacyReader: noLegacy)
     let fileUpdate: [String: Any] = ["protocol": "openai", "baseUrl": base + "/vendor/v1", "model": "native-qa", "apiKey": secret, "rememberKey": true]
     let persistent = try fileService.settings(fileUpdate)
@@ -61,25 +61,30 @@ import Foundation
       try atomicWrite(folder.appendingPathComponent("ai-settings.json"), JSONSerialization.data(withJSONObject: ["version": 1, "protocol": "openai", "baseUrl": base + "/vendor/v1", "model": "native-qa"]))
       return folder
     }
-    let silentDirectory = try legacyFixture("legacy-silent")
-    var silentCalls = [Bool]()
-    let migratedSilently = try NativeAIService(silentDirectory, legacyReader: { _, interactive in silentCalls.append(interactive); return secret }).settings()
-    _ = try NativeAIService(silentDirectory, legacyReader: noLegacy).settings()
-    try check(migratedSilently["keyStorage"] as? String == "file" && silentCalls == [false] && forbiddenLegacyCalls == 0, "authorized legacy key migrates silently once; subsequent launches never query Keychain")
+    let legacyDirectory = try legacyFixture("legacy-explicit")
+    var legacyCalls = 0
+    let legacy = NativeAIService(legacyDirectory, legacyReader: { _ in legacyCalls += 1; return secret })
+    let firstRead = try legacy.settings(); _ = try legacy.settings()
+    try check(firstRead["needsKeyMigration"] as? Bool == true && legacyCalls == 0, "legacy settings reads never touch Keychain automatically")
+    do { _ = try await legacy.rewrite(["id": "legacy-needs-migration", "instruction": "润色", "text": "公开选区"]); throw NSError(domain: "UnexpectedSuccess", code: 5) }
+    catch { try check(error.localizedDescription.contains("迁移旧密钥") && legacyCalls == 0, "normal rewrite never reads a legacy key or triggers Keychain authorization") }
+    let explicit = try legacy.settings(["protocol": "openai", "baseUrl": base + "/vendor/v1", "model": "native-qa", "rememberKey": true, "migrateLegacyKey": true])
+    _ = try NativeAIService(legacyDirectory, legacyReader: noLegacy).settings()
+    try check(explicit["keyStorage"] as? String == "file" && legacyCalls == 1 && forbiddenLegacyCalls == 0, "explicit one-time migration persists the key and removes future Keychain dependency")
     let deniedDirectory = try legacyFixture("legacy-denied")
-    var deniedCalls = [Bool]()
-    let denied = NativeAIService(deniedDirectory, legacyReader: { _, interactive in deniedCalls.append(interactive); if !interactive { throw NSError(domain: "InteractionRequired", code: 1) }; return secret })
-    let firstRead = try denied.settings(); _ = try denied.settings()
-    try check(firstRead["needsKeyMigration"] as? Bool == true && deniedCalls == [false], "denied legacy access is noninteractive and is not retried on each settings read")
-    do { _ = try await denied.rewrite(["id": "legacy-needs-migration", "instruction": "润色", "text": "公开选区"]); throw NSError(domain: "UnexpectedSuccess", code: 5) }
-    catch { try check(error.localizedDescription.contains("迁移旧密钥") && deniedCalls == [false], "normal rewrite cannot trigger an interactive legacy Keychain request") }
-    let explicit = try denied.settings(["protocol": "openai", "baseUrl": base + "/vendor/v1", "model": "native-qa", "rememberKey": true, "migrateLegacyKey": true])
-    _ = try NativeAIService(deniedDirectory, legacyReader: noLegacy).settings()
-    try check(explicit["keyStorage"] as? String == "file" && deniedCalls == [false, true] && forbiddenLegacyCalls == 0, "explicit one-time migration persists the key and removes future Keychain dependency")
-    let missingDirectory = try legacyFixture("legacy-no-key")
-    let missing = try NativeAIService(missingDirectory, legacyReader: { _, interactive in if interactive { throw NSError(domain: "UnexpectedInteraction", code: 1) }; return nil }).settings()
-    try check(missing["hasKey"] as? Bool == false && missing["needsKeyMigration"] as? Bool == false, "legacy local servers without a key migrate without an authorization prompt")
-
+    let deniedFile = deniedDirectory.appendingPathComponent("ai-settings.json"), beforeDenied = try Data(contentsOf: deniedDirectory.appendingPathComponent("ai-settings.json"))
+    var deniedCalls = 0
+    let denied = NativeAIService(deniedDirectory, legacyReader: { _ in deniedCalls += 1; throw NSError(domain: "MigrationDenied", code: 1) })
+    _ = try denied.settings()
+    do { _ = try denied.settings(["protocol": "openai", "baseUrl": base + "/vendor/v1", "model": "native-qa", "rememberKey": true, "migrateLegacyKey": true]); throw NSError(domain: "UnexpectedSuccess", code: 6) }
+    catch { try check((try? Data(contentsOf: deniedFile)) == beforeDenied && deniedCalls == 1, "denied explicit migration leaves the original configuration untouched") }
+    _ = try denied.settings()
+    try check(deniedCalls == 1, "opening settings after a denied migration does not retry authorization")
+    _ = try denied.settings(["protocol": "openai", "baseUrl": base + "/vendor/v1", "model": "native-qa", "apiKey": secret, "rememberKey": true])
+    try check(deniedCalls == 1, "re-entering a key replaces the old binding without any Keychain access")
+    let noKeyDirectory = try legacyFixture("legacy-no-key")
+    let noKey = try NativeAIService(noKeyDirectory, legacyReader: noLegacy).settings(["protocol": "openai", "baseUrl": base + "/vendor/v1", "model": "native-qa", "clearKey": true, "rememberKey": true])
+    try check(noKey["hasKey"] as? Bool == false && noKey["needsKeyMigration"] as? Bool == false && forbiddenLegacyCalls == 0, "legacy services without authentication can explicitly keep no key without accessing Keychain")
     print("PASS: native AI transport acceptance complete")
   }
 }

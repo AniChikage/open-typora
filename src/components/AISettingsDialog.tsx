@@ -51,7 +51,7 @@ export function AISettingsDialog({ close, saved }: { close(): void; saved(): voi
       {original?.hasKey && <button type="button" disabled={busy} onClick={() => { setClearKey(true); if (keyInput.current) keyInput.current.value = ""; }}>移除已保存密钥</button>}
       <label className="checkbox-option"><input aria-label="记住模型密钥" type="checkbox" checked={remember} disabled={loading || busy || !fileStorage && original?.secureStorage === false} onChange={event => setRemember(event.target.checked)} />{fileStorage ? "保存密钥到本机配置文件" : "使用系统安全存储记住密钥"}</label>
       <p className="dialog-note">{fileStorage ? "密钥明文保存在本机 ai-settings.json，文件权限为仅当前用户可读写。取消勾选后，退出应用即清除会话密钥。" : original?.secureStorage === false ? "本机安全存储不可用，密钥只会保留到本次应用退出。" : "密钥使用系统保护的加密存储。取消勾选后，退出应用即清除会话密钥。"}</p>
-      {original?.needsKeyMigration && !clearKey && <div className="dialog-note"><p>旧版密钥仍在钥匙串中，可迁移一次或重新填写。迁移可能需要最后一次授权，之后都读配置文件。</p><button type="button" disabled={loading || busy} onClick={() => void save(false, true)}>迁移旧密钥到配置文件</button></div>}
+      {original?.needsKeyMigration && !clearKey && <div className="dialog-note"><p>旧版配置需要迁移密钥或重新填写。点击迁移可能需要最后一次授权，之后都读配置文件；无需密钥的服务可清除当前密钥后保存。</p><button type="button" disabled={loading || busy} onClick={() => void save(false, true)}>迁移旧密钥到配置文件</button></div>}
       {error && <p className="form-error" role="alert">{error}</p>}
       {status && <p className="ai-status" role="status">{status}</p>}
       <div className="dialog-actions"><button type="button" disabled={loading || busy} onClick={() => void save(true)}>保存并测试连接</button><button className="primary-button" type="submit" disabled={loading || busy} onKeyDown={event => { if (imeKey(event.nativeEvent)) event.preventDefault(); }}>{busy ? "正在处理…" : "保存设置"}</button></div>
