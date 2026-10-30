@@ -23,6 +23,7 @@ struct DocumentRecord: Codable {
   var conflict: Bool?
   var bom: Bool?
   var encoding: String?
+  var historyWarning: String?
 }
 struct WorkspaceLayoutState: Codable {
   var primaryId: String
@@ -82,6 +83,7 @@ func atomicWrite(_ url: URL, _ data: Data, permissions: UInt16? = nil, beforeCom
 }
 final class DocumentStore {
   let dataDirectory: URL
+  let versions: VersionStore
   var records = [String: DocumentRecord]()
   var tokens = [String: URL]()
   var folder: URL?
@@ -90,7 +92,7 @@ final class DocumentStore {
   private var closedOrder = [String]()
   // Asset/conversion budget only. Markdown open/save/recovery has no fixed byte cap.
   static let maxBytes = 20 * 1024 * 1024
-  init(_ directory: URL) { dataDirectory = directory }
+  init(_ directory: URL, historyDirectory: URL? = nil) { dataDirectory = directory; versions = VersionStore(historyDirectory ?? directory) }
   func require(_ id: String) throws -> DocumentRecord {
     guard let record = records[id] else { throw NativeFailure("文件已关闭，请重新打开。") }
     return record
@@ -144,6 +146,7 @@ final class DocumentStore {
       diskHash: hashData(bytes), lineEnding: text.contains("\r\n") ? "\r\n" : "\n", conflict: false,
       bom: bom, encoding: detected)
     records[record.id] = record
+    _ = try? versions.capture(record, content: text, reason: "opened")
     return record
   }
   func draft(_ record: DocumentRecord) throws -> DocumentRecord {
@@ -162,6 +165,7 @@ final class DocumentStore {
     -> DocumentRecord
   {
     var record = try require(id)
+    let historySource = record
     guard let target = destination ?? record.path.map({ URL(fileURLWithPath: $0) }) else {
       throw NativeFailure("请先为草稿选择保存位置。")
     }
@@ -178,15 +182,22 @@ final class DocumentStore {
     let selectedEncoding = encoding ?? record.encoding ?? "utf-8"
     let selectedBOM = bom ?? record.bom ?? false
     let bytes = try Self.encode(text, encoding: selectedEncoding, bom: selectedBOM)
+    var historyWarning: String?
+    do { historyWarning = try versions.capture(record, content: record.savedContent, reason: "opened")["warning"] as? String }
+    catch { historyWarning = "无法保存版本历史，文档保存仍可继续。" }
     try atomicWrite(target, bytes, beforeCommit: verify)
     record.encoding = selectedEncoding
     record.bom = selectedBOM && selectedEncoding.hasPrefix("utf-")
-    record.path = target.path
+    record.path = canonicalFileURL(target).path
     record.name = target.lastPathComponent
     record.content = text
     record.savedContent = text
     record.diskHash = hashData(bytes)
     record.conflict = false
+    if historySource.path != record.path { do { try versions.adopt(historySource, record) } catch { historyWarning = "历史版本迁移失败，原始历史记录已保留。" } }
+    do { historyWarning = try versions.capture(record, content: text, reason: "saved")["warning"] as? String ?? historyWarning }
+    catch { historyWarning = "无法保存版本历史，文档已保存。" }
+    record.historyWarning = historyWarning
     records[id] = record
     return record
   }
@@ -270,6 +281,34 @@ final class DocumentStore {
     folder = root
     tokens = nextTokens
     return ["folder": root.path, "files": files, "truncated": truncated, "skipped": skipped]
+  }
+
+  struct ContextAccess {
+    let token: String, file: URL?, root: URL?, name: String, encoding: String?, draft: String?
+  }
+  func contextAccess(_ token: String) throws -> ContextAccess {
+    if token.hasPrefix("document:") {
+      let record = try require(String(token.dropFirst(9)))
+      return ContextAccess(token: token, file: record.path.map { URL(fileURLWithPath: $0) }, root: nil, name: record.name, encoding: record.encoding, draft: record.path == nil ? record.content : nil)
+    }
+    guard let file = tokens[token], let folder else { throw NativeFailure("资料已不在当前授权范围，请刷新后重试。") }
+    return ContextAccess(token: token, file: file, root: folder, name: file.path.hasPrefix(folder.path + "/") ? String(file.path.dropFirst(folder.path.count + 1)) : file.lastPathComponent, encoding: records.values.first(where: { $0.path == file.path })?.encoding, draft: nil)
+  }
+  func readContext(_ access: ContextAccess) throws -> [String: Any] {
+    if let content = access.draft {
+      guard content.utf8.count <= 2 * 1024 * 1024 else { throw NativeFailure("单份参考资料超过 2 MiB，已跳过；不影响编辑或保存。") }
+      return ["token": access.token, "name": access.name, "path": NSNull(), "content": content, "hash": hashData(Data(content.utf8)), "bytes": content.utf8.count]
+    }
+    guard let file = access.file else { throw NativeFailure("资料已不在当前授权范围，请刷新后重试。") }
+    let resolved = canonicalFileURL(file)
+    let metadata = try file.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
+    guard file.path == resolved.path, metadata.isSymbolicLink != true, metadata.isRegularFile == true,
+      ["md", "markdown", "mdown"].contains(file.pathExtension.lowercased()), access.root == nil || contained(access.root!, resolved) else { throw NativeFailure("资料已不在当前授权范围，请刷新后重试。") }
+    guard (metadata.fileSize ?? Int.max) <= 2 * 1024 * 1024 else { throw NativeFailure("单份参考资料超过 2 MiB，已跳过；不影响编辑或保存。") }
+    let bytes = try Data(contentsOf: resolved)
+    guard bytes.count <= 2 * 1024 * 1024, canonicalFileURL(file).path == resolved.path else { throw NativeFailure("参考资料在读取时发生变化，请重试。") }
+    let (content, _, _) = try decode(bytes, encoding: access.encoding)
+    return ["token": access.token, "name": access.name, "path": resolved.path, "content": content, "hash": hashData(bytes), "bytes": bytes.count]
   }
 
   func persist(_ incoming: SessionRecord) throws {

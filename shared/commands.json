@@ -13,6 +13,7 @@
     {"label":"撤销文件操作","action":"undo-file"},
     {"label":"保存","action":"save","key":"Mod-S","context":"document"},
     {"label":"另存为…","action":"saveAs","key":"Mod-Shift-S","context":"document"},
+    {"label":"版本历史…","action":"versions","context":"document"},
     {"label":"文本编码…","action":"encoding","context":"document"},
     {"label":"导入 Word / 其他格式…","action":"import"},
     {"label":"导出 HTML…","action":"html","context":"document"},
@@ -49,6 +50,7 @@
     {"label":"查找上一个","action":"find-previous","pcKey":"Shift-F3","key":"Mod-Shift-G","context":"document"},
     {"label":"搜索文件夹内容…","action":"global-search","key":"Mod-Shift-F"},
     {"label":"AI 改写选区…","action":"ai-rewrite","key":"Mod-Shift-R","context":"document"},
+    {"label":"目录问答…","action":"knowledge"},
     {"label":"模型设置…","action":"ai-models"}
   ]},
   {"title":"段落","items":[

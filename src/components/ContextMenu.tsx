@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronRight } from "lucide-react";
@@ -39,7 +40,7 @@ function MenuPanel({ label, x, y, items, choose, back, parentLeft, autofocus = t
     setExpanded(null);
     controls().find(button => button.dataset.menuId === id)?.focus({ preventScroll: true });
   }
-  return <div ref={root} role="menu" aria-label={label} className="context-menu" style={position}
+  return <div ref={root} role="menu" aria-label={t(label)} className="context-menu" style={position}
     onKeyDown={event => {
       if ((event.target as HTMLElement).closest('[role="menu"]') !== event.currentTarget) return;
       const buttons = controls(), index = buttons.indexOf(document.activeElement as HTMLButtonElement);
@@ -65,7 +66,7 @@ function MenuPanel({ label, x, y, items, choose, back, parentLeft, autofocus = t
           else choose(item.id);
         }}>
         <span className="context-menu-check" aria-hidden="true">{item.checked && <Check size={13} />}</span>
-        <span className="context-menu-label">{item.label}</span>{item.children && <ChevronRight size={13} aria-hidden="true" />}
+        <span className="context-menu-label">{t(item.label)}</span>{item.children && <ChevronRight size={13} aria-hidden="true" />}
       </button>
       {item.children && expanded?.id === item.id && <MenuPanel label={item.label} x={expanded.rect.right - 3} y={expanded.rect.top - 4} parentLeft={expanded.rect.left}
         items={item.children} choose={choose} autofocus={expanded.keyboard} back={() => restoreParent(item.id)} />}

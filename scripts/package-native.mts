@@ -23,6 +23,8 @@ execFileSync(
     "-target",
     `${process.arch === "arm64" ? "arm64" : "x86_64"}-apple-macos14.0`,
     "native/DocumentStore.swift",
+    "native/Versions.swift",
+    "native/Localization.swift",
     "native/Workspace.swift",
     "native/Interchange.swift",
     "native/ImageActions.swift",
@@ -43,6 +45,7 @@ await cp("dist", path.join(resources, "dist"), { recursive: true });
 await cp("build/runtime/native/bridge.js", path.join(resources, "bridge.js"));
 await cp("shared/samples.json", path.join(resources, "samples.json"));
 await cp("shared/commands.json", path.join(resources, "commands.json"));
+await cp("shared/en.json", path.join(resources, "en.json"));
 await cp("build/runtime/shared/plugin-loader.mjs", path.join(resources, "plugin-loader.js"));
 await cp("build/icon.icns", path.join(resources, "icon.icns"));
 await cp("LICENSE", path.join(resources, "LICENSE"));

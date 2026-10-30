@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import {
   FileText,
   FolderOpen,
@@ -51,7 +52,7 @@ export function Sidebar(props: Props) {
   function operate(action: FileOperation["action"]) {
     const file = menu?.file, directory = file?.isDirectory === "true";
     const parent = directory ? file!.path : file?.path.slice(0, -file.name.length - 1) || props.folder || undefined;
-    props.operation({ action, path: ["new-file", "new-folder"].includes(action) ? parent : file?.path, name: action === "new-file" ? "未命名.md" : action === "new-folder" ? "新文件夹" : action === "duplicate" ? file?.name.replace(/(\.[^.]+)$/, " 副本$1") : file?.name }); setMenu(null);
+    props.operation({ action, path: ["new-file", "new-folder"].includes(action) ? parent : file?.path, name: action === "new-file" ? t("未命名.md") : action === "new-folder" ? t("新文件夹") : action === "duplicate" ? file?.name.replace(/(\.[^.]+)$/, " 副本$1") : file?.name }); setMenu(null);
   }
   const [switcher, setSwitcher] = useState(false);
   const heading = useRef<HTMLDivElement>(null);
@@ -71,16 +72,16 @@ export function Sidebar(props: Props) {
     };
   }, [switcher]);
   return (
-    <aside className="sidebar" aria-label="文档侧栏">
+    <aside className="sidebar" aria-label={t("文档侧栏")}>
       <div className="sidebar-heading" ref={heading}>
         <button
           className="sidebar-switcher"
-          aria-label="切换侧栏内容"
+          aria-label={t("切换侧栏内容")}
           aria-expanded={switcher}
           aria-haspopup="menu"
           onClick={() => setSwitcher(!switcher)}
         >
-          {props.tab === "files" ? "文件" : props.tab === "tree" ? "文件树" : "大纲"}
+          {props.tab === "files" ? t("文件") : props.tab === "tree" ? t("文件树") : t("大纲")}
           <ChevronDown size={12} />
         </button>
         {switcher && (
@@ -95,7 +96,7 @@ export function Sidebar(props: Props) {
                   setSwitcher(false);
                 }}
               >
-                {tab === "files" ? "文件" : tab === "tree" ? "文件树" : "大纲"}
+                {tab === "files" ? t("文件") : tab === "tree" ? t("文件树") : t("大纲")}
               </button>
             ))}
           </div>
@@ -106,22 +107,22 @@ export function Sidebar(props: Props) {
           <>
             <div className="sidebar-section-label">
               <span>
-                {props.folder ? props.folder.split("/").at(-1) : "打开的文档"}
+                {props.folder ? props.folder.split("/").at(-1) : t("打开的文档")}
               </span>
               <div>
                 <button
                   className="icon-button"
-                  aria-label="新建文档"
-                  title={`新建文档 ${shortcutLabel("Mod-N")}`}
+                  aria-label={t("新建文档")}
+                  title={t("新建文档 {0}", shortcutLabel("Mod-N"))}
                   onClick={props.create}
                 >
                   <Plus size={16} />
                 </button>
-                {props.folder && <button className="icon-button" aria-label="文件夹操作" onClick={event => context(event, null)}><MoreHorizontal size={16} /></button>}
+                {props.folder && <button className="icon-button" aria-label={t("文件夹操作")} onClick={event => context(event, null)}><MoreHorizontal size={16} /></button>}
                 {props.folder && (
                   <button
                     className="icon-button"
-                    aria-label="刷新文件夹"
+                    aria-label={t("刷新文件夹")}
                     onClick={props.refresh}
                   >
                     <RefreshCw size={14} />
@@ -129,7 +130,7 @@ export function Sidebar(props: Props) {
                 )}
               </div>
             </div>
-            <nav aria-label="文件列表">
+            <nav aria-label={t("文件列表")}>
               {props.documents.filter(record => props.tab !== "tree" || !props.files.some(file => file.path === record.path)).map((record) => (
                 <div
                   className={`file-row ${props.activeId === record.id ? "selected" : ""}`}
@@ -144,12 +145,12 @@ export function Sidebar(props: Props) {
                     <FileText size={17} />
                     <span>{record.name}</span>
                     {record.content !== record.savedContent && (
-                      <span className="dirty-dot" aria-label="未保存" />
+                      <span className="dirty-dot" aria-label={t("未保存")} />
                     )}
                   </button>
                   <button
                     className="file-close"
-                    aria-label={`关闭 ${record.name}`}
+                    aria-label={t("关闭 {0}", record.name)}
                     onClick={() => props.close(record.id)}
                   >
                     <X size={13} />
@@ -176,17 +177,13 @@ export function Sidebar(props: Props) {
                   </div>
                 ))}
               {!props.documents.length && !props.files.length && (
-                <p className="sidebar-empty">
-                  打开一个文件夹，
-                  <br />
-                  浏览 Markdown 文档。
-                </p>
+                <p className="sidebar-empty">{t("打开一个文件夹，")}<br />{t("浏览 Markdown 文档。")}</p>
               )}
             </nav>
           </>
         ) : (
-          <nav className="outline" aria-label="文档大纲">
-            {props.outlinePending ? <p className="sidebar-empty" role="status">正在分析文档大纲…</p> : props.headings.length ? (
+          <nav className="outline" aria-label={t("文档大纲")}>
+            {props.outlinePending ? <p className="sidebar-empty" role="status">{t("正在分析文档大纲…")}</p> : props.headings.length ? (
               props.headings.map((heading, index) => (
                 <button
                   key={`${heading.line}-${index}`}
@@ -197,34 +194,30 @@ export function Sidebar(props: Props) {
                 </button>
               ))
             ) : (
-              <p className="sidebar-empty">
-                使用 # 标题，
-                <br />
-                在这里看见文档结构。
-              </p>
+              <p className="sidebar-empty">{t("使用 # 标题，")}<br />{t("在这里看见文档结构。")}</p>
             )}
-            {props.outlineTruncated && <p className="sidebar-empty">仅显示前 2000 个标题。</p>}
+            {props.outlineTruncated && <p className="sidebar-empty">{t("仅显示前 2000 个标题。")}</p>}
           </nav>
         )}
       </div>
-      {menu && <div className="file-context-menu" role="menu" aria-label="文件操作" style={{ left: menu.x, top: Math.max(45, menu.y) }} onClick={event => event.stopPropagation()}>
-        <button role="menuitem" onClick={() => operate("new-file")}>新建文件…</button><button role="menuitem" onClick={() => operate("new-folder")}>新建文件夹…</button>
-        {menu.file && <><hr />{menu.file.isDirectory !== "true" && <button role="menuitem" onClick={() => operate("duplicate")}>创建副本…</button>}<button role="menuitem" onClick={() => operate("rename")}>重命名…</button><button role="menuitem" onClick={() => operate("move")}>移动到…</button><button role="menuitem" onClick={() => operate("trash")}>移到废纸篓</button><button role="menuitem" onClick={() => { void host.writeClipboard(menu.file!.path); setMenu(null); }}>复制路径</button><button role="menuitem" onClick={() => { void host.reveal(menu.file!.path).catch(e => props.notify(e.message)); setMenu(null); }}>在 Finder 中显示</button></>}
-        <hr /><button role="menuitem" onClick={() => operate("undo")}>撤销上次文件操作</button><hr /><label>排序<select aria-label="文件排序" value={sort} onChange={e => setSort(e.target.value as FileSort)}><option value="natural">自然名称</option><option value="name">字母顺序</option><option value="modified">修改时间</option><option value="created">创建时间</option></select></label><label><input type="checkbox" checked={descending} onChange={e => setDescending(e.target.checked)} />降序</label><label><input type="checkbox" checked={foldersFirst} onChange={e => setFoldersFirst(e.target.checked)} />文件夹优先</label>
+      {menu && <div className="file-context-menu" role="menu" aria-label={t("文件操作")} style={{ left: menu.x, top: Math.max(45, menu.y) }} onClick={event => event.stopPropagation()}>
+        <button role="menuitem" onClick={() => operate("new-file")}>{t("新建文件…")}</button><button role="menuitem" onClick={() => operate("new-folder")}>{t("新建文件夹…")}</button>
+        {menu.file && <><hr />{menu.file.isDirectory !== "true" && <button role="menuitem" onClick={() => operate("duplicate")}>{t("创建副本…")}</button>}<button role="menuitem" onClick={() => operate("rename")}>{t("重命名…")}</button><button role="menuitem" onClick={() => operate("move")}>{t("移动到…")}</button><button role="menuitem" onClick={() => operate("trash")}>{t("移到废纸篓")}</button><button role="menuitem" onClick={() => { void host.writeClipboard(menu.file!.path); setMenu(null); }}>{t("复制路径")}</button><button role="menuitem" onClick={() => { void host.reveal(menu.file!.path).catch(e => props.notify(e.message)); setMenu(null); }}>{t("在 Finder 中显示")}</button></>}
+        <hr /><button role="menuitem" onClick={() => operate("undo")}>{t("撤销上次文件操作")}</button><hr /><label>{t("排序")}<select aria-label={t("文件排序")} value={sort} onChange={e => setSort(e.target.value as FileSort)}><option value="natural">{t("自然名称")}</option><option value="name">{t("字母顺序")}</option><option value="modified">{t("修改时间")}</option><option value="created">{t("创建时间")}</option></select></label><label><input type="checkbox" checked={descending} onChange={e => setDescending(e.target.checked)} />{t("降序")}</label><label><input type="checkbox" checked={foldersFirst} onChange={e => setFoldersFirst(e.target.checked)} />{t("文件夹优先")}</label>
       </div>}
-      <div className="sidebar-footer"><button className="icon-button" aria-label="搜索文件夹" title={`搜索文件夹 ${shortcutLabel("Mod-Shift-F")}`} onClick={props.search}><Search size={16} /></button><button className="icon-button" aria-label="最近项目" onClick={props.recent}><History size={16} /></button>
+      <div className="sidebar-footer"><button className="icon-button" aria-label={t("搜索文件夹")} title={t("搜索文件夹 {0}", shortcutLabel("Mod-Shift-F"))} onClick={props.search}><Search size={16} /></button><button className="icon-button" aria-label={t("最近项目")} onClick={props.recent}><History size={16} /></button>
         <button
           className="icon-button"
-          aria-label="打开文件夹"
-          title="打开文件夹"
+          aria-label={t("打开文件夹")}
+          title={t("打开文件夹")}
           onClick={props.openFolder}
         >
           <FolderOpen size={16} />
         </button>
         <button
           className="icon-button"
-          title="切换主题"
-          aria-label="切换主题"
+          title={t("切换主题")}
+          aria-label={t("切换主题")}
           onClick={props.toggleTheme}
         >
           {props.theme === "dark" ? <Moon size={19} /> : <Sun size={19} />}

@@ -1,3 +1,4 @@
+import { t } from "../i18n.ts";
 import { compactTable } from "./tableData.ts";
 import MarkdownIt from "markdown-it";
 import taskLists from "markdown-it-task-lists";

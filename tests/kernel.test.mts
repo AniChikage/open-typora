@@ -1058,3 +1058,20 @@ test("spreadsheet paste expands beyond the old 100-row and 30-column editor limi
   assert.equal(f.root.querySelectorAll('th').length,40);
   f.editor.undo();assert.equal(f.model.text,original);f.close();
 });
+
+test("typing terminal spaces preserves the paragraph caret and never moves into the next block", () => {
+  for (const prefix of ["", "# ", "- ", "> "]) {
+    const original = prefix + "Original" + "\n\nNext paragraph\n", f = fixture(original);
+    try {
+      const from = original.indexOf("Original"); f.model.selection = { anchor: from, head: from + 8 }; f.editor.restore();
+      const replacement = "Current text after snapshot.";
+      for (let i = 0; i < replacement.length; i++) {
+        input(f.root, "insertText", replacement[i]);
+        assert.equal(f.editor.bookmark().head, from + i + 1, prefix + " caret after " + JSON.stringify(replacement.slice(0, i + 1)));
+      }
+      assert.equal(f.model.toMarkdown(), original.replace("Original", replacement));
+      f.editor.undo(); assert.equal(f.model.toMarkdown(), original);
+      f.editor.redo(); assert.equal(f.model.toMarkdown(), original.replace("Original", replacement));
+    } finally { f.close(); }
+  }
+});
