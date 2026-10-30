@@ -1,3 +1,4 @@
+import { t } from "../i18n.ts";
 import { fenceRange } from "./fenceRange.ts";
 export { fenceRange } from "./fenceRange.ts";
 import { contiguousPositions, mappedPositions } from "./sourcePositions.ts";
@@ -102,6 +103,8 @@ export function renderNode(
   environment: Record<string, unknown> = {},
 ): HTMLElement {
   const holder = document.createElement("div");
+  const sourceLines = node.source.split("\n"), lineOffsets = [0];
+  for (const line of sourceLines) lineOffsets.push(lineOffsets.at(-1)! + line.length + 1);
   const alert = /^\s*>\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/i.exec(node.source);
   if (alert) environment = { ...environment, alertType: alert[1].toUpperCase() };
   let pointer = 0,
@@ -110,10 +113,7 @@ export function renderNode(
   const leaf = (raw: string, map?: [number, number] | null, kind?: string) => {
     let start = pointer;
     if (map)
-      start = node.source
-        .split("\n")
-        .slice(0, map[0])
-        .reduce((n, line) => n + line.length + 1, 0);
+      start = lineOffsets[map[0]] || 0;
     const positions: number[] = [];
     let search = start;
     for (const [lineIndex, line] of raw.split("\n").entries()) {
@@ -194,8 +194,15 @@ export function renderNode(
       node.source,
       documentId,
       (token) => {
-        const cell = cells.shift(),
-          raw = cell ? cell.raw : token.content;
+        const cell = cells.shift();
+        let raw = cell ? cell.raw : token.content;
+        if (!cell && token.map) {
+          // Markdown-it trims terminal whitespace from inline content. Keep it
+          // editable so a caret after a typed space cannot fall into another block.
+          const lastLine = sourceLines[token.map[1] - 1] || "";
+          const trailing = /[ \t]+$/.exec(lastLine)?.[0] || "";
+          if (trailing && !raw.endsWith(trailing)) raw += trailing;
+        }
         if (cell) pointer = cell.start;
         const id = leaf(raw, cell ? null : token.map);
         if (cell) {
@@ -207,19 +214,19 @@ export function renderNode(
           pointer = cell.end;
         }
         const sourceLine = token.map
-          ? node.source.split("\n")[token.map[0]]
+          ? sourceLines[token.map[0]]
           : "";
         const task = /^\s*(?:>\s*)*(?:[-+*]|\d+[.)])\s+\[([ xX])\]\s/.exec(
           sourceLine || "",
         );
-        const taskFrom = node.from + node.source.split("\n").slice(0, token.map?.[0] || 0).reduce((n, line) => n + line.length + 1, 0) + sourceLine.indexOf("[") + 1;
+        const taskFrom = node.from + (lineOffsets[token.map?.[0] || 0] || 0) + sourceLine.indexOf("[") + 1;
         const checkbox = task
           ? `<input class="task-checkbox" data-task="${taskFrom}" type="checkbox" contenteditable="false" ${task[1].toLowerCase() === "x" ? "checked" : ""} />`
           : "";
         return `${checkbox}<span class="md-line" data-leaf="${id}">${tokenInlineHtml(raw, documentId, environment) || "<br />"}</span>`;
       },
       (token) => {
-        const openingLine = node.source.split("\n")[token.map?.[0] || 0];
+        const openingLine = sourceLines[token.map?.[0] || 0];
         if (token.map?.[1] === (token.map?.[0] || 0) + 1 && !node.source.includes("\n")) { const raw = openingLine.replace(/^\s*(?:>\s*)*(?:(?:[-+*]|\d+[.)])\s+)?/, ""), id = leaf(raw, token.map); return `<p><span data-leaf="${id}" class="md-fence-opening">${escapeHtml(raw)}</span></p>`; }
         const { id, raw } = fenceLeaf(token.map?.[0] || 0);
         if (/^(mermaid|sequence|flow)$/.test(token.info.trim()))
@@ -352,7 +359,7 @@ export function tokenInlineHtml(
     }
     if (token.type === "html_embed") { append(object(token.content, renderMarkdown(token.content, documentId, { ...environment, fragment: true }).replace(/^<p>|<\/p>\n?$/g, ""), "image", cursor)); cursor += token.content.length; continue; }
     if (token.type === "comment") {
-      append(object(token.markup, `<span class="md-comment-view">${escapeHtml(token.content.trim()) || "注释"}</span>`, "comment", cursor)); cursor += token.markup.length; continue;
+      append(object(token.markup, `<span class="md-comment-view">${escapeHtml(token.content.trim()) || t("注释")}</span>`, "comment", cursor)); cursor += token.markup.length; continue;
     }
     if (["sup", "sub", "emoji", "footnote_ref"].includes(token.type)) {
       const from = cursor;

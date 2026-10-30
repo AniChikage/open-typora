@@ -12,7 +12,10 @@ const server = createServer(async (request, response) => {
     const body = JSON.parse(data);
     if (request.headers.authorization) assert.equal(request.headers.authorization, "Bearer owned-native-fixture-not-a-real-key" + (body.model === "edited-credential" ? "-edited" : ""));
     assert.equal(body.stream, false); assert.equal(body.messages.length, 2);
-    const selection = JSON.parse(body.messages[1].content); assert.equal(typeof selection.selection, "string"); assert.equal(typeof selection.instruction, "string");
+    const selection = JSON.parse(body.messages[1].content);
+    if (selection.question) assert.equal(typeof selection.question, "string");
+    else { assert.equal(typeof selection.selection, "string"); assert.equal(typeof selection.instruction, "string"); }
+    if (selection.sources) { assert.equal(data.includes("forbidden-private-metadata"), false); for (const source of selection.sources) assert.deepEqual(Object.keys(source).sort(), ["fromLine", "id", "name", "text", "toLine"]); }
     calls.push({ url: request.url || "", authorized: !!request.headers.authorization, format: request.url === "/api/chat" ? "ollama" : "compatible" });
     if (request.url?.startsWith("/unauthorized")) { response.writeHead(401); response.end("owned-native-fixture-not-a-real-key"); return; }
     if (request.url?.startsWith("/redirect")) { response.writeHead(302, { Location: "/collected" }); response.end(); return; }
@@ -25,7 +28,9 @@ const server = createServer(async (request, response) => {
 await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
 try {
   const executable = path.join(directory, "AITransportTests");
-  execFileSync("/usr/bin/xcrun", ["swiftc", "-swift-version", "5", "-target", (process.arch === "arm64" ? "arm64" : "x86_64") + "-apple-macos14.0", "native/DocumentStore.swift", "native/AI.swift", "tests/AITransportTests.swift", "-o", executable, "-framework", "AppKit"], { stdio: "inherit" });
+  execFileSync("/usr/bin/xcrun", ["swiftc", "-swift-version", "5", "-target", (process.arch === "arm64" ? "arm64" : "x86_64") + "-apple-macos14.0", "native/DocumentStore.swift",
+    "native/Versions.swift",
+    "native/Localization.swift", "native/AI.swift", "tests/AITransportTests.swift", "-o", executable, "-framework", "AppKit"], { stdio: "inherit" });
   const base = "http://127.0.0.1:" + (server.address() as import("node:net").AddressInfo).port;
   await new Promise<void>((resolve, reject) => {
     const child = spawn(executable, [path.join(directory, "profile"), base], { stdio: "inherit" });

@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import { KnowledgeDialog } from "./components/KnowledgeDialog";
+import { VersionHistoryDialog } from "./components/VersionHistoryDialog";
+import { referenceFiles, readReference } from "./knowledge";
+import type { Evidence } from "../shared/knowledge.mts";
+import { setLanguage, t, useLanguage } from "./i18n";
+import "./knowledge.css";
 import { AISettingsDialog } from "./components/AISettingsDialog";
 import { AIReviewPanel } from "./components/AIReviewPanel";
 import type { RewriteSelection } from "./editor/aiReview";
@@ -46,6 +52,7 @@ import { backgroundRevisionKey, backgroundStyle } from "./background";
 import { imeKey } from "./editor/composition";
 import type { BackgroundAsset } from "./background";
 export default function App() {
+  useLanguage();
   const editors = useRef(new Map<string, EditorHandle>());
   const composing = useCallback(() => [...editors.current.values()].some(editor => editor.composing()), []);
   const session = useDocuments(() => !composing());
@@ -59,13 +66,14 @@ export default function App() {
   const [readOnly, setReadOnly] = useState(false);
   const pluginRuntime = useRef<PluginRuntime | null>(null);
   const [typewriter, setTypewriter] = useState(false);
-  const [dialog, setDialog] = useState<"ai-settings" | "preferences" | "plugins" | "quick-open" | "statistics" | "recent" | "global-search" | "encoding" | InsertKind | null>(null);
+  const [dialog, setDialog] = useState<"knowledge" | "versions" | "ai-settings" | "preferences" | "plugins" | "quick-open" | "statistics" | "recent" | "global-search" | "encoding" | InsertKind | null>(null);
   const [fileOperation, setFileOperation] = useState<FileOperation | null>(null);
   const [aiSelection, setAISelection] = useState<{ selection: RewriteSelection; id: string } | null>(null);
+  const mutationState = useRef({ readOnly, dialog, aiId: aiSelection?.id }); mutationState.current = { readOnly, dialog, aiId: aiSelection?.id };
   const [aiSettingsRevision, setAISettingsRevision] = useState(0);
   function startRewrite() {
-    if (!host.native) { session.setMessage("AI 改写请使用桌面应用。"); return; }
-    if (composing()) { session.setMessage("请先完成当前输入法组合输入。"); return; }
+    if (!host.native) { session.setMessage(t("AI 改写请使用桌面应用。")); return; }
+    if (composing()) { session.setMessage(t("请先完成当前输入法组合输入。")); return; }
     const selection = editor()?.captureRewrite();
     if (selection) setAISelection({ selection, id: crypto.randomUUID() });
   }
@@ -89,7 +97,47 @@ export default function App() {
   const printDocument = useRef<HTMLElement>(null);
   const commands = useRef<(command: Command) => void>(() => {});
   const active = session.active;
+  const references = useMemo(() => referenceFiles(session.documents, session.files), [session.documents, session.files]);
   const sessionRef = useRef(session); sessionRef.current = session;
+  async function historyMutation(id: string, reason: "ai" | "restore", valid: () => boolean, change: (target: EditorHandle) => boolean | void) {
+    const target = editors.current.get(id), before = target?.markdown();
+    const permitted = () => !!target && sessionRef.current.activeId === id && editors.current.get(id) === target && !composing() && !mutationState.current.readOnly && target.markdown() === before && valid();
+    if (!permitted() || before === undefined) return false;
+    const result = await host.captureVersion(id, before, reason === "ai" ? "before-ai" : "before-restore");
+    if (!permitted()) { sessionRef.current.setMessage(t("文档或输入状态已变化，未应用修改。请重新操作。")); return false; }
+    if (result.warning) sessionRef.current.setMessage(result.warning);
+    const modal = document.querySelector<HTMLElement>('[role="dialog"]');
+    const focused = document.activeElement instanceof HTMLElement && !document.activeElement.matches(":disabled") && modal?.contains(document.activeElement) ? document.activeElement : modal?.querySelector<HTMLElement>('button:not(:disabled)');
+    if (change(target!) === false) return false;
+    // Rich editing transactions restore the caret. Keep focus in an open modal
+    // so subsequent typing cannot modify the covered document.
+    if (modal?.isConnected && focused?.isConnected) focused.focus({ preventScroll: true });
+    try { const saved = await host.captureVersion(id, target!.markdown(), reason); if (saved.warning) sessionRef.current.setMessage(saved.warning); }
+    catch { sessionRef.current.setMessage(t("修改已应用，但版本快照保存失败；仍可用撤销恢复。")); }
+    return true;
+  }
+  async function navigateEvidence(source: Evidence) {
+    const current = sessionRef.current;
+    let record = current.documents.find(document => source.token === "document:" + document.id || document.path && document.path === source.path);
+    if (!record) {
+      const entry = current.files.find(file => file.path === source.path || file.token === source.token);
+      if (!entry) throw new Error(t("原文件已关闭或离开授权范围，请先重新打开文件。"));
+      record = await current.openToken(entry.token) || undefined;
+    }
+    if (!record || !sessionRef.current.setActiveId(record.id)) return;
+    const fresh = await readReference({ token: "document:" + record.id, name: source.name, path: record.path }, [record]);
+    if (fresh.hash !== source.hash) sessionRef.current.setMessage(t("原文已变化，引用保留的是生成时的片段；行号可能已移动。"));
+    const id = record.id; requestAnimationFrame(() => editors.current.get(id)?.jump(source.fromLine));
+  }
+  async function insertAnswer(text: string, draft: boolean) {
+    if (composing() || mutationState.current.readOnly) { sessionRef.current.setMessage(t("请先完成输入法组合输入并关闭只读模式。")); return false; }
+    if (draft) {
+      const record = { id: crypto.randomUUID(), path: null, name: t("问答草稿.md"), content: text, savedContent: "", diskHash: null, lineEnding: "\n" };
+      await host.registerDraft(record); await sessionRef.current.add(record); return true;
+    }
+    const id = sessionRef.current.activeId;
+    return historyMutation(id, "ai", () => mutationState.current.dialog === "knowledge", target => target.insert("\n\n" + text + "\n"));
+  }
   const registerEditor = useCallback((id: string, handle: EditorHandle | null) => { if (handle) editors.current.set(id,handle); else editors.current.delete(id); }, []);
   const selectDocument = useCallback((id: string) => sessionRef.current.setActiveId(id), []);
   const changeDocument = useCallback((id: string, content: string) => sessionRef.current.update(id,{content}), []);
@@ -145,7 +193,7 @@ export default function App() {
   }, []);
   useEffect(() => {
     if (!session.ready) return;
-    void host.plugins().then(items => setInstalledPlugins(items.map(item => ({ ...item, description: "本地插件，通过兼容接口运行。", config: {} })))).catch(error => session.setMessage(error.message));
+    void host.plugins().then(items => setInstalledPlugins(items.map(item => ({ ...item, description: t("本地插件，通过兼容接口运行。"), config: {} })))).catch(error => session.setMessage(error.message));
   }, [session.ready, dialog === "plugins"]);
   useEffect(() => {
     localStorage.setItem(pluginPreferenceKey, JSON.stringify(pluginPreferences));
@@ -155,7 +203,7 @@ export default function App() {
   useEffect(() => { pluginRuntime.current?.documentChanged(); }, [active?.id, active?.path, active?.content]);
   useEffect(() => { pluginRuntime.current?.event("beforeToggleSourceMode", !rendered); }, [rendered]);
   useEffect(() => { pluginRuntime.current?.event("afterToggleSidebar", sidebar); }, [sidebar]);
-  async function installPlugin(folder = false) { const installed = await host.installPlugin(folder); if (installed) setInstalledPlugins(previous => [...previous.filter(item => item.id !== installed.id), { ...installed, description: "本地插件，通过兼容接口运行。", config: {} }]); }
+  async function installPlugin(folder = false) { const installed = await host.installPlugin(folder); if (installed) setInstalledPlugins(previous => [...previous.filter(item => item.id !== installed.id), { ...installed, description: t("本地插件，通过兼容接口运行。"), config: {} }]); }
   async function removePlugin(id: string) {
     const definition = pluginDefinitions.find(item => item.id === id); if (!definition || definition.builtin) return;
     await pluginRuntime.current?.setEnabled(definition, false); await host.removePlugin(id);
@@ -177,6 +225,9 @@ export default function App() {
   const selectionCharacters = useMemo(() => Array.from(selection.replace(/\s/g, "")).length, [selection]);
   useEffect(() => { localStorage.setItem("open-typora-count-unit", countUnit); }, [countUnit]);
   useEffect(() => {
+    setLanguage(preferences.language);
+    document.documentElement.lang = preferences.language;
+    void host.setLocale(preferences.language).catch(() => {});
     localStorage.setItem("open-typora-preferences", JSON.stringify(preferences));
     document.documentElement.style.setProperty("--editor-font-size", `${preferences.fontSize}px`);
   }, [preferences]);
@@ -185,7 +236,7 @@ export default function App() {
   useEffect(() => { if (session.ready) void refreshThemes().catch(e => session.setMessage(e.message)); }, [session.ready]);
   const [customizations, setCustomizations] = useState(loadCustomizations);
   const themeCustomization = customizations[theme] || customizationDefaults;
-  useEffect(() => { try { localStorage.setItem(themeCustomizationKey, JSON.stringify(customizations)); } catch { session.setMessage("主题设置存储空间不足，请导出当前主题 CSS 保存。当前预览仍可使用。"); } }, [customizations]);
+  useEffect(() => { try { localStorage.setItem(themeCustomizationKey, JSON.stringify(customizations)); } catch { session.setMessage(t("主题设置存储空间不足，请导出当前主题 CSS 保存。当前预览仍可使用。")); } }, [customizations]);
   useEffect(() => applyTheme(theme, themes, themeCustomization), [theme, themes, themeCustomization]);
   function customizeTheme(value: ThemeCustomization) { setCustomizations(previous => ({ ...previous, [theme]: normalizeCustomization(value) })); }
   function resetTheme() { setCustomizations(previous => { const next = { ...previous }; delete next[theme]; return next; }); }
@@ -211,17 +262,17 @@ export default function App() {
     catch (e) { session.setMessage((e as Error).message); }
   }
   function closeDialog() { setDialog(null); queueMicrotask(() => editor()?.focus()); }
-  function changePreferences(next: typeof preferences) { setMarkdownOptions(next); setPreferences(next); }
+  function changePreferences(next: typeof preferences) { setLanguage(next.language); setMarkdownOptions(next); setPreferences(next); }
   async function exportDocument(kind: string) {
     if (exportingRef.current || !active || !printDocument.current) return;
-    if (editor()?.composing()) { session.setMessage("请先完成当前输入法组合输入，再导出。"); return; }
+    if (editor()?.composing()) { session.setMessage(t("请先完成当前输入法组合输入，再导出。")); return; }
     exportingRef.current = true; setExporting(true); document.body.classList.add("printing");
     try {
       await host.persist({ documents: session.documents, activeId: session.activeId, workspace: session.workspace });
       printDocument.current.innerHTML = renderMarkdown(active.content, active.id);
       await Promise.all([renderDiagrams(printDocument.current), renderMath(printDocument.current), document.fonts.ready]);
       const result = kind === "pdf" ? await host.exportPdf(await portableHtml(printDocument.current, active.name, preferences), { paper: preferences.pdfPaper, margin: preferences.pdfMargin, header: preferences.pdfHeader, footer: preferences.pdfFooter, title: active.name }) : kind === "html" ? await host.exportHtml(active.name, await portableHtml(printDocument.current, active.name)) : await host.exportConverted(active.id, kind, await conversionMarkdown(active.content, printDocument.current), await portableHtml(printDocument.current, active.name));
-      if (result) session.setMessage(`${kind.toUpperCase()} 已导出。`);
+      if (result) session.setMessage(t("{0} 已导出。", kind.toUpperCase()));
     } catch (error) { session.setMessage((error as Error).message); }
     finally { document.body.classList.remove("printing"); exportingRef.current = false; setExporting(false); }
   }
@@ -234,7 +285,7 @@ export default function App() {
       if (event.key === pluginPreferenceKey) setPluginPreferences(loadPluginPreferences());
       if (event.key === "open-typora-theme") setTheme(event.newValue || "light");
       if (event.key === themeCustomizationKey) setCustomizations(loadCustomizations());
-      if (event.key === "open-typora-preferences") { const next = loadPreferences(); setMarkdownOptions(next); setPreferences(next); }
+      if (event.key === "open-typora-preferences") { const next = loadPreferences(); setLanguage(next.language); setMarkdownOptions(next); setPreferences(next); }
       if (event.key === backgroundRevisionKey) void refreshBackground().catch(error => session.setMessage(error.message));
     };
     window.addEventListener("storage", sync); return () => window.removeEventListener("storage", sync);
@@ -245,7 +296,7 @@ export default function App() {
   commands.current = ({ action, document: opened, anchor, line, message }) => {
     if (action === "newWindow" && window.desktop?.windowAction) { void host.windowAction(action).catch((error: Error) => session.setMessage(error.message)); return; }
     const context = commandsByAction.get(action)?.context;
-    if (readOnly && ((context && context !== "document") || ["ai-rewrite", "delete-word", "pagebreak", "indent", "outdent", "undo", "redo", "paste-plain", "image", "table", "link", "reference-link", "footnote", "copy-all-images", "move-all-images", "upload-all-images"].includes(action))) { session.setMessage("只读模式已开启，请先在插件管理中关闭或切换只读效果。"); return; }
+    if (readOnly && ((context && context !== "document") || ["ai-rewrite", "delete-word", "pagebreak", "indent", "outdent", "undo", "redo", "paste-plain", "image", "table", "link", "reference-link", "footnote", "copy-all-images", "move-all-images", "upload-all-images"].includes(action))) { session.setMessage(t("只读模式已开启，请先在插件管理中关闭或切换只读效果。")); return; }
     if (context && !active) return;
     if (["rich", "table"].includes(context || "") && !editor()?.richMode()) return;
     if (action === "notice") { if (message) session.setMessage(message); }
@@ -256,6 +307,7 @@ export default function App() {
     else if (action === "folder") void session.openFolder();
     else if (action === "save") void session.save();
     else if (action === "ai-rewrite") startRewrite();
+    else if (action === "knowledge" || action === "versions") { if (host.native) setDialog(action); else session.setMessage(t("目录问答和版本历史请使用桌面应用。")); }
     else if (action === "ai-models") setDialog("ai-settings");
     else if (action === "encoding") setDialog("encoding");
     else if (action === "saveAs") void session.save(true);
@@ -287,7 +339,7 @@ export default function App() {
       setTheme((value) => (value === "dark" ? "light" : "dark"));
     else if (action === "focus") setFocus((value) => !value);
     else if (action === "typewriter") setTypewriter(value => !value);
-    else if (action === "new-file" || action === "new-folder") setFileOperation({ action, path: session.folder || undefined, name: action === "new-file" ? "未命名.md" : "新文件夹" });
+    else if (action === "new-file" || action === "new-folder") setFileOperation({ action, path: session.folder || undefined, name: action === "new-file" ? t("未命名.md") : t("新文件夹") });
     else if (action === "undo-file") void session.fileOperation({ action: "undo" }).catch(e => session.setMessage(e.message));
     else if (["preferences", "plugins", "quick-open", "statistics", "recent", "global-search", "table", "link", "reference-link", "footnote"].includes(action)) {
       setSelectedText(editor()?.selectionText() || ""); setDialog(action as typeof dialog);
@@ -314,7 +366,7 @@ export default function App() {
     else if (action === "import") void importDocument();
     else if (["copy-all-images", "move-all-images", "upload-all-images"].includes(action) && active) {
       const source = active.content, sources = [...new Set(imageReferences(source).map(image => image.url))];
-      if (!sources.length) { session.setMessage("当前文档没有图片。"); return; }
+      if (!sources.length) { session.setMessage(t("当前文档没有图片。")); return; }
       void host.persist({ documents: session.documents, activeId: session.activeId, workspace: session.workspace }).then(() => host.imageAction(active.id, sources, action.split("-")[0], { ...preferences })).then(mapping => { if (mapping) editors.current.get(active.id)?.transform(text => updateImageReferences(text, mapping)); }).catch(e => session.setMessage(e.message));
     }
     else if (action === "copy-markdown") void host.writeClipboard(editor()?.selectionText(true) || "").catch(error => session.setMessage(error.message));
@@ -322,7 +374,7 @@ export default function App() {
     else if (action === "image" && active) void (async () => {
       await host.persist({ documents: session.documents, activeId: session.activeId, workspace: session.workspace });
       const image = await host.chooseImage(active.id, { ...preferences, source: active.content }); if (!image) return;
-      if (preferences.imageAutoUpload) { try { const mapping = await host.imageAction(active.id, [image.path], "upload", { ...preferences }); if (mapping?.[image.path]) image.path = mapping[image.path]; } catch (e) { session.setMessage(`上传失败，已保留本地图片：${(e as Error).message}`); } }
+      if (preferences.imageAutoUpload) { try { const mapping = await host.imageAction(active.id, [image.path], "upload", { ...preferences }); if (mapping?.[image.path]) image.path = mapping[image.path]; } catch (e) { session.setMessage(t("上传失败，已保留本地图片：{0}", (e as Error).message)); } }
       editors.current.get(active.id)?.insert(`![${image.alt.replace(/[\[\]]/g, "")}](${image.path})`);
     })().catch(error => session.setMessage(error.message));
     else editor()?.command(action);
@@ -353,18 +405,18 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [session.message]);
   const status = session.saving
-    ? "正在保存…"
+    ? t("正在保存…")
     : active?.conflict
-      ? "磁盘修改冲突"
+      ? t("磁盘修改冲突")
       : active?.content !== active?.savedContent
         ? active?.path
           ? session.autosave
-            ? "等待保存"
-            : "未保存"
-          : "本地草稿"
+            ? t("等待保存")
+            : t("未保存")
+          : t("本地草稿")
         : active?.path
-          ? "已保存"
-          : "本地草稿";
+          ? t("已保存")
+          : t("本地草稿");
   return (
     <div
       className={`app-shell ${sidebar ? "" : "sidebar-hidden"} ${focus ? "focus-mode" : ""} ${typewriter ? "typewriter-mode" : ""}`}
@@ -402,34 +454,28 @@ export default function App() {
         theme={theme}
         toggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
       />
-      <main className={`writing-area ${background ? "has-background" : ""}`} aria-label="写作空间" inert={session.fileOperationBusy}>
+      <main className={`writing-area ${background ? "has-background" : ""}`} aria-label={t("写作空间")} inert={session.fileOperationBusy}>
         {background && <div className="background-image editor-background" data-editor-background="true" aria-hidden="true" style={backgroundStyle(background,preferences)} />}
         {active?.conflict && (
           <div className="conflict-banner" role="alert">
             <AlertCircle size={17} />
-            <span>文件在磁盘上已改变。当前草稿已保留。</span>
-            <button onClick={() => void session.save(true)}>另存副本</button>
-            <button onClick={() => void session.reload()}>重新载入</button>
-            <button onClick={() => void session.save(false, active.id, true)}>
-              覆盖磁盘
-            </button>
+            <span>{t("文件在磁盘上已改变。当前草稿已保留。")}</span>
+            <button onClick={() => void session.save(true)}>{t("另存副本")}</button>
+            <button onClick={() => void session.reload()}>{t("重新载入")}</button>
+            <button onClick={() => void session.save(false, active.id, true)}>{t("覆盖磁盘")}</button>
           </div>
         )}
         {!session.ready ? (
-          <div className="empty-document">正在恢复文档…</div>
+          <div className="empty-document">{t("正在恢复文档…")}</div>
         ) : !active ? (
           <div className="empty-document">
             <h1>Open Typora</h1>
-            <p>新建或打开 Markdown 文档。</p>
+            <p>{t("新建或打开 Markdown 文档。")}</p>
             <div>
               <button onClick={() => void session.create()}>
-                <FilePlus2 size={18} />
-                新建文档
-              </button>
+                <FilePlus2 size={18} />{t("新建文档")}</button>
               <button onClick={() => void session.open()}>
-                <FolderOpen size={18} />
-                打开文件
-              </button>
+                <FolderOpen size={18} />{t("打开文件")}</button>
             </div>
           </div>
         ) : (
@@ -438,14 +484,17 @@ export default function App() {
             <EditorWorkspace documents={session.documents} activeId={session.activeId} layout={session.workspace} modes={modes}
               preferences={preferences} readOnly={readOnly} typewriter={typewriter} select={selectDocument} register={registerEditor} change={changeDocument} error={session.setMessage} cursor={cursorDocument} selection={selectionDocument} compositionEnd={compositionDocument} mode={modeDocument} closePane={closePane} command={commandDocument} tabAction={tabAction} autosave={session.autosave} composing={composing}
               create={() => void session.create()} close={id => void session.close(id)} reorder={session.reorder} split={direction => void session.split(direction)} swap={session.swapPanes} resize={session.resizeWorkspace} />
-            {aiSelection && <AIReviewPanel key={aiSelection.id} selection={aiSelection.selection} documentName={session.documents.find(document => document.id === aiSelection.selection.documentId)?.name || "已关闭文档"}
-              current={!!editor()?.rewriteCurrent(aiSelection.selection)} composing={composing} settingsRevision={aiSettingsRevision}
+            {aiSelection && <AIReviewPanel key={aiSelection.id} selection={aiSelection.selection} documentName={session.documents.find(document => document.id === aiSelection.selection.documentId)?.name || t("已关闭文档")}
+              current={!!editor()?.rewriteCurrent(aiSelection.selection)} composing={composing} files={references} documents={session.documents} settingsRevision={aiSettingsRevision}
               settings={() => setDialog("ai-settings")} recapture={startRewrite} close={() => setAISelection(null)} notify={session.setMessage}
-              apply={text => {
-                const target = editor(); if (!target || !target.applyRewrite(aiSelection.selection, text)) return false;
-                const selection = { ...aiSelection.selection, source: target.markdown(), to: aiSelection.selection.from + text.length, text };
-                setAISelection(previous => previous?.id === aiSelection.id ? { ...previous, selection } : previous);
-                return true;
+              apply={async text => {
+                const id = aiSelection.selection.documentId;
+                return historyMutation(id, "ai", () => mutationState.current.aiId === aiSelection.id && !!editors.current.get(id)?.rewriteCurrent(aiSelection.selection), target => {
+                  if (!target.applyRewrite(aiSelection.selection, text)) return false;
+                  const selection = { ...aiSelection.selection, source: target.markdown(), to: aiSelection.selection.from + text.length, text };
+                  setAISelection(previous => previous?.id === aiSelection.id ? { ...previous, selection } : previous);
+                  return true;
+                });
               }} />}
             </div>
             <article
@@ -457,27 +506,27 @@ export default function App() {
       </main>
       <footer className="statusbar">
         <button id="footer-word-count-label" onClick={() => setDialog("statistics")}
-          title={`${status} · 第 ${cursor.line} 行，第 ${cursor.column} 列 · Markdown · ${encodingNames[active?.encoding || "utf-8"]}`}
-          aria-label={`${characters === null ? "正在统计" : characters + " 字"}，${status}`}
+          title={t("{0} · 第 {1} 行，第 {2} 列 · Markdown · {3}", status, cursor.line, cursor.column, encodingNames[active?.encoding || "utf-8"])}
+          aria-label={t("{0}，{1}", characters === null ? t("正在统计") : characters + " " + t("字"), status)}
         >
-          {!selection && largeDocument && !sourceAnalysis ? "正在统计…" : <>{!selection && largeDocument && countUnit === "words" && "约 "}{countUnit === "characters" ? (selection ? selectionCharacters : characters) : (selection ? documentStatistics(selection, selection, preferences.readingSpeed).words : wholeStatistics?.words || 0)} {countUnit === "characters" ? "字" : "词"}{selection && "（选中）"}</>}{exporting && " · 正在导出…"}
+          {!selection && largeDocument && !sourceAnalysis ? t("正在统计…") : <>{!selection && largeDocument && countUnit === "words" && t("约 ")}{countUnit === "characters" ? (selection ? selectionCharacters : characters) : (selection ? documentStatistics(selection, selection, preferences.readingSpeed).words : wholeStatistics?.words || 0)} {countUnit === "characters" ? t("字") : t("词")}{selection && t("（选中）")}</>}{exporting && t(" · 正在导出…")}
         </button>
-        {active && <button aria-label="更改文本编码" title="文本编码与字节顺序标记" onClick={() => setDialog("encoding")}>{encodingNames[active.encoding || "utf-8"]}{active.bom ? " BOM" : ""}</button>}
+        {active && <button aria-label={t("更改文本编码")} title={t("文本编码与字节顺序标记")} onClick={() => setDialog("encoding")}>{encodingNames[active.encoding || "utf-8"]}{active.bom ? " BOM" : ""}</button>}
       </footer>
       {focus && (
-        <button className="leave-focus" onClick={() => setFocus(false)}>
-          退出专注 · Esc
-        </button>
+        <button className="leave-focus" onClick={() => setFocus(false)}>{t("退出专注 · Esc")}</button>
       )}
       {session.message && (
         <div className="toast" role="status">
-          <span>{session.message}</span>
-          <button aria-label="关闭提示" onClick={() => session.setMessage("")}>
+          <span>{t(session.message)}</span>
+          <button aria-label={t("关闭提示")} onClick={() => session.setMessage("")}>
             <X size={15} />
           </button>
         </div>
       )}
       {fileOperation && <FileOperationDialog operation={fileOperation} files={session.files} folder={session.folder} run={session.fileOperation} close={() => setFileOperation(null)} />}
+      {dialog === "knowledge" && <KnowledgeDialog documents={session.documents} files={session.files} folder={session.folder} targetPath={active?.path || null} composing={composing} navigate={navigateEvidence} insert={insertAnswer} settings={() => setDialog("ai-settings")} close={closeDialog} />}
+      {dialog === "versions" && active && <VersionHistoryDialog key={active.id} record={active} composing={composing} restore={content => historyMutation(active.id, "restore", () => mutationState.current.dialog === "versions", target => target.transform(() => content))} close={closeDialog} />}
       {dialog === "ai-settings" && <AISettingsDialog saved={() => setAISettingsRevision(value => value + 1)} close={closeDialog} />}
       {dialog === "encoding" && active && <EncodingDialog key={active.id} record={active} change={session.changeEncoding} close={closeDialog} />}
       {dialog === "recent" && <RecentDialog entries={session.recent} action={session.recentAction} close={closeDialog} />}
@@ -486,23 +535,23 @@ export default function App() {
       {dialog === "plugins" && <PluginsDialog definitions={pluginDefinitions} preferences={pluginPreferences} states={pluginStates} toggle={(id, enabled) => setPluginPreferences(previous => ({ ...previous, [id]: { ...previous[id], enabled } }))} configure={(id, config) => setPluginPreferences(previous => ({ ...previous, [id]: { ...previous[id], config } }))} invoke={async (id,action) => { await pluginRuntime.current?.invoke(id,action); }} actions={id => pluginRuntime.current?.actions(id) || []} install={installPlugin} remove={removePlugin} close={closeDialog} />}
       {dialog === "quick-open" && <QuickOpen documents={session.documents} files={session.files} recent={session.recent} openRecent={path => session.recentAction("open", path)} select={session.setActiveId} open={session.openToken} close={closeDialog} />}
       {dialog && ["table", "link", "reference-link", "footnote"].includes(dialog) && <InsertDialog kind={dialog as InsertKind} selected={selectedText} close={closeDialog} submit={value => {
-        if (dialog === "link") editor()?.insert(`[${(value.label || value.value || "链接").replace(/[\[\]]/g, character => "\\" + character)}](${value.value})`);
+        if (dialog === "link") editor()?.insert(`[${(value.label || value.value || t("链接")).replace(/[\[\]]/g, character => "\\" + character)}](${value.value})`);
         else editor()?.command(dialog, value);
         closeDialog();
       }} />}
-      {dialog === "statistics" && statistics && <Dialog title="字数统计" close={closeDialog}><dl className="document-statistics"><dt>范围</dt><dd>{statistics.selected ? "选中文字" : "全文"}</dd><dt>单词</dt><dd>{statistics.words}</dd><dt>字符（不含空白）</dt><dd>{statistics.compactCharacters}</dd><dt>字符（含空白）</dt><dd>{statistics.characters}</dd><dt>行数</dt><dd>{statistics.lines}</dd><dt>预计阅读</dt><dd>{statistics.minutes} 分钟</dd></dl><label>底部显示<select aria-label="底部显示" value={countUnit} onChange={e => setCountUnit(e.target.value as typeof countUnit)}><option value="characters">字符数</option><option value="words">单词数</option></select></label><p className="dialog-note">{largeDocument ? "大文件字词按 Markdown 源码估算；" : "单词不计格式符号，"}中文按每字一词；字符包含源码符号。阅读速度按每分钟 {preferences.readingSpeed} 词估算。</p></Dialog>}
+      {dialog === "statistics" && statistics && <Dialog title={t("字数统计")} close={closeDialog}><dl className="document-statistics"><dt>{t("范围")}</dt><dd>{statistics.selected ? t("选中文字") : t("全文")}</dd><dt>{t("单词")}</dt><dd>{statistics.words}</dd><dt>{t("字符（不含空白）")}</dt><dd>{statistics.compactCharacters}</dd><dt>{t("字符（含空白）")}</dt><dd>{statistics.characters}</dd><dt>{t("行数")}</dt><dd>{statistics.lines}</dd><dt>{t("预计阅读")}</dt><dd>{statistics.minutes}{t("分钟")}</dd></dl><label>{t("底部显示")}<select aria-label={t("底部显示")} value={countUnit} onChange={e => setCountUnit(e.target.value as typeof countUnit)}><option value="characters">{t("字符数")}</option><option value="words">{t("单词数")}</option></select></label><p className="dialog-note">{largeDocument ? t("大文件字词按 Markdown 源码估算；") : t("单词不计格式符号，")}{t("中文按每字一词；字符包含源码符号。阅读速度按每分钟")}{preferences.readingSpeed}{t("词估算。")}</p></Dialog>}
       {about && (
         <div className="dialog-backdrop" onClick={() => setAbout(false)}>
           <section
             className="about-dialog"
             role="dialog"
             aria-modal="true"
-            aria-label="关于 Open Typora"
+            aria-label={t("关于 Open Typora")}
             onClick={(event) => event.stopPropagation()}
           >
             <button
               className="icon-button close-about"
-              aria-label="关闭关于"
+              aria-label={t("关闭关于")}
               autoFocus
               onClick={() => setAbout(false)}
             >
@@ -510,15 +559,10 @@ export default function App() {
             </button>
             <img className="app-mark" src={appIcon} width={96} height={96} alt="" />
             <h2>Open Typora</h2>
-            <p>让文字，回到文字。</p>
+            <p>{t("让文字，回到文字。")}</p>
             <p className="about-details">
-              {appVersion} · 本地 Markdown 写作空间
-              <br />
-              MIT 开源 · 独立实现
-            </p>
-            <button className="folder-button" onClick={() => setAbout(false)}>
-              回到写作
-            </button>
+              {appVersion}{t("· 本地 Markdown 写作空间")}<br />{t("MIT 开源 · 独立实现")}</p>
+            <button className="folder-button" onClick={() => setAbout(false)}>{t("回到写作")}</button>
           </section>
         </div>
       )}

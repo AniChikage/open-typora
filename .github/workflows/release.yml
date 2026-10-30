@@ -8,9 +8,13 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing version tag, for example v0.5.2"
+        description: "Version tag, for example v0.21.0"
         required: true
         type: string
+      create_tag:
+        description: "Create a missing version tag from the selected commit only after all acceptance jobs pass"
+        type: boolean
+        default: false
 
 concurrency:
   group: release-${{ inputs.tag || github.ref_name }}
@@ -26,7 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ inputs.create_tag && github.sha || inputs.tag || github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
@@ -76,7 +80,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ inputs.create_tag && github.sha || inputs.tag || github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
@@ -144,7 +148,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ inputs.create_tag && github.sha || inputs.tag || github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
@@ -175,7 +179,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ inputs.create_tag && github.sha || inputs.tag || github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
@@ -214,7 +218,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ inputs.create_tag && github.sha || inputs.tag || github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
@@ -271,10 +275,12 @@ jobs:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
+      RELEASE_SOURCE_SHA: ${{ github.sha }}
+      CREATE_RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.create_tag }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ inputs.create_tag && github.sha || inputs.tag || github.sha }}
           persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
@@ -287,6 +293,18 @@ jobs:
           cd release-assets
           cat SHA256SUMS-*.txt | sort -k2 > SHA256SUMS.txt
           sha256sum --check SHA256SUMS.txt
+      - name: Create or verify the tested version tag
+        run: |
+          set -euo pipefail
+          release_commit=$(git rev-parse HEAD)
+          if [ "$CREATE_RELEASE_TAG" = "true" ]; then test "$release_commit" = "$RELEASE_SOURCE_SHA"; fi
+          if gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" > "$RUNNER_TEMP/version-tag.json" 2>/dev/null; then
+            tag_commit=$(gh api "repos/$GH_REPO/commits/$RELEASE_TAG" --jq .sha)
+            test "$tag_commit" = "$release_commit"
+          else
+            test "$CREATE_RELEASE_TAG" = "true"
+            gh api --method POST "repos/$GH_REPO/git/refs" -f "ref=refs/tags/$RELEASE_TAG" -f "sha=$release_commit" > /dev/null
+          fi
       - name: Publish all three platforms together
         run: |
           set -euo pipefail

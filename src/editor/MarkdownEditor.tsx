@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { selectionCurrent } from "./aiReview";
 import type { RewriteSelection } from "./aiReview";
 import { codeSelectionCommand, selectionActions } from "./selectionCommands";
@@ -84,6 +85,22 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
     { document: record, rendered, active = true, readOnly = false, preferences, typewriter = false, onChange, onError, onCursor, onSelection, onCompositionEnd, onCommand },
     ref,
   ) {
+    const languageBehavior = useRef(new Compartment());
+    function phrases() { return EditorState.phrases.of({
+              Find: t("查找"),
+              Replace: t("替换为"),
+              next: t("下一个"),
+              previous: t("上一个"),
+              all: t("全部匹配"),
+              "match case": t("区分大小写"),
+              regexp: t("正则表达式"),
+              "by word": t("整词匹配"),
+              replace: t("替换"),
+              "replace all": t("全部替换"),
+              close: t("关闭查找"),
+              "current match": t("当前匹配"),
+              "on line": t("所在行"),
+            }); }
     const root = useRef<HTMLDivElement>(null),
       sourceParent = useRef<HTMLDivElement>(null);
     const model = useRef<MarkdownDocument | null>(null),
@@ -123,7 +140,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
     }
     function openContextMenu(target: HTMLElement, x: number, y: number, keyboard = false) {
       const doc = model.current; if (!doc) return;
-      if (isComposing()) { callbacks.current.onError("请先完成当前输入法组合输入，再打开编辑菜单。"); return; }
+      if (isComposing()) { callbacks.current.onError(t("请先完成当前输入法组合输入，再打开编辑菜单。")); return; }
       let state: NonNullable<ReturnType<RichEditor["contextSelection"]>>;
       if (activeMode.current) {
         const selected = rich.current?.contextSelection(target, x, y, keyboard); if (!selected) return;
@@ -142,7 +159,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
       setContextMenu({ ...state, x, y, source: doc.text, rendered: activeMode.current, image: imageAt(target) });
     }
     function restoreContext(menu: EditorMenu, table = false) {
-      if (!viewOptions.current.active || !model.current || model.current.text !== menu.source || activeMode.current !== menu.rendered || isComposing()) { callbacks.current.onError("文档或输入状态已变化，请重新打开右键菜单。"); return false; }
+      if (!viewOptions.current.active || !model.current || model.current.text !== menu.source || activeMode.current !== menu.rendered || isComposing()) { callbacks.current.onError(t("文档或输入状态已变化，请重新打开右键菜单。")); return false; }
       const selection: SelectionBookmark = table ? menu.point : menu.selection;
       if (activeMode.current) rich.current?.select(selection);
       else { source.current?.dispatch({ selection }); source.current?.focus(); }
@@ -165,30 +182,30 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
       const editable = !viewOptions.current.readOnly, selected = menu.selection.anchor !== menu.selection.head;
       const entry = (id: string, label: string, disabled = false) => ({ id, label, disabled });
       const richEnabled = editable && menu.rendered && !menu.code;
-      const items: ContextMenuEntry[] = [entry("undo", "撤销", !editable || !model.current?.canUndo), entry("redo", "重做", !editable || !model.current?.canRedo), null,
-        entry("cut", "剪切", !editable || !selected), entry("copy", "复制", !selected), entry("paste", "粘贴", !editable), entry("paste-plain", "粘贴为纯文本", !editable), entry("copy-markdown", "复制为 Markdown", !selected), entry("select-all", "全选"), null];
-      items.push(entry("ai-rewrite", "AI 改写选区…", !editable || !selected), null);
-      if (menu.image) items.push(entry("image-edit", "编辑图片…", !editable), entry("copy-image-path", "复制图片地址"), null);
+      const items: ContextMenuEntry[] = [entry("undo", t("撤销"), !editable || !model.current?.canUndo), entry("redo", t("重做"), !editable || !model.current?.canRedo), null,
+        entry("cut", t("剪切"), !editable || !selected), entry("copy", t("复制"), !selected), entry("paste", t("粘贴"), !editable), entry("paste-plain", t("粘贴为纯文本"), !editable), entry("copy-markdown", t("复制为 Markdown"), !selected), entry("select-all", t("全选")), null];
+      items.push(entry("ai-rewrite", t("AI 改写选区…"), !editable || !selected), null);
+      if (menu.image) items.push(entry("image-edit", t("编辑图片…"), !editable), entry("copy-image-path", t("复制图片地址")), null);
       if (menu.table) {
         const { row, rows, column, columns } = menu.table;
-        items.push({ id: "table-operations", label: "表格", disabled: !editable, children: [
-          entry("table-rowBefore", "上方插入行"), entry("table-row", "下方插入行"), entry("table-columnBefore", "左侧插入列"), entry("table-column", "右侧插入列"), null,
-          entry("table-moveRowUp", "向上移动行", row <= 2), entry("table-moveRowDown", "向下移动行", row < 2 || row >= rows - 1),
-          entry("table-moveColumnLeft", "向左移动列", column === 0), entry("table-moveColumnRight", "向右移动列", column >= columns - 1), null,
-          entry("table-left", "左对齐"), entry("table-center", "居中对齐"), entry("table-right", "右对齐"), entry("table-format", "格式化表格源码"), null,
-          entry("table-removeRow", "删除行", row < 2), entry("table-removeColumn", "删除列"), entry("table-deleteTable", "删除表格"),
+        items.push({ id: "table-operations", label: t("表格"), disabled: !editable, children: [
+          entry("table-rowBefore", t("上方插入行")), entry("table-row", t("下方插入行")), entry("table-columnBefore", t("左侧插入列")), entry("table-column", t("右侧插入列")), null,
+          entry("table-moveRowUp", t("向上移动行"), row <= 2), entry("table-moveRowDown", t("向下移动行"), row < 2 || row >= rows - 1),
+          entry("table-moveColumnLeft", t("向左移动列"), column === 0), entry("table-moveColumnRight", t("向右移动列"), column >= columns - 1), null,
+          entry("table-left", t("左对齐")), entry("table-center", t("居中对齐")), entry("table-right", t("右对齐")), entry("table-format", t("格式化表格源码")), null,
+          entry("table-removeRow", t("删除行"), row < 2), entry("table-removeColumn", t("删除列")), entry("table-deleteTable", t("删除表格")),
         ] });
       }
-      items.push({ id: "format-menu", label: "格式", disabled: !richEnabled, children: [entry("bold", "粗体"), entry("italic", "斜体"), entry("underline", "下划线"), entry("strike", "删除线"), entry("inline-code", "行内代码"), entry("highlight", "高亮"), null, entry("clear-format", "清除格式")] },
-        { id: "paragraph-menu", label: "段落", disabled: !richEnabled, children: [entry("heading-0", "普通段落"), ...[1, 2, 3, 4, 5, 6].map(level => entry(`heading-${level}`, `${level} 级标题`)), null, entry("quote", "引用"), entry("unordered-list", "无序列表"), entry("ordered-list", "有序列表"), entry("task-list", "任务列表"), null, entry("paragraph-above", "在上方插入段落"), entry("paragraph-below", "在下方插入段落"), entry("indent", "增加缩进"), entry("outdent", "减少缩进")] },
-        { id: "insert-menu", label: "插入", disabled: !editable, children: [entry("table", "表格…", !menu.rendered), entry("link", "超链接…", !menu.rendered), entry("image", "图片…"), entry("code", "代码块", !menu.rendered), entry("math-block", "公式块", !menu.rendered), entry("hr", "水平分割线", !menu.rendered), entry("pagebreak", "分页符")] },
-        null, entry("find", "查找与替换"), entry("source", menu.rendered ? "切换源码模式" : "切换即时渲染"));
+      items.push({ id: "format-menu", label: t("格式"), disabled: !richEnabled, children: [entry("bold", t("粗体")), entry("italic", t("斜体")), entry("underline", t("下划线")), entry("strike", t("删除线")), entry("inline-code", t("行内代码")), entry("highlight", t("高亮")), null, entry("clear-format", t("清除格式"))] },
+        { id: "paragraph-menu", label: t("段落"), disabled: !richEnabled, children: [entry("heading-0", t("普通段落")), ...[1, 2, 3, 4, 5, 6].map(level => entry(`heading-${level}`, t("{0} 级标题", level))), null, entry("quote", t("引用")), entry("unordered-list", t("无序列表")), entry("ordered-list", t("有序列表")), entry("task-list", t("任务列表")), null, entry("paragraph-above", t("在上方插入段落")), entry("paragraph-below", t("在下方插入段落")), entry("indent", t("增加缩进")), entry("outdent", t("减少缩进"))] },
+        { id: "insert-menu", label: t("插入"), disabled: !editable, children: [entry("table", t("表格…"), !menu.rendered), entry("link", t("超链接…"), !menu.rendered), entry("image", t("图片…")), entry("code", t("代码块"), !menu.rendered), entry("math-block", t("公式块"), !menu.rendered), entry("hr", t("水平分割线"), !menu.rendered), entry("pagebreak", t("分页符"))] },
+        null, entry("find", t("查找与替换")), entry("source", menu.rendered ? t("切换源码模式") : t("切换即时渲染")));
       return items;
     }
     function editingBlocked() {
       if (viewOptions.current.readOnly) return true;
       if (!isComposing()) return false;
-      callbacks.current.onError("请先完成当前输入法组合输入，再修改文档。");
+      callbacks.current.onError(t("请先完成当前输入法组合输入，再修改文档。"));
       return true;
     }
     function applyViewOptions() {
@@ -248,11 +265,11 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
     };
     function matches() {
       try { return textMatches(model.current?.text || "", searchTerms.current.query, searchTerms.current.replacement, searchTerms.current.searchOptions); }
-      catch (error) { setSearchStatus(`表达式无效：${(error as Error).message}`); return null; }
+      catch (error) { setSearchStatus(t("表达式无效：{0}", (error as Error).message)); return null; }
     }
     function findNext(back = false) {
       const doc = model.current, found = matches(); if (!doc || !found) return;
-      if (!found.length) { setSearchStatus("未找到匹配内容"); return; }
+      if (!found.length) { setSearchStatus(t("未找到匹配内容")); return; }
       const from = Math.min(doc.selection.anchor, doc.selection.head), to = Math.max(doc.selection.anchor, doc.selection.head);
       const exact = found.findIndex(match => match.from === from && match.to === to);
       const index = exact >= 0 ? (exact + (back ? -1 : 1) + found.length) % found.length : back ? found.findLastIndex(match => match.to <= from) : found.findIndex(match => match.from >= to);
@@ -262,9 +279,9 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
     function replaceMatch(all = false) {
       if (viewOptions.current.readOnly) return;
       const doc = model.current, found = matches(); if (!doc || !found) return;
-      if (!found.length) { setSearchStatus("未找到匹配内容"); return; }
+      if (!found.length) { setSearchStatus(t("未找到匹配内容")); return; }
       rich.current?.releaseFence(); doc.closeGroup();
-      if (all) { doc.replace(0, doc.text.length, replaceTextMatches(doc.text, found), "replace-all", { anchor: 0, head: 0 }); rich.current?.render(false); publish(); setSearchStatus(`已替换 ${found.length} 处`); return; }
+      if (all) { doc.replace(0, doc.text.length, replaceTextMatches(doc.text, found), "replace-all", { anchor: 0, head: 0 }); rich.current?.render(false); publish(); setSearchStatus(t("已替换 {0} 处", found.length)); return; }
       const from = Math.min(doc.selection.anchor, doc.selection.head), to = Math.max(doc.selection.anchor, doc.selection.head), match = found.find(item => item.from === from && item.to === to);
       if (!match) { findNext(); return; }
       doc.replace(from, to, match.replacement, "replace"); rich.current?.render(false); publish(); findNext();
@@ -308,7 +325,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
           new Uint8Array(await file.arrayBuffer()),
           file.name, { ...viewOptions.current.preferences, source: model.current?.toMarkdown() },
         );
-        if (viewOptions.current.preferences?.imageAutoUpload) { try { const mapped = await host.imageAction(initial.current.id, [relative], "upload", { ...viewOptions.current.preferences }); if (mapped?.[relative]) relative = mapped[relative]; } catch (e) { callbacks.current.onError(`上传失败，已保留本地图片：${(e as Error).message}`); } }
+        if (viewOptions.current.preferences?.imageAutoUpload) { try { const mapped = await host.imageAction(initial.current.id, [relative], "upload", { ...viewOptions.current.preferences }); if (mapped?.[relative]) relative = mapped[relative]; } catch (e) { callbacks.current.onError(t("上传失败，已保留本地图片：{0}", (e as Error).message)); } }
         insert(`![${file.name.replace(/[\[\]]/g, "")}](${relative})`, "paste");
       } catch (error) {
         callbacks.current.onError((error as Error).message);
@@ -338,21 +355,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
           doc: doc.text,
           selection: doc.selection,
           extensions: [
-            EditorState.phrases.of({
-              Find: "查找",
-              Replace: "替换为",
-              next: "下一个",
-              previous: "上一个",
-              all: "全部匹配",
-              "match case": "区分大小写",
-              regexp: "正则表达式",
-              "by word": "整词匹配",
-              replace: "替换",
-              "replace all": "全部替换",
-              close: "关闭查找",
-              "current match": "当前匹配",
-              "on line": "所在行",
-            }),
+            languageBehavior.current.of(phrases()),
             drawSelection(),
             EditorView.lineWrapping,
             highlightActiveLine(),
@@ -379,7 +382,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
               indentWithTab,
             ]),
             EditorView.contentAttributes.of({
-              "aria-label": "Markdown 源码编辑器",
+              "aria-label": t("Markdown 源码编辑器"),
               spellcheck: "false",
             }),
             EditorView.updateListener.of((update) => {
@@ -452,7 +455,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
                   void host.readClipboardFormats().then(formats => {
                     const current = view.state.selection.main;
                     if (source.current !== view || activeMode.current || !viewOptions.current.active || doc.text !== snapshot || current.anchor !== selection.anchor || current.head !== selection.head || isComposing() || viewOptions.current.readOnly) {
-                      callbacks.current.onError("粘贴期间文档或选区已变化，请重试。"); return;
+                      callbacks.current.onError(t("粘贴期间文档或选区已变化，请重试。")); return;
                     }
                     const table = clipboardTable({ getData: type => type === "text/html" ? formats.html : type === "text/plain" ? formats.text : "" });
                     if (literal && (table || /<table\b/i.test(formats.html))) insert(formats.text.replace(/\r\n?/g, "\n"), "paste");
@@ -532,16 +535,16 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
           const selection = activeMode.current ? rich.current?.bookmark() : source.current?.state.selection.main;
           if (!selection) return null;
           const from = Math.min(selection.anchor, selection.head), to = Math.max(selection.anchor, selection.head);
-          if (from === to) { callbacks.current.onError("请先选中需要改写的文字。"); return null; }
+          if (from === to) { callbacks.current.onError(t("请先选中需要改写的文字。")); return null; }
           doc.selection = { anchor: selection.anchor, head: selection.head }; doc.closeGroup();
           return { documentId: initial.current.id, source: doc.text, from, to, text: doc.text.slice(from, to) };
         },
         applyRewrite: (selection, text) => {
           const doc = model.current;
           if (!doc) return false;
-          if (viewOptions.current.readOnly) { callbacks.current.onError("只读模式已开启，请关闭后再应用改写。"); return false; }
+          if (viewOptions.current.readOnly) { callbacks.current.onError(t("只读模式已开启，请关闭后再应用改写。")); return false; }
           if (editingBlocked()) return false;
-          if (!viewOptions.current.active || !selectionCurrent(selection, initial.current.id, doc.text)) { callbacks.current.onError("文档已变化，请重新选择文字并生成；这份建议仍可复制。"); return false; }
+          if (!viewOptions.current.active || !selectionCurrent(selection, initial.current.id, doc.text)) { callbacks.current.onError(t("文档已变化，请重新选择文字并生成；这份建议仍可复制。")); return false; }
           if (text === selection.text) return true;
           rich.current?.releaseFence(); doc.selection = { anchor: selection.from, head: selection.to }; doc.closeGroup();
           doc.replace(selection.from, selection.to, text, "ai-rewrite", { anchor: selection.from, head: selection.from + text.length });
@@ -685,6 +688,11 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
     useEffect(() => {
       applyViewOptions();
     }, [preferences?.spellcheck, preferences?.tabSize, preferences?.autoPair, preferences?.emoji, preferences?.highlight, preferences?.subscript, preferences?.superscript, preferences?.inlineMath, preferences?.remoteImages, typewriter, readOnly]);
+    useEffect(() => {
+      rich.current?.localize();
+      source.current?.contentDOM.setAttribute("aria-label", t("Markdown 源码编辑器"));
+      if (source.current) source.current.dispatch({ effects: languageBehavior.current.reconfigure(phrases()) });
+    }, [preferences?.language]);
     useLayoutEffect(() => {
       // Focus once after the mode's DOM is visible, before keyboard input.
       // A delayed frame can restore an older caret after a navigation key.
@@ -715,8 +723,8 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
             <div>
               <input
                 ref={searchField}
-                aria-label="查找内容"
-                placeholder="查找"
+                aria-label={t("查找内容")}
+                placeholder={t("查找")}
                 value={query}
                 onChange={(event) => {
                   setQuery(event.target.value);
@@ -729,38 +737,38 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
                   }
                 }}
               />
-              <button onClick={() => findNext(true)} aria-label="上一个匹配">
+              <button onClick={() => findNext(true)} aria-label={t("上一个匹配")}>
                 ↑
               </button>
-              <button onClick={() => findNext()} aria-label="下一个匹配">
+              <button onClick={() => findNext()} aria-label={t("下一个匹配")}>
                 ↓
               </button>
               <span role="status">{searchStatus}</span>
-              {([["caseSensitive", "区分大小写"], ["wholeWord", "全词匹配"], ["regex", "正则表达式"]] as const).map(([key, label]) => <button key={key} aria-label={label} aria-pressed={searchOptions[key]} className={searchOptions[key] ? "search-option-active" : ""} onClick={() => { setSearchOptions(previous => ({ ...previous, [key]: !previous[key] })); setSearchStatus(""); }}>{key === "caseSensitive" ? "Aa" : key === "wholeWord" ? "W" : ".*"}</button>)}
+              {([["caseSensitive", t("区分大小写")], ["wholeWord", t("全词匹配")], ["regex", t("正则表达式")]] as const).map(([key, label]) => <button key={key} aria-label={label} aria-pressed={searchOptions[key]} className={searchOptions[key] ? "search-option-active" : ""} onClick={() => { setSearchOptions(previous => ({ ...previous, [key]: !previous[key] })); setSearchStatus(""); }}>{key === "caseSensitive" ? "Aa" : key === "wholeWord" ? "W" : ".*"}</button>)}
               <button
                 onClick={() => {
                   setSearchOpen(false);
                   rich.current?.restore();
                 }}
-                aria-label="关闭查找"
+                aria-label={t("关闭查找")}
               >
                 ×
               </button>
             </div>
             <div>
               <input
-                aria-label="替换内容"
-                placeholder="替换为"
+                aria-label={t("替换内容")}
+                placeholder={t("替换为")}
                 value={replacement}
                 onChange={(event) => setReplacement(event.target.value)}
               />
-              <button disabled={readOnly} onClick={() => replaceMatch()}>替换</button>
-              <button disabled={readOnly} onClick={() => replaceMatch(true)}>全部替换</button>
+              <button disabled={readOnly} onClick={() => replaceMatch()}>{t("替换")}</button>
+              <button disabled={readOnly} onClick={() => replaceMatch(true)}>{t("全部替换")}</button>
             </div>
           </div>
         )}
         {editingImage && <ImageDialog image={editingImage} documentId={record.id} options={{ ...preferences }} close={() => { setEditingImage(null); rich.current?.restore(); }} submit={value => {
-          const doc = model.current!; if (doc.text.slice(editingImage.from, editingImage.to) !== editingImage.source) { callbacks.current.onError("图片源码已变化，请重新选择图片。"); return; }
+          const doc = model.current!; if (doc.text.slice(editingImage.from, editingImage.to) !== editingImage.source) { callbacks.current.onError(t("图片源码已变化，请重新选择图片。")); return; }
           doc.closeGroup(); doc.replace(editingImage.from, editingImage.to, value, "image-edit"); rich.current?.render(false); publish();
         }} />}
         <div className="rich-scroller" hidden={!visibleMode} onDoubleClick={event => {
@@ -780,7 +788,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
           ref={sourceParent}
           onContextMenu={event => { event.preventDefault(); event.stopPropagation(); openContextMenu(event.target as HTMLElement, event.clientX, event.clientY, !event.clientX && !event.clientY); }}
         />
-        {contextMenu && <ContextMenu label={contextMenu.table ? "表格编辑菜单" : "正文编辑菜单"} x={contextMenu.x} y={contextMenu.y} items={contextItems(contextMenu)}
+        {contextMenu && <ContextMenu label={contextMenu.table ? t("表格编辑菜单") : t("正文编辑菜单")} x={contextMenu.x} y={contextMenu.y} items={contextItems(contextMenu)}
           close={reason => { setContextMenu(null); if (reason === "cancel") restoreContext(contextMenu); }} action={action => contextAction(contextMenu, action)} />}
       </div>
     );

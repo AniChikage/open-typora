@@ -15,6 +15,8 @@ try {
       "-swift-version",
       "5",
       "native/DocumentStore.swift",
+    "native/Versions.swift",
+    "native/Localization.swift",
     "native/Workspace.swift",
     "native/Interchange.swift",
     "native/ImageActions.swift",

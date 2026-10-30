@@ -271,5 +271,40 @@ func runStoreTests() throws {
   try expect(hugeRestored.documents.first?.content == hugeText + "草稿", "native recovery retains dirty content beyond 20 MiB")
   let hugeEncoded = try DocumentStore.encode(hugeText, encoding: "utf-16le", bom: true)
   try expect(hugeEncoded.count > 64 * 1024 * 1024 && hugeEncoded.starts(with: [0xff,0xfe]), "native encoded output can exceed 64 MiB")
+  let historyStore = DocumentStore(directory.appendingPathComponent("history-data"))
+  let historyFile = directory.appendingPathComponent("history.md"), historyText = "# 历史\r\n\r\n你好，中国 👨‍👩‍👧‍👦  \r\n"
+  try atomicWrite(historyFile, Data(historyText.utf8))
+  let historyRecord = try historyStore.open(historyFile)
+  _ = try historyStore.versions.capture(historyRecord, content: historyText + "快照", reason: "manual")
+  _ = try historyStore.save(historyRecord.id, text: historyText + "保存")
+  let anotherStore = DocumentStore(historyStore.dataDirectory), anotherRecord = try anotherStore.open(historyFile)
+  let snapshots = try anotherStore.versions.list(anotherRecord)["versions"] as! [[String: Any]]
+  let manual = snapshots.first { $0["reason"] as? String == "manual" }!
+  try expect(try anotherStore.versions.read(anotherRecord, id: manual["id"] as! String)["content"] as? String == historyText + "快照", "native snapshots survive a new host with exact Unicode and CRLF")
+  try expect(try String(contentsOf: historyFile, encoding: .utf8) == historyText + "保存", "viewing version history never rewrites the current file")
+  let historyDraft = DocumentRecord(id: UUID().uuidString, name: "draft.md", content: "草稿初版", savedContent: "", lineEnding: "\n")
+  _ = try historyStore.draft(historyDraft)
+  _ = try historyStore.versions.capture(historyDraft, content: historyDraft.content, reason: "manual")
+  let savedDraft = try historyStore.save(historyDraft.id, text: "草稿保存", destination: directory.appendingPathComponent("draft-saved.md"))
+  let draftVersions = try historyStore.versions.list(savedDraft)["versions"] as! [[String: Any]]
+  try expect(draftVersions.contains { $0["hash"] as? String == hashData(Data(historyDraft.content.utf8)) }, "native first Save As retains draft version history")
+  let movedHistoryFile = directory.appendingPathComponent("history-moved.md")
+  try historyStore.versions.remap(historyRecord.path!, movedHistoryFile.path)
+  var movedRecord = anotherRecord; movedRecord.path = movedHistoryFile.path
+  try expect((try historyStore.versions.list(movedRecord)["versions"] as! [[String: Any]]).contains { $0["id"] as? String == manual["id"] as? String }, "native rename migrates persistent history to the new path")
+  for number in 0..<60 { _ = try historyStore.versions.capture(movedRecord, content: "版本 \(number)", reason: "manual") }
+  let retained = try historyStore.versions.list(movedRecord)["versions"] as! [[String: Any]]
+  try expect(retained.count == 50 && (try historyStore.versions.read(movedRecord, id: retained[0]["id"] as! String)["content"] as? String) == "版本 59", "native retention keeps the latest 50 complete snapshots")
+  let grantRoot = directory.appendingPathComponent("context-folder")
+  try fm.createDirectory(at: grantRoot, withIntermediateDirectories: true)
+  let grantFile = grantRoot.appendingPathComponent("source.md"), outsideFile = directory.appendingPathComponent("private-source.md")
+  try atomicWrite(grantFile, Data("本地资料".utf8)); try atomicWrite(outsideFile, Data("private".utf8))
+  let inventory = try historyStore.scan(grantRoot), contextFiles = inventory["files"] as! [[String: String]], token = contextFiles.first { $0["name"] == "source.md" }!["token"]!
+  let recordCount = historyStore.records.count
+  let accessed = try historyStore.readContext(historyStore.contextAccess(token))
+  try expect(accessed["content"] as? String == "本地资料" && historyStore.records.count == recordCount, "native authorized context reads do not add documents to the session")
+  try fm.removeItem(at: grantFile); try fm.createSymbolicLink(at: grantFile, withDestinationURL: outsideFile)
+  do { _ = try historyStore.readContext(historyStore.contextAccess(token)); throw NativeFailure("Unexpected context escape") }
+  catch { try expect(error.localizedDescription.contains("授权"), "native context tokens reject replaced symlinks") }
   print("Native document store checks passed. Artifacts: \(directory.path)")
 }

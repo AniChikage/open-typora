@@ -1,3 +1,4 @@
+import { translate } from "../shared/translate.mjs";
 import type { IpcRequests, Command, PathChange } from "../shared/contracts.js";
 import type { IpcMainInvokeEvent } from "electron";
 type IpcHandlers = { [K in keyof IpcRequests]: (event: IpcMainInvokeEvent, ...args: Parameters<IpcRequests[K]>) => Awaited<ReturnType<IpcRequests[K]>> | Promise<Awaited<ReturnType<IpcRequests[K]>>> };
@@ -85,14 +86,22 @@ ipcMain.on("workspace:prepared", (event, id, value) => { if (event.sender !== wi
 function prepareOperation(phase: string, change: PathChange) { return new Promise<boolean>((resolve, reject) => { const id = randomUUID(), timeout = setTimeout(() => { handshakes.delete(id); reject(new Error("文件操作等待超时。")); }, 30000); handshakes.set(id, value => { clearTimeout(timeout); handshakes.delete(id); resolve(value); }); window!.webContents.send("workspace:operation", id, phase, change); }); }
 let operationRunning = false;
 let ai: AIService;
+let uiLocale = 'zh-CN';
+const l = (source: string) => translate(uiLocale, source);
+let buildMenu = () => {};
 const handlers: IpcHandlers = {
   aiSettings: (_, update) => ai.settings(update),
   aiRewrite: (_, request) => ai.rewrite(request),
   aiCancel: (_, id) => ai.cancel(id),
+  readContext: (_, token) => store.readContext(token),
+  versions: (_, id) => store.versions.list(store.require(id)),
+  captureVersion: (_, id, content, reason) => store.versions.capture(store.require(id), content, reason),
+  readVersion: (_, id, versionId) => store.versions.read(store.require(id), versionId),
+  setLocale: (_, locale) => { const next = locale === 'en' ? 'en' : 'zh-CN'; if (uiLocale !== next) { uiLocale = next; buildMenu(); } return true; },
   background: () => readBackground(store.dataDir),
   clearBackground: () => clearBackground(store.dataDir),
   chooseBackground: async () => {
-    const result = await dialog.showOpenDialog(window!,{title:"选择背景图片",filters:[{name:"背景图片",extensions:["png","jpg","jpeg","webp"]}],properties:["openFile"]});
+    const result = await dialog.showOpenDialog(window!,{title:l("选择背景图片"),filters:[{name:l("背景图片"),extensions:["png","jpg","jpeg","webp"]}],properties:["openFile"]});
     if (result.canceled || !result.filePaths[0]) return null;
     const file = result.filePaths[0];
     if ((await stat(file)).size > 8 * 1024 * 1024) throw new Error("背景图片须小于 8 MB。");
@@ -110,7 +119,7 @@ const handlers: IpcHandlers = {
   },
   plugins: async () => (await plugins(store.dataDir)).map(authorizedPlugin),
   removePlugin: async (_, id) => { if (!/^local-[a-f0-9]{64}$/.test(id)) throw new Error("插件标识无效。"); const root = await realpath(path.join(store.dataDir, "plugins")); if (path.dirname(root) !== await realpath(store.dataDir)) throw new Error("插件目录无效。"); for (const suffix of [".json", ".mjs"]) { const file = path.join(root, id + suffix); try { if (path.dirname(await realpath(file)) !== root) throw new Error("插件资源路径无效。"); await shell.trashItem(file); } catch (errorCaught) { const error = errorCaught as NodeJS.ErrnoException; if (error.code !== "ENOENT") throw error; } } return true; },
-  installPlugin: async (_, folder = false) => { const result = await dialog.showOpenDialog(window!, folder ? { title: "安装插件文件夹", properties: ["openDirectory"] } : { filters: [{ name: "JavaScript", extensions: ["js", "cjs"] }], properties: ["openFile"] }); return result.canceled ? null : authorizedPlugin(await installPlugin(result.filePaths[0], store.dataDir)); },
+  installPlugin: async (_, folder = false) => { const result = await dialog.showOpenDialog(window!, folder ? { title: l("安装插件文件夹"), properties: ["openDirectory"] } : { filters: [{ name: "JavaScript", extensions: ["js", "cjs"] }], properties: ["openFile"] }); return result.canceled ? null : authorizedPlugin(await installPlugin(result.filePaths[0], store.dataDir)); },
   themes: () => themes(store.dataDir),
   installTheme: async () => { const result = await dialog.showOpenDialog(window!, { filters: [{ name: "CSS", extensions: ["css"] }], properties: ["openFile"] }); return result.canceled ? null : installTheme(result.filePaths[0], store.dataDir); },
   previewSettings: (_, enable) => previewSettings(enable),
@@ -120,18 +129,18 @@ const handlers: IpcHandlers = {
     if (result.canceled) return null; await atomicWrite(result.filePath, css); return result.filePath;
   },
   readResource: async (_, address) => exportResource(address,store,path.join(root,"dist")),
-  conversionSettings: async (_, choose) => { if (choose) { const result = await dialog.showOpenDialog(window!, { title: "选择 Pandoc 可执行文件", properties: ["openFile"] }); if (!result.canceled) process.env.OPEN_TYPORA_PANDOC = result.filePaths[0]; } return { word: process.platform === "darwin", libreOffice: await libreOfficePath(), pandoc: await pandocPath() }; },
-  importDocument: async () => { const result = await dialog.showOpenDialog(window!, { title: "导入文档", properties: ["openFile"], filters: [{ name: "文档", extensions: ["docx", "doc", "rtf", "odt", "epub", "tex", "rst", "html", "txt"] }] }); return result.canceled ? null : convertImport(result.filePaths[0], store.dataDir); },
+  conversionSettings: async (_, choose) => { if (choose) { const result = await dialog.showOpenDialog(window!, { title: l("选择 Pandoc 可执行文件"), properties: ["openFile"] }); if (!result.canceled) process.env.OPEN_TYPORA_PANDOC = result.filePaths[0]; } return { word: process.platform === "darwin", libreOffice: await libreOfficePath(), pandoc: await pandocPath() }; },
+  importDocument: async () => { const result = await dialog.showOpenDialog(window!, { title: l("导入文档"), properties: ["openFile"], filters: [{ name: l("文档"), extensions: ["docx", "doc", "rtf", "odt", "epub", "tex", "rst", "html", "txt"] }] }); return result.canceled ? null : convertImport(result.filePaths[0], store.dataDir); },
   exportConverted: async (_, id, format, source, html) => { const record = store.require(id), ext = { latex: "tex", revealjs: "html", mediawiki: "wiki" }[format] || format; const result = await dialog.showSaveDialog(window!, { defaultPath: record.name.replace(/\.[^.]+$/, "." + ext) }); return result.canceled ? null : convertExport(store.dataDir, format, source, html, result.filePath); },
   imageAction: async (_, id, sources, action, options) => {
     store.require(id);
     if (!Array.isArray(sources) || !sources.length || sources.length > 200 || sources.some(source => typeof source !== "string") || !["copy", "move", "delete", "upload"].includes(action)) throw new Error("图片操作无效。");
     let destination, directory;
     if (["copy", "move"].includes(action)) {
-      if (sources.length > 1) { const result = await dialog.showOpenDialog(window!, {title:"选择图片目标文件夹",properties:["openDirectory"]}); if (result.canceled) return null; directory = result.filePaths[0]; }
-      else { const result = await dialog.showSaveDialog(window!, {title:action === "move" ? "移动或重命名图片" : "复制图片",defaultPath:imageName(sources[0])}); if (result.canceled) return null; destination = result.filePath; }
+      if (sources.length > 1) { const result = await dialog.showOpenDialog(window!, {title:l("选择图片目标文件夹"),properties:["openDirectory"]}); if (result.canceled) return null; directory = result.filePaths[0]; }
+      else { const result = await dialog.showSaveDialog(window!, {title:action === "move" ? l("移动或重命名图片") : l("复制图片"),defaultPath:imageName(sources[0])}); if (result.canceled) return null; destination = result.filePath; }
     }
-    if (action === "delete") { const result = await dialog.showMessageBox(window!,{type:"warning",message:"删除图片文件？",detail:"图片文件会移到废纸篓，文档中的引用也会移除。",buttons:["取消","移到废纸篓"],defaultId:0,cancelId:0}); if(result.response !== 1) return null; }
+    if (action === "delete") { const result = await dialog.showMessageBox(window!,{type:"warning",message:l("删除图片文件？"),detail:l("图片文件会移到废纸篓，文档中的引用也会移除。"),buttons:[l("取消"),l("移到废纸篓")],defaultId:0,cancelId:0}); if(result.response !== 1) return null; }
     return imageAction({store,id,sources,action,options,destination,directory,trash:file=>shell.trashItem(file),notice:message=>window!.webContents.send("app:command",{action:"notice",message})});
   },
   ready: async () => { rendererReady = true; for (const file of pending.splice(0)) {
@@ -154,9 +163,11 @@ const handlers: IpcHandlers = {
   fileOperation: async (_, operation) => {
     if (operationRunning) throw new Error("另一个文件操作正在进行。"); operationRunning = true;
     try {
-      if (operation.action === "trash") { const answer = await dialog.showMessageBox(window!, { message: "移到废纸篓？", detail: operation.path, buttons: ["取消", "移到废纸篓"], cancelId: 0 }); if (answer.response !== 1) return null; }
+      if (operation.action === "trash") { const answer = await dialog.showMessageBox(window!, { message: l("移到废纸篓？"), detail: operation.path, buttons: [l("取消"), l("移到废纸篓")], cancelId: 0 }); if (answer.response !== 1) return null; }
       if (!await prepareOperation("prepare", { removedPath: operation.action === "trash" ? operation.path : undefined })) throw new Error("文件操作已取消。");
-      const change = await workspace.execute(operation, store, file => shell.trashItem(file)); workspace.apply(change, store);
+      const change = await workspace.execute(operation, store, file => shell.trashItem(file));
+      if (change.fromPath && change.toPath) await store.versions.remap(change.fromPath, change.toPath).catch(() => send({ action: "notice", message: l("历史版本迁移失败，原始历史记录已保留。") }));
+      workspace.apply(change, store);
       await prepareOperation("commit", change); return change;
     } finally { try { await prepareOperation("release", {}); } finally { operationRunning = false; } }
   },
@@ -214,7 +225,7 @@ const handlers: IpcHandlers = {
   },
   chooseImage: async (_, id, options) => {
     store.require(id);
-    const result = await dialog.showOpenDialog(window!, { title: "插入图片", properties: ["openFile"], filters: [{ name: "图片", extensions: ["png", "jpg", "jpeg", "gif", "webp"] }] });
+    const result = await dialog.showOpenDialog(window!, { title: "插入图片", properties: ["openFile"], filters: [{ name: l("图片"), extensions: ["png", "jpg", "jpeg", "gif", "webp"] }] });
     if (result.canceled) return null;
     const file = result.filePaths[0];
     return { path: await store.importImage(id, new Uint8Array(await readFile(file)), path.basename(file), options), alt: path.basename(file) };
@@ -225,7 +236,7 @@ const handlers: IpcHandlers = {
     await atomicWrite(result.filePath, String(html)); return result.filePath;
   },
   confirmClose: async (_, name) => {
-    const result = await dialog.showMessageBox(window!, { type: "question", message: `保存对“${String(name).slice(0,150)}”所做的修改？`, buttons: ["保存", "取消", "不保存"], defaultId: 0, cancelId: 1 });
+    const result = await dialog.showMessageBox(window!, { type: "question", message: `保存对“${String(name).slice(0,150)}”所做的修改？`, buttons: [l("保存"), l("取消"), l("不保存")], defaultId: 0, cancelId: 1 });
     return (["save", "cancel", "discard"] as const)[result.response];
   },
   save: async (_, id, text, saveAs, force, options) => {
@@ -245,7 +256,7 @@ const handlers: IpcHandlers = {
         type: "warning",
         message: "覆盖磁盘上的修改？",
         detail: "当前草稿将替换磁盘文件。也可以取消并另存为副本。",
-        buttons: ["取消", "覆盖"],
+        buttons: [l("取消"), "覆盖"],
         defaultId: 0,
         cancelId: 0,
       });
@@ -264,7 +275,7 @@ const handlers: IpcHandlers = {
   },
   image: (_, id, bytes, name, options) => store.importImage(id, bytes, name, options),
   pdf: async (_, html, options) => {
-    const result = await dialog.showSaveDialog(window!, { title:"导出 PDF", defaultPath:"文档.pdf", filters:[{name:"PDF",extensions:["pdf"]}] });
+    const result = await dialog.showSaveDialog(window!, { title:l("导出 PDF"), defaultPath:"文档.pdf", filters:[{name:"PDF",extensions:["pdf"]}] });
     if (result.canceled) return null;
     const data = await renderPdf(html!, options); await atomicWrite(result.filePath, data); return result.filePath;
   },
@@ -275,7 +286,7 @@ const handlers: IpcHandlers = {
     const result = await dialog.showMessageBox(window!, {
       message: "在浏览器中打开链接？",
       detail: parsed.href,
-      buttons: ["取消", "打开"],
+      buttons: [l("取消"), l("打开")],
       defaultId: 0,
       cancelId: 0,
     });
@@ -293,7 +304,7 @@ const handlers: IpcHandlers = {
       type: "question",
       message: `关闭「${String(name).slice(0, 150)}」？`,
       detail: "尚未保存的修改将从当前会话移除。",
-      buttons: ["取消", "关闭"],
+      buttons: [l("取消"), "关闭"],
       defaultId: 0,
       cancelId: 0,
     });
@@ -400,11 +411,12 @@ app
     const groups = JSON.parse(await readFile(path.join(root, "shared/commands.json"), "utf8")) as {title: string; items: {action: string; label: string; key?: string; pcKey?: string; selector?: string}[]}[];
     const roles: Record<string, import("electron").MenuItemConstructorOptions["role"]> = { "cut:": "cut", "copy:": "copy", "paste:": "paste", "selectAll:": "selectAll" };
     const accelerator = (key?: string) => key?.replaceAll("Mod-", "CommandOrControl+").replaceAll("Ctrl-", "Control+").replaceAll("Alt-", "Alt+").replaceAll("Shift-", "Shift+");
-    Menu.setApplicationMenu(Menu.buildFromTemplate([
-      { label: "Open Typora", submenu: [{ label: "关于 Open Typora", click: command("about") }, { label: "偏好设置…", accelerator: "CommandOrControl+,", click: command("preferences") }, ...(process.platform === "darwin" ? [{ type: "separator" as const }, { role: "hide" as const, label: "隐藏 Open Typora" }, { role: "hideOthers" as const, label: "隐藏其他应用" }] : []), { type: "separator" as const }, { label: "退出 Open Typora", accelerator: "CommandOrControl+Q", click: command("quit") }] },
-      ...groups.map(group => ({ label: group.title, submenu: group.items.filter(item => item.action !== "preferences").map(item => ({ label: item.label, accelerator: accelerator(process.platform === "darwin" ? item.key : item.pcKey ?? item.key), ...(item.selector ? { role: roles[item.selector] } : { click: command(item.action) }) })) })),
-      { role: "windowMenu", label: "窗口" }
+    buildMenu = () => Menu.setApplicationMenu(Menu.buildFromTemplate([
+      { label: "Open Typora", submenu: [{ label: l("关于 Open Typora"), click: command("about") }, { label: l("偏好设置…"), accelerator: "CommandOrControl+,", click: command("preferences") }, ...(process.platform === "darwin" ? [{ type: "separator" as const }, { role: "hide" as const, label: l("隐藏 Open Typora") }, { role: "hideOthers" as const, label: l("隐藏其他应用") }] : []), { type: "separator" as const }, { label: l("退出 Open Typora"), accelerator: "CommandOrControl+Q", click: command("quit") }] },
+      ...groups.map(group => ({ label: uiLocale === "en" && group.title === "文件" ? "File" : l(group.title), submenu: group.items.filter(item => item.action !== "preferences").map(item => ({ label: l(item.label), accelerator: accelerator(process.platform === "darwin" ? item.key : item.pcKey ?? item.key), ...(item.selector ? { role: roles[item.selector] } : { click: command(item.action) }) })) })),
+      { role: "windowMenu", label: l("窗口") }
     ]));
+    buildMenu();
     createWindow();
     app.on("activate", () => {
       if (!window) {

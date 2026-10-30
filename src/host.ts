@@ -29,6 +29,11 @@ const browser: Host = {
   async aiSettings() { throw new Error("模型配置与改写请使用桌面应用。"); },
   async aiRewrite() { throw new Error("AI 改写请使用桌面应用。"); },
   async aiCancel() {},
+  async readContext() { throw new Error('读取本地参考资料请使用桌面应用。'); },
+  async versions() { return { versions: [], warning: '持久化版本历史请使用桌面应用。' }; },
+  async captureVersion() { return { versions: [] }; },
+  async readVersion() { throw new Error('持久化版本历史请使用桌面应用。'); },
+  async setLocale() {},
 
   native: false,
   async cancelClose() {},

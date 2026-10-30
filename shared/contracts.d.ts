@@ -1,7 +1,11 @@
 export interface AIConfig { protocol: "openai" | "ollama"; baseUrl: string; model: string }
 export interface AISettings extends AIConfig { hasKey: boolean; keyStorage: "file" | "system" | "session" | "none"; secureStorage: boolean; persistentStorage?: "file" | "system"; needsKeyMigration?: boolean }
 export interface AISettingsUpdate extends AIConfig { apiKey?: string; clearKey?: boolean; rememberKey: boolean; migrateLegacyKey?: boolean }
-export interface AIRewriteRequest { id: string; instruction: string; text: string }
+export interface AIContext { id: string; name: string; text: string; fromLine?: number; toLine?: number }
+export interface ContextDocument { token: string; name: string; path: string | null; content: string; hash: string; bytes: number }
+export interface DocumentVersion { id: string; createdAt: number; name: string; reason: string; hash: string; bytes: number }
+export interface VersionResult { versions: DocumentVersion[]; warning?: string }
+export interface AIRewriteRequest { id: string; instruction: string; text: string; mode?: 'question'; contexts?: AIContext[] }
 export interface WorkspaceLayout { primaryId: string; secondaryId: string; direction: "columns" | "rows"; ratio: number }
 export interface BackgroundAsset { name: string; dataUrl: string }
 export interface DocumentRecord {
@@ -15,6 +19,7 @@ export interface DocumentRecord {
   conflict?: boolean;
   bom?: boolean;
   encoding?: string;
+  historyWarning?: string;
 }
 export interface FileEntry {
   token: string;
@@ -68,6 +73,11 @@ export interface Host {
   aiSettings(update?: AISettingsUpdate): Promise<AISettings>;
   aiRewrite(request: AIRewriteRequest): Promise<{ text: string; model: string }>;
   aiCancel(id: string): Promise<unknown>;
+  readContext(token: string): Promise<ContextDocument>;
+  versions(id: string): Promise<VersionResult>;
+  captureVersion(id: string, content: string, reason: string): Promise<VersionResult>;
+  readVersion(id: string, versionId: string): Promise<{ version: DocumentVersion; content: string }>;
+  setLocale(locale: string): Promise<unknown>;
   cancelClose(): Promise<unknown>;
   windowAction(action: string): Promise<unknown>;
   imageAction(id: string, sources: string[], action: string, options?: Record<string, unknown>): Promise<Record<string, string> | null>;

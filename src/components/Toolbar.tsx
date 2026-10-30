@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import {
   Sparkles,
   PanelLeft,
@@ -47,49 +48,49 @@ export function Toolbar(props: Props) {
     };
   }, [open]);
   const items = [
-    { action: "new", icon: FilePlus2, label: "新建文档", shortcut: shortcutLabel("Mod-N") },
-    { action: "open", icon: FolderOpen, label: "打开文件", shortcut: shortcutLabel("Mod-O") },
-    { action: "save", icon: Save, label: "保存", shortcut: shortcutLabel("Mod-S") },
-    { action: "saveAs", icon: Copy, label: "另存为…", shortcut: shortcutLabel("Mod-Shift-S") },
-    { action: "find", icon: Search, label: "查找与替换", shortcut: shortcutLabel("Mod-F") },
-    { action: "bold", icon: Bold, label: "粗体", shortcut: shortcutLabel("Mod-B") },
-    { action: "italic", icon: Italic, label: "斜体", shortcut: shortcutLabel("Mod-I") },
-    { action: "code", icon: Code2, label: "代码块", shortcut: "" },
-    { action: "focus", icon: ScanLine, label: "专注模式", shortcut: "F8" },
-    { action: "pdf", icon: FileOutput, label: "导出 PDF", shortcut: "" },
+    { action: "new", icon: FilePlus2, label: t("新建文档"), shortcut: shortcutLabel("Mod-N") },
+    { action: "open", icon: FolderOpen, label: t("打开文件"), shortcut: shortcutLabel("Mod-O") },
+    { action: "save", icon: Save, label: t("保存"), shortcut: shortcutLabel("Mod-S") },
+    { action: "saveAs", icon: Copy, label: t("另存为…"), shortcut: shortcutLabel("Mod-Shift-S") },
+    { action: "find", icon: Search, label: t("查找与替换"), shortcut: shortcutLabel("Mod-F") },
+    { action: "bold", icon: Bold, label: t("粗体"), shortcut: shortcutLabel("Mod-B") },
+    { action: "italic", icon: Italic, label: t("斜体"), shortcut: shortcutLabel("Mod-I") },
+    { action: "code", icon: Code2, label: t("代码块"), shortcut: "" },
+    { action: "focus", icon: ScanLine, label: t("专注模式"), shortcut: "F8" },
+    { action: "pdf", icon: FileOutput, label: t("导出 PDF"), shortcut: "" },
   ];
   return (
     <>
       <header className="toolbar">
         <span className="document-title" title={props.name}>
           {props.name || "Open Typora"}
-          {props.edited && <span className="title-edited"> — 已编辑</span>}
+          {props.edited && <span className="title-edited">{t("— 已编辑")}</span>}
         </span>
       </header>
-      <div className="quick-actions" aria-label="编辑操作">
+      <div className="quick-actions" aria-label={t("编辑操作")}>
         <button
           className="icon-button sidebar-toggle"
-          title="切换侧栏"
-          aria-label="切换侧栏"
+          title={t("切换侧栏")}
+          aria-label={t("切换侧栏")}
           onClick={props.sidebar}
         >
           <PanelLeft size={17} />
         </button>
         <button
           className="icon-button source-toggle"
-          aria-label={props.rendered ? "源码" : "即时渲染"}
-          title={`切换源码模式 ${shortcutLabel("Mod-/")}`}
+          aria-label={props.rendered ? t("源码") : t("即时渲染")}
+          title={t("切换源码模式 {0}", shortcutLabel("Mod-/"))}
           aria-pressed={!props.rendered}
           disabled={props.disabled}
           onClick={() => props.setRendered(!props.rendered)}
         >
           <Code2 size={16} />
         </button>
-        <button className="icon-button" aria-label="AI 改写选区" title="AI 改写选区" disabled={props.disabled} onPointerDown={event => event.preventDefault()} onClick={() => props.command("ai-rewrite")}><Sparkles size={16} /></button>
+        <button className="icon-button" aria-label={t("AI 改写选区")} title={t("AI 改写选区")} disabled={props.disabled} onPointerDown={event => event.preventDefault()} onClick={() => props.command("ai-rewrite")}><Sparkles size={16} /></button>
         <div className="menu-container" ref={root}>
           <button
             className="icon-button"
-            aria-label="更多操作"
+            aria-label={t("更多操作")}
             aria-expanded={open}
             onClick={() => setOpen(!open)}
           >
@@ -124,9 +125,9 @@ export function Toolbar(props: Props) {
               ))}
               {commandGroups.filter(group => ["段落", "表格", "格式", "显示", "编辑", "文件"].includes(group.title)).map(group => {
                 const extra = group.items.filter(item => !item.selector && !items.some(quick => quick.action === item.action) && !["theme", "folder", "sidebar", "source", "close-window"].includes(item.action));
-                return <section className="command-group" key={group.title}><div className="menu-divider" /><p>{group.title}</p>{extra.map(item => <button key={item.action} role="menuitem" aria-label={item.label} disabled={
+                return <section className="command-group" key={group.title}><div className="menu-divider" /><p>{t(group.title)}</p>{extra.map(item => <button key={item.action} role="menuitem" aria-label={t(item.label)} disabled={
                   !!item.context && (props.disabled || (["rich", "table"].includes(item.context) && !props.rendered) || (item.context === "table" && props.context !== "table_open"))
-                } onClick={() => { setOpen(false); props.command(item.action); }}><span className="menu-check" /><span>{item.label}</span><kbd>{shortcutLabel(commandKey(item))}</kbd></button>)}</section>;
+                } onClick={() => { setOpen(false); props.command(item.action); }}><span className="menu-check" /><span>{t(item.label)}</span><kbd>{shortcutLabel(commandKey(item))}</kbd></button>)}</section>;
               })}
               <div className="menu-divider" />
               <button
@@ -137,7 +138,7 @@ export function Toolbar(props: Props) {
                 }}
               >
                 <span className="menu-check" />
-                <span>切换明暗主题</span>
+                <span>{t("切换明暗主题")}</span>
               </button>
               <button
                 role="menuitemcheckbox"
@@ -147,7 +148,7 @@ export function Toolbar(props: Props) {
                 <span className="menu-check">
                   {props.autosave && <Check size={16} />}
                 </span>
-                <span>自动保存已有文件</span>
+                <span>{t("自动保存已有文件")}</span>
               </button>
               <button
                 role="menuitem"
@@ -157,7 +158,7 @@ export function Toolbar(props: Props) {
                 }}
               >
                 <span className="menu-check" />
-                <span>关于 Open Typora</span>
+                <span>{t("关于 Open Typora")}</span>
                 <kbd>{version}</kbd>
               </button>
             </div>

@@ -1,7 +1,8 @@
+import { t } from "../i18n";
 import { imeKey } from "../editor/composition";
 import { useLayoutEffect, useRef } from "react";
 import type { ReactNode } from "react";
-export function Dialog({ title, close, children }: { title: string; close(): void; children: ReactNode }) {
+export function Dialog({ title, close, children, className = "" }: { title: string; close(): void; children: ReactNode; className?: string }) {
   const root = useRef<HTMLElement>(null), closing = useRef(close);
   closing.current = close;
   useLayoutEffect(() => {
@@ -12,7 +13,7 @@ export function Dialog({ title, close, children }: { title: string; close(): voi
     return () => { if (previous?.isConnected) previous.focus({ preventScroll: true }); };
   }, []);
   return <div className="dialog-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) closing.current(); }}>
-    <section ref={root} className="utility-dialog" role="dialog" aria-modal="true" aria-label={title} onKeyDown={event => {
+    <section ref={root} className={"utility-dialog " + className} role="dialog" aria-modal="true" aria-label={title} onKeyDown={event => {
       if (imeKey(event.nativeEvent)) return;
       if (event.key === "Escape") { event.stopPropagation(); closing.current(); }
       if (event.key !== "Tab") return;
@@ -21,7 +22,7 @@ export function Dialog({ title, close, children }: { title: string; close(): voi
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
       if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
     }}>
-      <div className="dialog-heading"><h2>{title}</h2><button type="button" onClick={close} aria-label={`关闭${title}`}>×</button></div>
+      <div className="dialog-heading"><h2>{title}</h2><button type="button" onClick={close} aria-label={t("关闭{0}", title)}>×</button></div>
       {children}
     </section>
   </div>;

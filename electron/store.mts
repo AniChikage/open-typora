@@ -1,3 +1,4 @@
+import { VersionStore } from './versions.mjs';
 import type { BinaryLike } from "node:crypto";
 import type { DocumentRecord, FileEntry, FolderResult, SessionSnapshot, Recovery, DiskChange } from "../shared/contracts.js";
 import {
@@ -81,8 +82,10 @@ export class DocumentStore {
   persistQueue = Promise.resolve();
   scanQueue = Promise.resolve();
   declare dataDir: string;
+  readonly versions: VersionStore;
   constructor(dataDir: string) {
     this.dataDir = dataDir;
+    this.versions = new VersionStore(dataDir);
   }
   async open(file: string, reload = false, encoding?: string): Promise<DocumentRecord & { path: string }> {
     const resolved = await realpath(file);
@@ -106,6 +109,7 @@ export class DocumentStore {
       bom: decoded.bom, encoding: decoded.encoding,
     };
     this.records.set(id, record);
+    try { await this.versions.capture(record, text, 'opened'); } catch { /* Reading a document must remain possible if its history is unavailable. */ }
     return { ...record };
   }
   registerDraft(record: Partial<DocumentRecord> | null | undefined) {
@@ -160,6 +164,8 @@ export class DocumentStore {
         }
         const encoding = options.encoding || record.encoding || "utf-8", bom = (options.bom ?? record.bom ?? false) && encoding.startsWith("utf-");
         const bytes = encodeText(text, encoding, bom);
+        let historyWarning: string | undefined;
+        try { historyWarning = (await this.versions.capture(record, record.savedContent, 'opened')).warning; } catch { historyWarning = '无法保存版本历史，文档保存仍可继续。'; }
         await atomicWrite(
           file,
           bytes,
@@ -190,7 +196,9 @@ export class DocumentStore {
           diskHash: digest(bytes),
         };
         this.records.set(id, updated);
-        return { ...updated };
+        if (record.path !== updated.path) try { await this.versions.adopt(record, updated); } catch { historyWarning = "历史版本迁移失败，原始历史记录已保留。"; }
+        try { historyWarning = (await this.versions.capture(updated, text, 'saved')).warning || historyWarning; } catch { historyWarning = '无法保存版本历史，文档已保存。'; }
+        return { ...updated, ...(historyWarning ? { historyWarning } : {}) };
       });
     this.queues.set(id, operation);
     try {
@@ -253,6 +261,24 @@ export class DocumentStore {
     this.folder = root;
     this.fileTokens = tokens;
     return { folder: root, files, truncated, skipped };
+  }
+  async readContext(token: string) {
+    const record = token.startsWith('document:') ? this.require(token.slice(9)) : undefined;
+    const file = record?.path || this.fileTokens.get(token);
+    if (record && !record.path) {
+      const bytes = Buffer.byteLength(record.content);
+      if (bytes > 2 * 1024 * 1024) throw new Error('单份参考资料超过 2 MiB，已跳过；不影响编辑或保存。');
+      return { token, name: record.name, path: null, content: record.content, hash: digest(record.content), bytes };
+    }
+    if (!file || !record && !this.folder) throw new Error('资料已不在当前授权范围，请刷新后重试。');
+    const resolved = await realpath(file), metadata = await lstat(file);
+    if (metadata.isSymbolicLink() || resolved !== file || !metadata.isFile() || !markdown.test(file) || !record && !within(this.folder!, resolved)) throw new Error('资料已不在当前授权范围，请刷新后重试。');
+    if (metadata.size > 2 * 1024 * 1024) throw new Error('单份参考资料超过 2 MiB，已跳过；不影响编辑或保存。');
+    const bytes = await readFile(file);
+    if (bytes.length > 2 * 1024 * 1024 || await realpath(file) !== resolved) throw new Error('参考资料在读取时发生变化，请重试。');
+    const opened = record || [...this.records.values()].find(item => item.path === file);
+    const content = decodeText(bytes, this.hasBOM(bytes) ? undefined : opened?.encoding).content;
+    return { token, name: this.folder && within(this.folder, file) ? path.relative(this.folder, file) : path.basename(file), path: resolved, content, hash: digest(bytes), bytes: bytes.length };
   }
   async openToken(token: string) {
     const file = this.fileTokens.get(token);

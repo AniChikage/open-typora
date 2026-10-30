@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { useMemo, useRef, useState } from "react";
 import { ChevronRight, FileText, Folder } from "lucide-react";
 import type { FileEntry } from "../types";
@@ -29,5 +30,5 @@ export function FileTree({ files, folder, activePath, open, context, move, sort,
       {directory && expanded && <div role="group">{children.get(file.relative)?.map(child => node(child, depth + 1))}</div>}
     </div>;
   }
-  return <div ref={root} role="tree" aria-label="文件树" onDragOver={event => { if (event.dataTransfer.types.includes("application/x-open-typora-file")) event.preventDefault(); }} onDrop={event => { const path = event.dataTransfer.getData("application/x-open-typora-file"); if (path && folder) { event.preventDefault(); move(path, folder); } }}>{children.get("")?.map(file => node(file, 0))}</div>;
+  return <div ref={root} role="tree" aria-label={t("文件树")} onDragOver={event => { if (event.dataTransfer.types.includes("application/x-open-typora-file")) event.preventDefault(); }} onDrop={event => { const path = event.dataTransfer.getData("application/x-open-typora-file"); if (path && folder) { event.preventDefault(); move(path, folder); } }}>{children.get("")?.map(file => node(file, 0))}</div>;
 }

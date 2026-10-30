@@ -20,11 +20,13 @@
 
 Open Typora is an open-source Markdown editor inspired by Typora's inline editing experience. Write directly in the rendered document, switch to source when you need it, and save ordinary `.md` files in your own folders.
 
-**Status:** early development, version **0.20.2**. Release builds support **macOS 14+ on Apple Silicon**, **Windows 10/11 x64**, and **Linux x64**. The interface is currently in Simplified Chinese. This is an independent project, unaffiliated with Typora; full feature and behavior parity is still in progress.
+**Status:** early development, version **0.21.0**. Release builds support **macOS 14+ on Apple Silicon**, **Windows 10/11 x64**, and **Linux x64**. The interface supports Simplified Chinese and English (Preferences → Language). This is an independent project, unaffiliated with Typora; full feature and behavior parity is still in progress.
 
 ## Features
 
 - **Optional AI editing** — connect your own OpenAI-compatible API, OpenRouter, LM Studio or Ollama; rewrite a selection, review individual changes, and apply with one-step undo. [Setup, privacy and limits](docs/ai.md).
+- **References and folder Q&A** — mention local files with `@`, inspect relevant excerpts before sending, and get answers with checked source quotes. Insert portable Markdown citations with one-step undo. [Workflow and limits](docs/workspace.md).
+- **Version history** — browse local snapshots across restarts, capture a version before experimenting, and restore earlier text while retaining the current content and undo.
 - **Live Markdown editing** — headings, inline formatting, lists, tasks, tables, links, footnotes, and YAML front matter. Edit code and formulas in place, or switch to the full source view.
 - **Spreadsheet paste** — copy an Excel/WPS range into an editable Markdown table in live or source mode; keep blank cells, quoted line breaks and one-step undo. [Clipboard behavior](docs/clipboard.md).
 - **Tabs and split editing** — reorder and navigate document tabs, compare two documents side by side or stacked, and use independent source/live modes. Restore the pane layout on restart. Right-click tabs for grouped closing, path copying, rename and split actions; use text/table context menus for editing.
@@ -57,18 +59,18 @@ The demo keeps documents in the current tab's memory; it does not upload or pers
 
 | Platform | Installer | Alternative |
 | --- | --- | --- |
-| Windows 10/11 · x64 | **[Download Setup.exe](https://github.com/AniChikage/open-typora/releases/download/v0.20.2/Open-Typora-0.20.2-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.20.2/Open-Typora-0.20.2-windows-x64.zip) |
-| macOS 14+ · Apple Silicon | **[Download DMG](https://github.com/AniChikage/open-typora/releases/download/v0.20.2/Open-Typora-0.20.2-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.20.2/Open-Typora-0.20.2-arm64.zip) |
-| Linux · x64 | **[Download DEB](https://github.com/AniChikage/open-typora/releases/download/v0.20.2/Open-Typora-0.20.2-linux-x64.deb)** | [AppImage](https://github.com/AniChikage/open-typora/releases/download/v0.20.2/Open-Typora-0.20.2-linux-x64.AppImage) |
+| Windows 10/11 · x64 | **[Download Setup.exe](https://github.com/AniChikage/open-typora/releases/download/v0.21.0/Open-Typora-0.21.0-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.21.0/Open-Typora-0.21.0-windows-x64.zip) |
+| macOS 14+ · Apple Silicon | **[Download DMG](https://github.com/AniChikage/open-typora/releases/download/v0.21.0/Open-Typora-0.21.0-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.21.0/Open-Typora-0.21.0-arm64.zip) |
+| Linux · x64 | **[Download DEB](https://github.com/AniChikage/open-typora/releases/download/v0.21.0/Open-Typora-0.21.0-linux-x64.deb)** | [AppImage](https://github.com/AniChikage/open-typora/releases/download/v0.21.0/Open-Typora-0.21.0-linux-x64.AppImage) |
 
-[SHA-256 checksums](https://github.com/AniChikage/open-typora/releases/download/v0.20.2/SHA256SUMS.txt) · [All releases](https://github.com/AniChikage/open-typora/releases)
+[SHA-256 checksums](https://github.com/AniChikage/open-typora/releases/download/v0.21.0/SHA256SUMS.txt) · [All releases](https://github.com/AniChikage/open-typora/releases)
 
 ### Install on Linux
 
 Ubuntu 22.04 or a compatible x64 distribution is the tested baseline. Download the DEB and install it with:
 
 ```sh
-sudo apt install ./Open-Typora-0.20.2-linux-x64.deb
+sudo apt install ./Open-Typora-0.21.0-linux-x64.deb
 ```
 
 The desktop launcher and Markdown file association are included. Uninstalling with `sudo apt remove open-typora` retains your documents and recovery data.
@@ -87,7 +89,7 @@ The Windows build is currently **not code-signed**. Windows may display an unkno
 
 ### Install on macOS
 
-1. Download **[Open-Typora-0.20.2-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.20.2/Open-Typora-0.20.2-arm64.dmg)** from [Releases](https://github.com/AniChikage/open-typora/releases/latest).
+1. Download **[Open-Typora-0.21.0-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.21.0/Open-Typora-0.21.0-arm64.dmg)** from [Releases](https://github.com/AniChikage/open-typora/releases/latest).
 2. Open the DMG and drag **Open Typora** into **Applications**.
 3. Launch Open Typora from Applications.
 
@@ -148,12 +150,12 @@ Open a Markdown file or a folder, or try [the example document](examples/a-quiet
 
 ### Set up AI editing (optional)
 
-1. Open **编辑 → 模型设置…** (Edit → Model settings), or **偏好设置 → AI 改写 → 模型设置…**.
-2. Choose **OpenAI 兼容 API / LM Studio** for a compatible API, OpenRouter or LM Studio; choose **Ollama 原生接口** for Ollama. Enter the service base URL, exact model ID and API key if needed. Start local servers separately.
-3. Click **保存并测试连接** (Save and test). This sends only the public sample `你好` and a fixed test instruction, rather than your open document. You can also save without testing.
-4. Select text, press **⌘⇧R** / **Ctrl+Shift+R**, enter an instruction and click **生成改写**. Review each change before choosing **应用 … 处修改**. Generating a proposal does not modify or save the document; applying it is one undoable edit. The panel stays open so you can continue rewriting or read a new selection.
+1. Open **Edit → Model settings…**, or **Preferences → AI rewriting → Model settings…**.
+2. Choose **OpenAI-compatible API / LM Studio** for a compatible API, OpenRouter or LM Studio; choose **Ollama native API** for Ollama. Enter the service base URL, exact model ID and API key if needed. Start local servers separately.
+3. Click **Save and test connection**. This sends only the public sample (`你好` / `Hello`) and a fixed test instruction, rather than your open document. You can also save without testing.
+4. Select text, press **⌘⇧R** / **Ctrl+Shift+R**, enter an instruction and click **Generate rewrite**. Review each change before choosing **Apply … changes**. Generating a proposal does not modify or save the document; applying it is one undoable edit. The panel stays open so you can continue rewriting or read a new selection.
 
-No model or API subscription is bundled. Only your selection, instruction and a fixed preservation instruction are sent to the configured service. On macOS, remembered keys are plaintext in the local configuration file with owner-only permissions; Windows/Linux retain system-backed encryption. Session-only keys are also supported. See the [AI guide](docs/ai.md) for endpoint examples, local models, credentials, errors and limits.
+No model or API subscription is bundled. By default, only your selection, instruction and a fixed preservation instruction are sent. Explicit `@file` references add relevant excerpts; folder Q&A sends only the excerpts you approve. See the [workspace guide](docs/workspace.md). On macOS, remembered keys are plaintext in the local configuration file with owner-only permissions; Windows/Linux retain system-backed encryption. Session-only keys are also supported. See the [AI guide](docs/ai.md) for endpoint examples, local models, credentials, errors and limits.
 
 ## Development
 

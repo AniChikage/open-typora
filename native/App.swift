@@ -96,7 +96,7 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
     self.owner = owner
     self.seed = seed
     super.init()
-    self.store = DocumentStore(directory)
+    self.store = DocumentStore(directory, historyDirectory: owner.directory)
   }
   var window: NSWindow!
   var webView: WKWebView!
@@ -207,6 +207,30 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
         return
       }
     #endif
+    if ["versions", "captureVersion", "readVersion", "readContext"].contains(name) {
+      do {
+        let first = try arg(args, 0, String.self)
+        let record = name == "readContext" ? nil : try store.require(first)
+        let access = name == "readContext" ? try store.contextAccess(first) : nil
+        let versions = store.versions, store = self.store!
+        let text = name == "captureVersion" ? try arg(args, 1, String.self) : ""
+        let reason = name == "captureVersion" ? try arg(args, 2, String.self) : ""
+        let versionID = name == "readVersion" ? try arg(args, 1, String.self) : ""
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+          let response: [String: Any]
+          do {
+            let value: [String: Any]
+            if let access { value = try store.readContext(access) }
+            else if name == "versions" { value = try versions.list(record!) }
+            else if name == "captureVersion" { value = try versions.capture(record!, content: text, reason: reason) }
+            else { value = try versions.read(record!, id: versionID) }
+            response = ["ok": true, "value": value]
+          } catch { response = ["ok": false, "error": error.localizedDescription] }
+          DispatchQueue.main.async { self?.reply(id, response) }
+        }
+      } catch { reply(id, ["ok": false, "error": error.localizedDescription]) }
+      return
+    }
     if name == "aiRewrite" {
       Task { @MainActor in
         do { let value = try await owner.ai.rewrite(arg(args, 0, [String: Any].self)); reply(id, ["ok": true, "value": value]) }
@@ -290,6 +314,7 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
           let change = try owner.workspace.execute(operation, store: store)
           try? owner.workspace.updateRecent(change)
           if let from = change["fromPath"], let to = change["toPath"] {
+            do { try store.versions.remap(from, to) } catch { deliver(["action": "notice", "message": "历史版本迁移失败，原始历史记录已保留。"]) }
             owner.recentClosedFiles = owner.recentClosedFiles.map { item in (URL(fileURLWithPath: item.url.path == from || item.url.path.hasPrefix(from + "/") ? to + item.url.path.dropFirst(from.count) : item.url.path), item.group) }
             owner.persistClosedHistory()
           }
@@ -392,10 +417,10 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
   static func openEncoded(_ file: URL, store: DocumentStore) throws -> DocumentRecord {
     do { return try store.open(file) }
     catch let error as NativeFailure where error.code == "INVALID_ENCODING" {
-      let alert = NSAlert(); alert.messageText = "选择文本编码"; alert.informativeText = "此文件没有可识别的 Unicode 编码。请选择创建文件时使用的编码，打开后可在底部更改。"
+      let alert = NSAlert(); alert.messageText = l("选择文本编码"); alert.informativeText = l("此文件没有可识别的 Unicode 编码。请选择创建文件时使用的编码，打开后可在底部更改。")
       let selector = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 260, height: 26))
       selector.addItems(withTitles: DocumentStore.encodings.map { $0.uppercased() }); selector.selectItem(at: 3)
-      alert.accessoryView = selector; alert.addButton(withTitle: "打开"); alert.addButton(withTitle: "取消")
+      alert.accessoryView = selector; alert.addButton(withTitle: l("打开")); alert.addButton(withTitle: l("取消"))
       guard alert.runModal() == .alertFirstButtonReturn else { throw NativeFailure("已取消打开。", "CANCELLED") }
       return try store.open(file, encoding: DocumentStore.encodings[selector.indexOfSelectedItem])
     }
@@ -421,14 +446,18 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
   }
   func confirm(_ title: String, detail: String, yes: String) -> Bool {
     let alert = NSAlert()
-    alert.messageText = title
-    alert.informativeText = detail
-    alert.addButton(withTitle: "取消")
-    alert.addButton(withTitle: yes)
+    alert.messageText = l(title)
+    alert.informativeText = l(detail)
+    alert.addButton(withTitle: l("取消"))
+    alert.addButton(withTitle: l(yes))
     return alert.runModal() == .alertSecondButtonReturn
   }
   func handle(_ name: String, _ args: [Any]) throws -> Any? {
     switch name {
+    case "setLocale":
+      let next = try arg(args, 0, String.self) == "en" ? "en" : "zh-CN"
+      if owner.uiLocale != next { owner.uiLocale = next; UILanguage.current = next; for host in owner.hosts { host.buildMenu() } }
+      return true
     case "aiSettings": return try owner.ai.settings(args.first as? [String: Any])
     case "aiCancel": owner.ai.cancel(try arg(args, 0, String.self)); return nil
     case "background": return try Interchange.background(owner.directory)
@@ -437,7 +466,7 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       #if WEBTEST
         let file = owner.directory.appendingPathComponent("Background-fixture.png")
       #else
-        let panel = NSOpenPanel(); panel.title = "选择背景图片"; panel.canChooseDirectories = false; panel.allowsMultipleSelection = false; panel.allowedContentTypes = [.png,.jpeg,UTType(filenameExtension:"webp")].compactMap { $0 }
+        let panel = NSOpenPanel(); panel.title = l("选择背景图片"); panel.canChooseDirectories = false; panel.allowsMultipleSelection = false; panel.allowedContentTypes = [.png,.jpeg,UTType(filenameExtension:"webp")].compactMap { $0 }
         guard panel.runModal() == .OK, let file = panel.url else { return nil }
       #endif
       return try Interchange.installBackground(file,directory:owner.directory)
@@ -465,7 +494,7 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       return try Interchange.installTheme(file, directory: owner.directory)
     case "conversionSettings":
       if args.first as? Bool == true {
-        let panel = NSOpenPanel(); panel.title = "选择 Pandoc 可执行文件"; panel.canChooseDirectories = false
+        let panel = NSOpenPanel(); panel.title = l("选择 Pandoc 可执行文件"); panel.canChooseDirectories = false
         if panel.runModal() == .OK, let file = panel.url, FileManager.default.isExecutableFile(atPath: file.path) { UserDefaults.standard.set(file.path, forKey: "pandocPath") }
       }
       return ["pandoc": Interchange.pandoc()?.path ?? "", "word": true]
@@ -670,11 +699,11 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
         return "cancel"
       #else
         let alert = NSAlert()
-        alert.messageText = "保存对“\(try arg(args, 0, String.self))”所做的修改？"
-        alert.informativeText = "保存后关闭文档，或选择不保存这次修改。"
-        alert.addButton(withTitle: "保存")
-        alert.addButton(withTitle: "取消")
-        alert.addButton(withTitle: "不保存")
+        alert.messageText = l("保存对“{0}”所做的修改？", try arg(args, 0, String.self))
+        alert.informativeText = l("保存后关闭文档，或选择不保存这次修改。")
+        alert.addButton(withTitle: l("保存"))
+        alert.addButton(withTitle: l("取消"))
+        alert.addButton(withTitle: l("不保存"))
         let response = alert.runModal()
         return response == .alertFirstButtonReturn
           ? "save" : response == .alertSecondButtonReturn ? "cancel" : "discard"
@@ -718,12 +747,12 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
     completionHandler: @escaping (String?) -> Void
   ) {
     let alert = NSAlert()
-    alert.messageText = prompt
+    alert.messageText = l(prompt)
     let field = NSTextField(string: defaultText ?? "")
     field.frame = NSRect(x: 0, y: 0, width: 280, height: 24)
     alert.accessoryView = field
-    alert.addButton(withTitle: "确定")
-    alert.addButton(withTitle: "取消")
+    alert.addButton(withTitle: l("确定"))
+    alert.addButton(withTitle: l("取消"))
     alert.window.initialFirstResponder = field
     completionHandler(alert.runModal() == .alertFirstButtonReturn ? field.stringValue : nil)
   }
@@ -735,8 +764,9 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
     let main = NSMenu()
     NSApp.mainMenu = main
     func group(_ title: String) -> NSMenu {
-      let root = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-      let menu = NSMenu(title: title)
+      let label = UILanguage.current == "en" && title == "文件" ? "File" : l(title)
+      let root = NSMenuItem(title: label, action: nil, keyEquivalent: "")
+      let menu = NSMenu(title: label)
       root.submenu = menu
       main.addItem(root)
       return menu
@@ -748,7 +778,7 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
         if key.hasPrefix("F"), let number = Int(key.dropFirst()), (1...20).contains(number) { key = String(UnicodeScalar(0xF703 + number)!) }
         if key == "Backspace" { key = "\u{8}" }
         let item = NSMenuItem(
-          title: command.label, action: command.selector.map { NSSelectorFromString($0) } ?? #selector(NativeApplication.command(_:)), keyEquivalent: key.lowercased())
+          title: l(command.label), action: command.selector.map { NSSelectorFromString($0) } ?? #selector(NativeApplication.command(_:)), keyEquivalent: key.lowercased())
         if command.selector == nil { item.target = owner }
         item.representedObject = command.action
         item.keyEquivalentModifierMask = []
@@ -762,26 +792,26 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
     add(EditorCommand(label: "关于 Open Typora", action: "about", key: nil, context: nil, selector: nil), to: appMenu)
     add(EditorCommand(label: "偏好设置…", action: "preferences", key: "Mod-,", context: nil, selector: nil), to: appMenu)
     appMenu.addItem(.separator())
-    appMenu.addItem(NSMenuItem(title: "隐藏 Open Typora", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h"))
+    appMenu.addItem(NSMenuItem(title: l("隐藏 Open Typora"), action: #selector(NSApplication.hide(_:)), keyEquivalent: "h"))
     add(EditorCommand(label: "退出 Open Typora", action: "quit", key: "Mod-Q", context: nil, selector: nil), to: appMenu)
     for definition in owner.commandGroups where definition.title != "表格" {
       let menu = group(definition.title)
       for command in definition.items where command.action != "preferences" {
         if command.action == "table" {
-          let tableRoot = NSMenuItem(title: "表格", action: nil, keyEquivalent: ""), table = NSMenu(title: "表格")
+          let tableRoot = NSMenuItem(title: l("表格"), action: nil, keyEquivalent: ""), table = NSMenu(title: l("表格"))
           add(command, to: table)
           for operation in owner.commandGroups.first(where: { $0.title == "表格" })?.items ?? [] { add(operation, to: table) }
           tableRoot.submenu = table; menu.addItem(tableRoot)
         } else { add(command, to: menu) }
       }
     }
-    let windows = NSMenuItem(title: "窗口", action: nil, keyEquivalent: "")
-    let menu = NSMenu(title: "窗口")
+    let windows = NSMenuItem(title: l("窗口"), action: nil, keyEquivalent: "")
+    let menu = NSMenu(title: l("窗口"))
     menu.addItem(
       NSMenuItem(
-        title: "最小化", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m"))
+        title: l("最小化"), action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m"))
     menu.addItem(
-      NSMenuItem(title: "全屏", action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: ""))
+      NSMenuItem(title: l("全屏"), action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: ""))
     windows.submenu = menu
     main.addItem(windows)
     NSApp.windowsMenu = menu
@@ -790,6 +820,7 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
 final class NativeApplication: NSObject, NSApplicationDelegate, NSMenuItemValidation {
   lazy var ai = NativeAIService(ProcessInfo.processInfo.environment["OPEN_TYPORA_AI_SETTINGS_DIR"].map { URL(fileURLWithPath: $0) } ?? directory)
   lazy var workspace = Workspace(directory)
+  var uiLocale = "zh-CN"
   var fileOperationRunning = false
   var recentClosedFiles: [(url: URL, group: String?)] = []
   lazy var commandGroups: [CommandGroup] = {

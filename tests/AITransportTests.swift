@@ -85,6 +85,14 @@ import Foundation
     let noKeyDirectory = try legacyFixture("legacy-no-key")
     let noKey = try NativeAIService(noKeyDirectory, legacyReader: noLegacy).settings(["protocol": "openai", "baseUrl": base + "/vendor/v1", "model": "native-qa", "clearKey": true, "rememberKey": true])
     try check(noKey["hasKey"] as? Bool == false && noKey["needsKeyMigration"] as? Bool == false && forbiddenLegacyCalls == 0, "legacy services without authentication can explicitly keep no key without accessing Keychain")
+    let contextService = NativeAIService(directory.appendingPathComponent("context-requests"))
+    _ = try contextService.settings(["protocol": "openai", "baseUrl": base + "/vendor/v1", "model": "native-context", "rememberKey": false])
+    let context: [String: Any] = ["id": "S1", "name": "plan.md", "text": "Budget: 300 USD.", "fromLine": 1, "toLine": 1, "path": "forbidden-private-metadata", "token": "forbidden-private-metadata"]
+    let contextual = try await contextService.rewrite(["id": "context-rewrite", "instruction": "Polish", "text": "Public selection", "contexts": [context]])
+    let questionResult = try await contextService.rewrite(["id": "context-question", "mode": "question", "instruction": "Answer", "text": "Budget?", "contexts": [context]])
+    try check(contextual["text"] == "你好，中国" && questionResult["text"] == "你好，中国", "native contextual and question requests whitelist source fields without authority metadata")
+    do { _ = try await contextService.rewrite(["id": "bad-context", "instruction": "Polish", "text": "Public", "contexts": [context, context]]); throw NSError(domain: "UnexpectedSuccess", code: 8) }
+    catch { try check(error.localizedDescription.contains("参考资料"), "native duplicate source IDs fail before transport") }
     print("PASS: native AI transport acceptance complete")
   }
 }

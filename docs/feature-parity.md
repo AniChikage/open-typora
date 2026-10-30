@@ -1,6 +1,6 @@
 # Typora 功能对齐清单
 
-当前交付版本：**0.20.2，macOS arm64 / Windows x64 / Linux x64**。基准为本机 Typora 1.14.10 的菜单、实际交互和官方公开文档。功能存在、自动化通过与完整等价是不同结论；未验证的组合不写成已对齐。当前发布及 GitHub 问题回归范围见[版本化验收记录](verification.md)。
+当前交付版本：**0.21.0，macOS arm64 / Windows x64 / Linux x64**。基准为本机 Typora 1.14.10 的菜单、实际交互和官方公开文档。功能存在、自动化通过与完整等价是不同结论；未验证的组合不写成已对齐。当前发布及 GitHub 问题回归范围见[版本化验收记录](verification.md)。
 
 公开依据：[Markdown](https://support.typora.io/Markdown-Reference/)、[文件管理](https://support.typora.io/File-Management/)、[图片](https://support.typora.io/Images/)、[导出](https://support.typora.io/Export/)、[HTML](https://support.typora.io/HTML/)、[快捷键](https://support.typora.io/Shortcut-Keys/)。REA 的静态证据及覆盖边界见 [research.md](research.md)。
 
@@ -39,6 +39,9 @@
 | 第三方插件兼容 | 部分兼容，已有实际运行 | 六款固定版本 obgnail/typora_plugin 原版源码（增加列表折叠）；单文件与文件夹 CommonJS 安装、相对 JS/JSON/CSS 引用及模块缓存、配置、生命周期、动态命令、事件解绑/单次/有序监听、动态快捷键、定时器与异步失败清理和卸载；0.12.0 在等待异步 destroy 前立即释放样式、事件和只读锁，已停用实例的兼容 API 写入/重新加锁/注册事件与定时器均失效，旧实例清理不再解除新实例的锁；原生 WebKit 已验收安装模块动态导入、可撤销文档修改及只读保护。未兼容完整插件包、Node/Electron、npm 依赖及所有 Typora 私有接口；详见 [plugins.md](plugins.md) |
 | Windows 系统 Markdown 预览 | 已实现，需启用 | 原生 x64 COM 处理器，支持文件／Shell Item 初始化，UTF-8／带 BOM 的 UTF-16／GB18030 回退；使用 WebView2 在 Everything／资源管理器预览，无编辑桥接、插件或远程图片；完整读取文件并按可视块渲染，支持中文／空格及父目录相对图片；超过 5 MiB 样本验证末尾与实际图片像素，启用前保存原处理器，关闭／卸载恢复；[设置与验收范围](windows-preview.md) |
 | AI 选区改写（本项目扩展） | 已实现并回归 | 自定义兼容 API、OpenRouter、LM Studio 和 Ollama 原生协议；逐项差异采纳、显式应用与一次撤销，过期结果、只读、分屏及组合输入保护。真实自定义 API 与 macOS 搜狗单独验收；Ollama 未运行本地权重。见 [AI 指南](ai.zh-CN.md) |
+| 本地资料问答（本项目扩展） | 已实现并限定验收 | `@文件` 参考、关键词检索、显式发送片段、引文匹配、来源跳转与带脚注插入；不含向量索引、自动代理或多文件写入，见 [workspace.zh-CN.md](workspace.zh-CN.md) |
+| 持久版本历史（本项目扩展） | 已实现并回归 | 本地快照跨重启保留、查看与恢复、恢复前快照及一次撤销；有数量与容量预算，不等于跨重启逐步撤销 |
+| 中英文界面 | 已实现并回归 | 正式控件与原生菜单支持切换，保留文档和编辑器；第三方插件、自定义主题及系统对话框独立 |
 | 安装更新与旧版本清理 | 已实现并回归 | M 图标保留；验证新包后替换安装版并删除临时回滚包；只保留当前版本归档。用户文档/草稿不属于版本清理对象 |
 | Windows、其他平台与签名 | 部分交付 | Windows x64 提供 NSIS EXE / ZIP，安装验收覆盖编辑、保存、PDF、图片、恢复、单实例与文件关联；Windows 实体候选交互未人工验收。Linux x64 提供 DEB / AppImage，验证安装/卸载、恢复数据、编辑、PDF、插件、背景和第二实例；0.17.4 增加 Ubuntu 22.04 / 24.04 完整 VM 的真实 FUSE 挂载、普通用户启动、沙箱状态、保存/撤销及退出卸载，24.04 使用应用级 userns 规则且保留全局限制，详见 [AppImage 指南](linux-appimage.md)。不同桌面环境未穷尽。Windows/Linux ARM / Intel Mac 未交付；Windows 无代码签名证书，macOS 未公证 |
 

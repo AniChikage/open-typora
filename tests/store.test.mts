@@ -19,7 +19,7 @@ async function setup(text = "# 原文\n\n中文内容\n") {
   const directory = await mkdtemp(path.join(os.tmpdir(), "open-typora-test-"));
   const file = path.join(directory, "note.md");
   await writeFile(file, text);
-  const store = new DocumentStore(path.join(directory, "recovery"));
+  const store = new DocumentStore(path.join(directory, ".recovery"));
   return { store, directory, file, record: await store.open(file) };
 }
 test("atomic save preserves BOM, CRLF, original text and file permissions", async () => {
@@ -90,7 +90,7 @@ test("recovery preserves dirty content and reports conflicting disk changes", as
   });
   await writeFile(file, "外部新版本");
   const restored = await new DocumentStore(
-    path.join(directory, "recovery"),
+    path.join(directory, ".recovery"),
   ).restore();
   assert.equal(restored!.documents[0].content, "未保存的草稿");
   assert.equal(restored!.documents[0].conflict, true);
@@ -104,7 +104,7 @@ test("untitled documents survive session recovery", async () => {
   });
   await store.persist({ documents: [record], activeId: "draft" });
   const result = await new DocumentStore(
-    path.join(directory, "recovery"),
+    path.join(directory, ".recovery"),
   ).restore();
   assert.equal(result!.documents[0].content, "草稿");
   assert.equal(result!.documents[0].path, null);
@@ -136,8 +136,8 @@ test("image reads reject directory traversal and external symlinks", async () =>
 });
 test("corrupt recovery is backed up before a new session is written", async () => {
   const { store, directory } = await setup();
-  const data = path.join(directory, "recovery");
-  await mkdir(data);
+  const data = path.join(directory, ".recovery");
+  await mkdir(data, { recursive: true });
   await writeFile(path.join(data, "session.json"), "{bad");
   const result = await store.restore();
   assert.ok(result!.restoreError);
@@ -205,10 +205,10 @@ test("document order, active tab and split layout survive session recovery", asy
   const second=store.registerDraft({id:"second-tab",name:"Second.md",content:"unsaved second"});
   const workspace: import("../shared/contracts.js").WorkspaceLayout={primaryId:record.id,secondaryId:second.id,direction:"rows",ratio:.63};
   await store.persist({documents:[second,record],activeId:second.id,workspace});
-  const restored=await new DocumentStore(path.join(directory,"recovery")).restore();
+  const restored=await new DocumentStore(path.join(directory,".recovery")).restore();
   assert.deepEqual(restored!.documents.map(item=>item.id),[second.id,record.id]);assert.equal(restored!.activeId,second.id);assert.deepEqual(restored!.workspace,workspace);
   await store.persist({documents:[record,second],activeId:record.id,workspace:null});
-  assert.equal((await new DocumentStore(path.join(directory,"recovery")).restore())!.workspace!,null);
+  assert.equal((await new DocumentStore(path.join(directory,".recovery")).restore())!.workspace!,null);
 });
 
 test("reopening an untitled tab restores its clean content without reading a null path", async () => {

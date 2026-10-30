@@ -1,3 +1,4 @@
+import { t } from "../i18n.ts";
 import { LargeTableView } from "./LargeTableView.ts";
 import { positionIndex, shiftPositions } from "./sourcePositions.ts";
 import { BlockViewport, blockSpacer } from "./blockViewport.ts";
@@ -82,6 +83,11 @@ export class RichEditor {
   private codePreviews = new Map<string, {element: HTMLElement; raw: string; view: EditorView}>();
   private tableViews = new Map<string, LargeTableView>();
   private fenceOptions() { return [EditorState.readOnly.of(this.readOnly), EditorView.editable.of(!this.readOnly), indentUnit.of(" ".repeat(this.tabSize)), ...(this.autoPair ? [closeBrackets(), keymap.of(closeBracketsKeymap)] : [])]; }
+  localize() {
+    this.root.setAttribute("aria-label", t("Markdown 编辑器"));
+    this.emojiPopup.setAttribute("aria-label", t("Emoji 建议"));
+    for (const button of this.tableToolbar.querySelectorAll<HTMLButtonElement>("button[data-chrome-label]")) button.textContent = t(button.dataset.chromeLabel!);
+  }
   readonly root: HTMLElement;
   readonly model: MarkdownDocument;
   readonly documentId: string;
@@ -100,7 +106,7 @@ export class RichEditor {
     root.role = "textbox";
     root.tabIndex = 0;
     root.setAttribute("aria-multiline", "true");
-    root.setAttribute("aria-label", "Markdown 编辑器");
+    root.setAttribute("aria-label", t("Markdown 编辑器"));
     root.spellcheck = false;
     for (const type of ["beforeinput", "keydown", "paste", "cut", "drop", "compositionstart"]) root.addEventListener(type, this.protectReadOnly, true);
     root.addEventListener("beforeinput", this.beforeInput);
@@ -130,13 +136,14 @@ export class RichEditor {
       ["右对齐", "right"],
     ]) {
       const button = document.createElement("button");
-      button.textContent = label;
+      button.dataset.chromeLabel = label;
+      button.textContent = t(label);
       button.type = "button";
       button.addEventListener("mousedown", (event) => event.preventDefault());
       button.addEventListener("click", () => this.tableAction(action));
       this.tableToolbar.append(button);
     }
-    this.emojiPopup = document.createElement("div"); this.emojiPopup.className = "emoji-completion"; this.emojiPopup.hidden = true; this.emojiPopup.role = "listbox"; this.emojiPopup.setAttribute("aria-label", "Emoji 建议");
+    this.emojiPopup = document.createElement("div"); this.emojiPopup.className = "emoji-completion"; this.emojiPopup.hidden = true; this.emojiPopup.role = "listbox"; this.emojiPopup.setAttribute("aria-label", t("Emoji 建议"));
     this.emojiPopup.addEventListener("mousedown", event => event.preventDefault());
     root.parentElement!.append(this.emojiPopup);
     root.parentElement!.append(this.tableToolbar);

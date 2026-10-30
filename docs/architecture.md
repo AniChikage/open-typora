@@ -1,4 +1,4 @@
-# 编辑架构（0.20.2）
+# 编辑架构（0.21.0）
 
 macOS 的发布包使用 Swift/AppKit + WKWebView。Windows/Linux 发布包使用 Electron/Chromium，并保留为跨平台开发与回归测试宿主；macOS 的 `package:mac` 与 `install:app` 仍使用原生宿主。Windows 使用系统标题栏、Ctrl 快捷键与单实例文件打开，`package:win` 生成 NSIS 安装包与 ZIP。
 
@@ -140,3 +140,13 @@ AI 配置与 HTTP 请求由宿主处理，WebKit 使用 `NativeAIService`／URLS
 macOS 配置格式 v2 的私有 `apiKey` 字段只由宿主读取，写入使用原子替换并强制 0600 权限；持久密钥不受旧内存缓存覆盖，手动修改配置后下一次请求读取新值。v1 钥匙串配置只返回待迁移状态，设置查询与普通改写均不读取旧密钥；只有用户显式迁移才访问钥匙串，也可重新填写或清除当前密钥后写入 v2。会话密钥只保存在内存，更换端点不沿用原密钥。Mac Electron 开发宿主使用相同文件策略，Windows/Linux 发布宿主继续使用系统加密。
 
 旧式文件钥匙串对“禁止认证 UI”的参数存在兼容边界，参见 [Chromium 的实现说明](https://chromium.googlesource.com/chromium/src/crypto/+/refs/heads/main/apple/scoped_keychain_user_interaction_allowed.cc)。因此迁移不在加载配置时自动执行，也不临时修改进程的钥匙串交互开关。
+
+## 0.21.0 资料检索、持久版本和本地化
+
+`knowledge.ts` 只读取已打开文档与当前授权目录的 token。已打开资料优先使用未保存文字；其他文件通过 Node/Swift 的有界只读接口访问，不加入恢复会话。`knowledge.worker.ts` 进行中文双字词／英文关键词匹配、切片和排序；目录问答先展示片段，再显式请求模型。线号、文件摘要及授权 token 仅在本机用于跳转和变更提示；模型上下文由白名单字段重建。`citedAnswer` 校验 JSON、来源编号和原文引文；这不等价于语义正确性验证。
+
+`electron/versions.mts` 与 `native/Versions.swift` 实现同格式的独立快照库。正文按 SHA-256 命名，索引和正文原子写入并使用 0600 权限；同一存储目录串行化，实施每文档和全局保留预算。AI 应用和恢复前先记录当前正文，异步返回后重新检查文档身份、源码、只读和组合输入，再通过既有模型事务修改。快照与内存撤销历史分开，不承诺跨重启逐步撤销。保存、另存为与应用内路径迁移保留对应快照；索引损坏时保留文件并明确报错。
+
+`shared/en.json` 是 UI 翻译词表，渲染端和两种宿主共用。React 语言状态更新控件，CodeMirror 通过 Compartment 更新语句，RichEditor 仅更新自有工具栏与无障碍标签；不使用遍历正文的文本替换。语言切换不重新创建编辑内核。第三方插件、自定义主题名与系统对话框的语言单独受各自来源控制。
+
+正文渲染补回 Markdown-it 在行内 token 中裁掉的段末空白，使空格后的光标仍可映射回原段落；回归覆盖普通段落、标题、列表、引用和逐字符真实浏览器输入。

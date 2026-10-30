@@ -71,6 +71,19 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
       disposed = true;
     };
   }, []);
+  const snapshotRecords = useRef(new WeakSet<DocumentRecord>());
+  useEffect(() => {
+    if (!ready || !host.native) return;
+    const timer = setTimeout(() => {
+      if (!prepareEditor.current() || closing.current) return;
+      for (const record of current.current.documents) {
+        if (record.content === record.savedContent || snapshotRecords.current.has(record)) continue;
+        snapshotRecords.current.add(record);
+        void host.captureVersion(record.id, record.content, "automatic").then(result => { if (result.warning) setMessage(result.warning); }).catch(() => { snapshotRecords.current.delete(record); setMessage("自动版本快照保存失败，文档和恢复草稿不受影响。"); });
+      }
+    }, 8000);
+    return () => clearTimeout(timer);
+  }, [documents, ready]);
   useEffect(() => {
     if (!ready) return;
     const timer = setTimeout(() => {
@@ -109,6 +122,7 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
       .save(id, snapshot.content, saveAs, force)
       .then((result) => {
         if (!result) return false;
+        if (result.historyWarning) setMessage(result.historyWarning);
         update(id, {
             path: result.path,
             name: result.name,

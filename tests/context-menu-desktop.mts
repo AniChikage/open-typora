@@ -47,7 +47,7 @@ try{
  await expect.poll(()=>page.evaluate(()=>localStorage.getItem('open-typora-autosave'))).toBe('false');
  await app.evaluate(async({clipboard,shell})=>{globalThis.__menuClipboard=await clipboard.read();globalThis.__menuReveals=[];shell.showItemInFolder=(file: string)=>globalThis.__menuReveals.push(['reveal',file]);shell.openPath=async (file: string)=>{globalThis.__menuReveals.push(['open',file]);return '';};});
  for(const [label,expected] of [['复制文件名（含扩展名）',names[1]],['复制文件名（不含扩展名）','Table'],['复制完整路径',records[1].path],['复制带引号完整路径','"'+records[1].path+'"'],['复制所在文件夹路径',directory]]){
-  await chooseTab(names[1],label);await expect.poll(()=>app.evaluate(({clipboard})=>clipboard.readText())).toBe(expected);await expect(tab(names[0])).toHaveAttribute('aria-selected','true');
+  await chooseTab(names[1],label);await expect.poll(()=>app.evaluate(async({clipboard},expected)=>await clipboard.readText()===expected,expected)).toBe(true);await expect(tab(names[0])).toHaveAttribute('aria-selected','true');
  }
  await chooseTab(names[1],'在文件管理器中显示');await chooseTab(names[1],'打开所在文件夹');
  await expect.poll(()=>app.evaluate(()=>globalThis.__menuReveals)).toEqual([['reveal',records[1].path],['open',directory]]);
@@ -61,7 +61,7 @@ try{
  checks.push('Closing a background tab restores the active editor selection after commit; immediate typing replaces that selection and undoes once.');
  await command('reopen');await expect(page.getByRole('tab')).toHaveCount(4);await tab(names[0]).click();
 
- await selectText('menus-0','alpha');await item(await selectedMenu(),'复制').click();await expect.poll(()=>app.evaluate(({clipboard})=>clipboard.readText())).toBe('alpha');
+ await selectText('menus-0','alpha');await item(await selectedMenu(),'复制').click();await expect.poll(()=>app.evaluate(async({clipboard})=>await clipboard.readText()==='alpha')).toBe(true);
  await selectText('menus-0','alpha');await item(await selectedMenu(),'剪切').click();await saved(records[0].path,alpha.replace('alpha',''));
  await app.evaluate(({clipboard,ClipboardItem})=>clipboard.write([new ClipboardItem({'text/plain':'粘贴中文','text/html':'<b>粘贴中文</b>'})]));
  const first=pane('menus-0').locator('.rich-document > p').first();await chooseEditor(first,'粘贴');
@@ -101,7 +101,7 @@ try{
  const last=large.getByText('stable 中文 value 11999 '+ 'x'.repeat(30),{exact:true});await expect(last).toBeVisible();await chooseEditor(last,'居中对齐','表格','表格编辑菜单');await saved(records[2].path,big.replace('|---|---|','| --- | :---: |'));await command('undo');await saved(records[2].path,big);
  checks.push('Virtualized large-table right-click maps the visible final cell to its original source column and preserves all other rows with exact undo.');
 
- await tab(names[0]).click();await command('source');const source=pane('menus-0').locator('.source-surface .cm-content');await expect(source).toBeVisible();await source.click();await source.press(`${mod}+a`);await source.press('Shift+F10');await expect(menu('正文编辑菜单')).toBeVisible();await item(menu('正文编辑菜单'),'复制').click();await expect.poll(()=>app.evaluate(({clipboard})=>clipboard.readText())).toBe(alpha);
+ await tab(names[0]).click();await command('source');const source=pane('menus-0').locator('.source-surface .cm-content');await expect(source).toBeVisible();await source.click();await source.press(`${mod}+a`);await source.press('Shift+F10');await expect(menu('正文编辑菜单')).toBeVisible();await item(menu('正文编辑菜单'),'复制').click();await expect.poll(()=>app.evaluate(async({clipboard},expected)=>await clipboard.readText()===expected,alpha)).toBe(true);
  await chooseEditor(source,'切换即时渲染');await expect(pane('menus-0').locator('.rich-document')).toBeVisible();
  await selectText('menus-0','alpha');const cdp=await app.context().newCDPSession(page);await cdp.send('Input.imeSetComposition',{text:'zhong',selectionStart:5,selectionEnd:5});
  await pane('menus-0').locator('.rich-document').dispatchEvent('contextmenu',{bubbles:true,cancelable:true,clientX:200,clientY:250});await expect(menu('正文编辑菜单')).toHaveCount(0);
