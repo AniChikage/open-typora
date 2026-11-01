@@ -13,10 +13,33 @@ const digest=(text: string | Buffer)=>createHash('sha256').update(text).digest('
 const env: Record<string, string>={...process.env,OPEN_TYPORA_DATA_DIR:profile};delete env.ELECTRON_RUN_AS_NODE;delete env.OPEN_TYPORA_DEV_URL;
 const mod=process.platform==='darwin'?'Meta':'Control',end=process.platform==='darwin'?'Meta+ArrowDown':'Control+End';
 let app!: import("playwright").ElectronApplication, page!: import("playwright").Page;const errors: string[]=[],timings: Record<string, number | number[]>={},checks: string[]=[];
-async function launch(){app=await electron.launch({...(process.env.OPEN_TYPORA_EXECUTABLE?{executablePath:process.env.OPEN_TYPORA_EXECUTABLE,args:[]}:{args:[process.cwd()]}),env,timeout:60000});page=await app.firstWindow();page.on('pageerror',error=>errors.push(error.message));await page.setViewportSize({width:1300,height:900});await expect(page.locator('.document-editor:not([hidden]) .rich-document').first()).toBeVisible({timeout:60000});}
+async function launch(){app=await electron.launch({...(process.env.OPEN_TYPORA_EXECUTABLE?{executablePath:process.env.OPEN_TYPORA_EXECUTABLE,args:[]}:{args:[process.cwd()]}),env,timeout:60000});page=await app.firstWindow();page.on('pageerror',error=>errors.push(error.message));await page.setViewportSize({width:1300,height:900});await expect(page.locator('.document-editor:not([hidden]) .rich-document').first()).toBeVisible({timeout:60000});
+ await app.evaluate(({ipcMain})=>{
+  const handlers=Reflect.get(ipcMain,'_invokeHandlers') as Map<string,(...args:unknown[])=>Promise<unknown>>;
+  const original=handlers.get('document:save');if(!original)throw new Error('Save IPC handler unavailable for diagnostics');
+  const trace:Record<string,unknown>[]=[];Reflect.set(globalThis,'hugeSaveTrace',trace);
+  ipcMain.removeHandler('document:save');ipcMain.handle('document:save',async(event,...args:unknown[])=>{
+   const entry:Record<string,unknown>={started:Date.now(),id:args[0],characters:typeof args[1]==='string'?args[1].length:null};trace.push(entry);
+   try{const result=await original(event,...args) as {ok:boolean;error?:string;code?:string;value?:{content?:string;historyWarning?:string}};entry.finished=Date.now();entry.result={ok:result.ok,error:result.error,code:result.code,characters:result.value?.content?.length,historyWarning:result.value?.historyWarning};return result;}
+   catch(error){entry.finished=Date.now();entry.error=(error as Error).message;throw error;}
+  });
+ });
+ await page.evaluate(()=>{
+  const trace:Record<string,unknown>[]=[];Reflect.set(window,'hugeDOMTrace',trace);
+  const record=(event:Event)=>{const target=event.target as HTMLElement;trace.push({at:Date.now(),type:event.type,inputType:(event as InputEvent).inputType,composing:(event as InputEvent).isComposing,code:!!target.closest('.cm-editor')});if(trace.length>100)trace.shift();};
+  for(const type of ['compositionstart','compositionend','beforeinput','input'])document.addEventListener(type,record,true);
+  let message='';new MutationObserver(()=>{const text=document.querySelector('.toast')?.textContent||'';if(text&&text!==message){message=text;trace.push({at:Date.now(),message:text});}}).observe(document.body,{subtree:true,childList:true,characterData:true});
+ });
+}
 async function command(action: string){await app.evaluate(({BrowserWindow},action: string)=>BrowserWindow.getAllWindows()[0].webContents.send('app:command',{action}),action);}
 async function open(file: string){await app.evaluate(({dialog},file: string)=>{dialog.showOpenDialog=async()=>({canceled:false,filePaths:[file]});},file);await command('open');await expect(page.getByRole('tab',{name:path.basename(file),exact:true})).toHaveAttribute('aria-selected','true',{timeout:60000});}
-async function saved(file: string,text: string | Buffer){await command('save');await expect.poll(async()=>digest(await readFile(file)),{timeout:60000}).toBe(digest(text));}
+async function saved(file: string,text: string | Buffer){await command('save');try{await expect.poll(async()=>digest(await readFile(file)),{timeout:60000}).toBe(digest(text));}catch(error){
+ const trace=await app.evaluate(()=>Reflect.get(globalThis,'hugeSaveTrace'));
+ const dom=await page.evaluate(()=>({trace:Reflect.get(window,'hugeDOMTrace'),focused:document.activeElement?.className,status:document.querySelector('.toast')?.textContent,editable:document.querySelector('.large-code.fence-editing .cm-content')?.getAttribute('contenteditable')}));
+ const session=JSON.parse(await readFile(path.join(profile,'session.json'),'utf8')),record=session.documents.find((item:import('../shared/contracts.js').DocumentRecord)=>item.path===file);
+ const state={expectedCharacters:text.length,diskCharacters:(await readFile(file,'utf8')).length,recoveryCharacters:record?.content.length,recoverySavedCharacters:record?.savedContent.length,recoveryMatches:record?.content!==undefined&&digest(record.content)===digest(text),savedMatches:record?.savedContent!==undefined&&digest(record.savedContent)===digest(text),trace,dom};
+ await writeFile(path.join(qa,'huge-save-diagnostic.json'),JSON.stringify(state,null,2));console.log('SAVE-DIAGNOSTIC',JSON.stringify(state));throw error;
+}}
 async function pointCell(cell: import("playwright").Locator){await cell.click();await cell.evaluate((element: HTMLElement)=>{const range=document.createRange();range.selectNodeContents(element);range.collapse(false);const selection=getSelection()!;selection.removeAllRanges();selection.addRange(range);});}
 async function editCode(){const editable=page.locator('.large-code.fence-editing .cm-content');if(!await editable.count()){const preview=page.locator('.large-code .code-preview .cm-content');await preview.click();}await expect(editable).toBeVisible();await editable.press(end);await editable.press('ArrowUp');await editable.press('End');return editable;}
 try{
