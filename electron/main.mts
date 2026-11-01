@@ -28,7 +28,7 @@ import { atomicWrite, DocumentStore } from "./store.mjs";
 import { readFile, realpath, stat } from "node:fs/promises";
 import { launchFiles } from "./launch-files.mjs";
 import { plugins, installPlugin } from "./plugins.mjs";
-import { pluginResource, exportResource } from "./resources.mjs";
+import { pluginResource, validatePlugin, exportResource } from "./resources.mjs";
 import { readBackground, saveBackground, clearBackground } from "./background.mjs";
 const runtimeRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const root = app.isPackaged ? runtimeRoot : path.resolve(runtimeRoot, "../..");
@@ -93,6 +93,7 @@ const handlers: IpcHandlers = {
   aiSettings: (_, update) => ai.settings(update),
   aiRewrite: (_, request) => ai.rewrite(request),
   aiCancel: (_, id) => ai.cancel(id),
+  validatePlugin: (_, id) => validatePlugin(id, store.dataDir),
   readContext: (_, token) => store.readContext(token),
   versions: (_, id) => store.versions.list(store.require(id)),
   captureVersion: (_, id, content, reason) => store.versions.capture(store.require(id), content, reason),
@@ -326,14 +327,18 @@ app
     }, process.platform === "darwin" ? "file" : "system");
     workspace = new Workspace(app.getPath("userData"));
     protocol.handle("opentypora", async request => {
+      const headers: Record<string, string> = { "X-Content-Type-Options": "nosniff" };
+      const origin = request.headers.get("origin");
+      if (origin === "null" || origin === "file://" || (development && origin === new URL(development).origin)) headers["Access-Control-Allow-Origin"] = origin;
       try {
         if (new URL(request.url).searchParams.get("token") !== pluginToken) throw new Error("插件会话无效。");
         const { bytes, mime } = await pluginResource(request.url, store.dataDir);
-        const headers: Record<string, string> = { "Content-Type": mime, "X-Content-Type-Options": "nosniff" };
-        const origin = request.headers.get("origin");
-        if (origin === "null" || origin === "file://" || (development && origin === new URL(development).origin)) headers["Access-Control-Allow-Origin"] = origin;
+        headers["Content-Type"] = mime;
         return new Response(bytes, { headers });
-      } catch { return new Response("Resource unavailable", { status: 404 }); }
+      } catch (error) {
+        const oversized = (error as NodeJS.ErrnoException).code === "PLUGIN_TOO_LARGE";
+        return new Response(oversized ? (error as Error).message : "Resource unavailable", { status: oversized ? 413 : 404, headers: { ...headers, "Content-Type": "text/plain;charset=utf-8" } });
+      }
     });
     protocol.handle("open-typora-asset", async (request) => {
       try {

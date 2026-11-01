@@ -1,6 +1,7 @@
 import { readFile, readdir, mkdir, realpath, lstat } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import path from "node:path";
+import { pluginLimits, pluginSourceError, pluginPackageError } from "../shared/plugin-limits.mjs";
 import { atomicWrite } from "./store.mjs";
 import { pluginModule, pluginPackage } from "../shared/plugin-module.mjs";
 export async function plugins(directory: string) {
@@ -21,7 +22,8 @@ export async function plugins(directory: string) {
 export async function installPlugin(file: string, directory: string) {
   if ((await lstat(file)).isDirectory()) return installPackage(file,directory);
   if (!/\.(?:js|cjs)$/i.test(file)) throw new Error("请选择 JavaScript 插件。");
-  const bytes = await readFile(file); if (bytes.length > 1_000_000) throw new Error("插件必须小于 1 MB。");
+  if ((await lstat(file)).size > pluginLimits.source) throw new Error(pluginSourceError);
+  const bytes = await readFile(file); if (bytes.length > pluginLimits.source) throw new Error(pluginSourceError);
   const source = new TextDecoder("utf-8", { fatal: true }).decode(bytes), id = "local-" + createHash("sha256").update(bytes).digest("hex"), name = path.basename(file, path.extname(file)).slice(0, 96);
   const root = path.join(directory, "plugins"); await mkdir(root, { recursive: true });
   const canonical = await realpath(root), base = await realpath(directory);
@@ -33,15 +35,16 @@ export async function installPlugin(file: string, directory: string) {
 async function installPackage(folder: string,directory: string) {
   const base=await realpath(folder), files: Record<string,string>={}; let total=0;
   async function collect(current: string,depth=0): Promise<void> {
-    if (depth>8) throw new Error('插件文件夹最多支持 8 层。');
+    if (depth>pluginLimits.depth) throw new Error('插件文件夹最多支持 8 层。');
     for (const item of (await readdir(current,{withFileTypes:true})).sort((a,b)=>a.name<b.name?-1:a.name>b.name?1:0)) {
       if (item.name.startsWith('.') || item.name==='node_modules') continue;
       const file=path.join(current,item.name);
       if (item.isSymbolicLink()) throw new Error('插件文件夹不能包含符号链接。');
       if (item.isDirectory()) { await collect(file,depth+1); continue; }
       if (!item.isFile() || !/\.(js|cjs|json|css)$/i.test(item.name)) continue;
+      if ((await lstat(file)).size > pluginLimits.source) throw new Error(pluginPackageError);
       const bytes=await readFile(file);total+=bytes.length;
-      if (bytes.length>1_000_000 || total>4_000_000 || Object.keys(files).length>=64) throw new Error('插件文件夹最多 64 个文件、共 4 MB，单文件不超过 1 MB。');
+      if (bytes.length>pluginLimits.source || total>pluginLimits.package || Object.keys(files).length>=pluginLimits.files) throw new Error(pluginPackageError);
       const source=new TextDecoder('utf-8',{fatal:true}).decode(bytes);
       if (source.includes('\0')) throw new Error('插件必须使用无 NUL 的 UTF-8 文件。');
       files[path.relative(base,file).split(path.sep).join('/')]=source;

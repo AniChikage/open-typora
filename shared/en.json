@@ -324,7 +324,6 @@
   "移除插件": "Remove plugin",
   "安装本地插件": "Install local plugin",
   "插件代码可以读取、修改已打开的文档，并调用编辑器的桌面接口。请仅安装你信任的源码。": "Plugins can read and modify open documents and call desktop APIs. Only install source code you trust.",
-  "选择 BasePlugin / BaseCustomPlugin 入口文件（.js / .cjs），或包含 index.js / package.json main 的文件夹。文件夹仅收集 JS、CJS、JSON、CSS，最多 64 个文件、共 4 MB，单文件不超过 1 MB；跳过隐藏目录和 node_modules。安装后默认关闭；完整 Typora 插件发行包不能直接运行。": "Choose a BasePlugin / BaseCustomPlugin entry (.js / .cjs), or a folder with index.js or a package.json main. Folders support JS, CJS, JSON, and CSS: up to 64 files, 4 MB total, and 1 MB per file. Hidden folders and node_modules are skipped. Plugins are disabled after installation; full Typora plugin distributions cannot run directly.",
   "我信任将要安装的插件源码": "I trust the plugin source I am installing",
   "选择插件并安装…": "Choose and install plugin…",
   "选择插件文件夹…": "Choose plugin folder…",
@@ -839,5 +838,12 @@
   "YAML Front Matter": "YAML front matter",
   "正文目录": "Table of contents",
   "可使用 ${title}、${pageNo}、${totalPages} 和 ${date}。": "Available variables: ${title}, ${pageNo}, ${totalPages}, and ${date}.",
-  "{0}，{1}": "{0}, {1}"
+  "{0}，{1}": "{0}, {1}",
+  "选择 BasePlugin / BaseCustomPlugin 入口文件（.js / .cjs），或包含 index.js / package.json main 的文件夹。文件夹仅收集 JS、CJS、JSON、CSS，最多 64 个文件、共 32 MiB，单文件不超过 16 MiB；跳过隐藏目录和 node_modules。封装后的模块最多 64 MiB。安装后默认关闭；完整 Typora 插件发行包不能直接运行。": "Choose a BasePlugin / BaseCustomPlugin entry (.js / .cjs), or a folder with index.js or a package.json main. Folders support JS, CJS, JSON, and CSS: up to 64 files, 32 MiB total, and 16 MiB per file. Hidden folders and node_modules are skipped. Wrapped modules are limited to 64 MiB. Plugins are disabled after installation; full Typora plugin distributions cannot run directly.",
+  "单个插件源文件超过 16 MiB，请拆分文件后重新安装。": "The plugin source exceeds 16 MiB. Split the file and reinstall.",
+  "插件文件夹最多 64 个文件、共 32 MiB，单个文件不超过 16 MiB。": "Plugin folders support up to 64 files, 32 MiB total, and 16 MiB per file.",
+  "插件构建产物超过 64 MiB，请拆分插件或减小构建产物后重新安装。": "The wrapped plugin exceeds 64 MiB. Split the plugin or reduce the build size and reinstall.",
+  "插件文件不可用，请重新安装。": "The installed plugin file is unavailable. Reinstall the plugin.",
+  "插件资源必须是普通文件。": "The plugin resource must be a regular file.",
+  "插件必须使用无 NUL 的 UTF-8 文件。": "Plugin files must use UTF-8 without NUL characters."
 }

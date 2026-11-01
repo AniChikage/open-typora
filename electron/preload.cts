@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld("desktop", {
   setLocale: locale => call('setLocale', locale),
   readResource: address => call("readResource", address),
   background: () => call("background"), chooseBackground: () => call("chooseBackground"), clearBackground: () => call("clearBackground"),
+  validatePlugin: id => call("validatePlugin", id),
   plugins: () => call("plugins"), installPlugin: folder => call("installPlugin", folder), removePlugin: id => call("removePlugin", id),
   themes: () => call("themes"), installTheme: () => call("installTheme"), conversionSettings: choose => call("conversionSettings", choose), importDocument: () => call("importDocument"), exportConverted: (id, format, source, html) => call("exportConverted", id, format, source, html), imageAction: (id, sources, action, options) => call("imageAction", id, sources, action, options),
   ready: () => call("ready"),

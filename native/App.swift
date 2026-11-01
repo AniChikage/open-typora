@@ -14,6 +14,17 @@ final class Resources: NSObject, WKURLSchemeHandler {
     self.store = store
     self.pluginDirectory = canonicalFileURL(pluginDirectory ?? store.dataDirectory).appendingPathComponent("plugins")
   }
+  func pluginInfo(_ id: String) throws -> (URL, Int) {
+    guard id.range(of: "^local-[a-f0-9]{64}$", options: .regularExpression) != nil else { throw NativeFailure("插件标识无效。") }
+    let file = pluginDirectory.appendingPathComponent(id + ".mjs")
+    guard canonicalFileURL(pluginDirectory).deletingLastPathComponent() == canonicalFileURL(pluginDirectory.deletingLastPathComponent()), contained(pluginDirectory, canonicalFileURL(file)) else { throw NativeFailure("插件资源路径无效。") }
+    guard FileManager.default.fileExists(atPath: file.path) else { throw NativeFailure("插件文件不可用，请重新安装。") }
+    let metadata = try file.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+    guard metadata.isRegularFile == true else { throw NativeFailure("插件资源必须是普通文件。") }
+    let size = metadata.fileSize ?? Int.max
+    guard size <= PluginLimits.resource else { throw NativeFailure(PluginLimits.resourceError) }
+    return (file, size)
+  }
   func read(_ url: URL) throws -> (Data, String) {
     let file: URL
     if url.scheme == "open-typora-asset", url.host == "local" {
@@ -23,17 +34,19 @@ final class Resources: NSObject, WKURLSchemeHandler {
     } else if url.scheme == "opentypora", url.host == "app", url.path.hasPrefix("/_plugins/") {
       let name = url.lastPathComponent
       guard url.path == "/_plugins/" + name, name.range(of: "^local-[a-f0-9]{64}\\.mjs$", options: .regularExpression) != nil else { throw NativeFailure("插件资源路径无效。") }
-      file = pluginDirectory.appendingPathComponent(name)
-      guard contained(pluginDirectory, canonicalFileURL(file)) else { throw NativeFailure("插件资源路径无效。") }
+      file = try pluginInfo(String(name.dropLast(4))).0
     } else {
       guard url.scheme == "opentypora", url.host == "app" else { throw NativeFailure("资源来源无效。") }
       file = root.appendingPathComponent(String(url.path.dropFirst())).resolvingSymlinksInPath()
       guard contained(root, file) else { throw NativeFailure("资源路径无效。") }
     }
     let size = try file.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? DocumentStore.maxBytes + 1
-    guard size <= DocumentStore.maxBytes else { throw NativeFailure("资源大小超出支持范围。") }
+    let plugin = url.scheme == "opentypora" && url.host == "app" && url.path.hasPrefix("/_plugins/")
+    guard size <= (plugin ? PluginLimits.resource : DocumentStore.maxBytes) else { throw NativeFailure(plugin ? PluginLimits.resourceError : "资源大小超出支持范围。") }
     let mime = ["mjs":"application/javascript","js":"application/javascript","css":"text/css","html":"text/html","woff2":"font/woff2","woff":"font/woff","ttf":"font/ttf","json":"application/json","svg":"image/svg+xml","png":"image/png","jpg":"image/jpeg","jpeg":"image/jpeg","webp":"image/webp","gif":"image/gif","avif":"image/avif","mp4":"video/mp4","webm":"video/webm","ogg":"audio/ogg","mp3":"audio/mpeg","wav":"audio/wav","m4a":"audio/mp4"][file.pathExtension.lowercased()] ?? "application/octet-stream"
-    return (try Data(contentsOf: file), mime)
+    let data = try Data(contentsOf: file)
+    guard data.count <= (plugin ? PluginLimits.resource : DocumentStore.maxBytes) else { throw NativeFailure(plugin ? PluginLimits.resourceError : "资源大小超出支持范围。") }
+    return (data, mime)
   }
   func webView(_ webView: WKWebView, start task: WKURLSchemeTask) {
     guard let url = task.request.url else { return }
@@ -471,6 +484,9 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       #endif
       return try Interchange.installBackground(file,directory:owner.directory)
     case "themes": return try Interchange.themes(owner.directory)
+    case "validatePlugin":
+      let (_, bytes) = try Resources(Bundle.main.resourceURL!.appendingPathComponent("dist"), store: store, pluginDirectory: owner.directory).pluginInfo(arg(args, 0, String.self))
+      return ["bytes": bytes]
     case "plugins": return try Interchange.plugins(owner.directory)
     case "removePlugin":
       let id = try arg(args, 0, String.self)

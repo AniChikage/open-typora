@@ -185,6 +185,7 @@ export default function App() {
       composing: () => !!pluginContext.current.editor()?.composing(),
       insert: text => pluginContext.current.editor()?.insert(text), replace: text => pluginContext.current.editor()?.transform(() => text),
       setReadOnly, notify: text => pluginContext.current.notify(text), changed: (id, state) => setPluginStates(previous => ({ ...previous, [id]: state })),
+      validatePlugin: id => host.validatePlugin(id),
       reservedHotkeys: [...commandsByAction.values()].map(command => commandKey(command) || "").filter(Boolean),
       saveConfig: (id, config) => setPluginPreferences(previous => ({ ...previous, [id]: { ...previous[id], config: { ...previous[id]?.config, ...config } } })),
     });
