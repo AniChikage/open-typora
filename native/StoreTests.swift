@@ -242,6 +242,19 @@ func runStoreTests() throws {
   let pluginResources = Resources(directory, store: store)
   let (_, pluginMime) = try pluginResources.read(URL(string: installedPlugin["url"]!)!)
   try expect(pluginMime == "application/javascript", "installed plugin modules load through the existing same-origin resource scheme")
+  let largePlugin = directory.appendingPathComponent("large-plugin.js")
+  let largeSource = "module.exports.plugin=class {};\n/*" + String(repeating: "x", count: 1_011_934) + "*/"
+  try atomicWrite(largePlugin, Data(largeSource.utf8))
+  let largeInstalled = try Interchange.installPlugin(largePlugin, directory: store.dataDirectory)
+  let (largeModule, _) = try pluginResources.read(URL(string: largeInstalled["url"]!)!)
+  try expect(largeModule.count > 1_010_000, "native plugin source and module above the old cap install and load")
+  try atomicWrite(largePlugin, Data(repeating: 120, count: PluginLimits.source + 1))
+  do { _ = try Interchange.installPlugin(largePlugin, directory: store.dataDirectory); throw NativeFailure("Unexpected oversized source") }
+  catch let error as NativeFailure { try expect(error.message == PluginLimits.sourceError, "native source size rejection names the 16 MiB limit") }
+  let largeModuleURL = store.dataDirectory.appendingPathComponent("plugins/" + largeInstalled["id"]! + ".mjs")
+  let handle = try FileHandle(forWritingTo: largeModuleURL); try handle.truncate(atOffset: UInt64(PluginLimits.resource + 1)); try handle.close()
+  do { _ = try pluginResources.pluginInfo(largeInstalled["id"]!); throw NativeFailure("Unexpected oversized module") }
+  catch let error as NativeFailure { try expect(error.message == PluginLimits.resourceError, "native plugin preflight names the 64 MiB limit without reading oversized data") }
   let otherWindowStore = DocumentStore(store.dataDirectory.appendingPathComponent("windows/other"))
   let otherWindowResources = Resources(directory, store: otherWindowStore, pluginDirectory: store.dataDirectory)
   let (otherModule, _) = try otherWindowResources.read(URL(string: installedPlugin["url"]!)!)

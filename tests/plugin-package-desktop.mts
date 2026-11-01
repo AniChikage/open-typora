@@ -1,11 +1,12 @@
 import {_electron as electron,expect} from 'playwright/test';
 import assert from 'node:assert/strict';
-import {mkdtemp,mkdir,cp,rm,readFile,writeFile} from 'node:fs/promises';
+import {mkdtemp,mkdir,cp,rm,readFile,writeFile,truncate} from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 const data=await mkdtemp(path.join(os.tmpdir(),'open-typora-package-ui-')), profile=path.join(data,'profile'), folder=path.join(data,'插件文件夹');
 const qa=process.env.OPEN_TYPORA_QA_DIR || path.join(data,'evidence');await mkdir(qa,{recursive:true});await mkdir(profile);
 await cp(new URL('./fixtures/plugin-package',import.meta.url),folder,{recursive:true});
+for(let i=0;i<3;i++)await writeFile(path.join(folder,`padding-${i}.js`),'/*'+'x'.repeat(1_500_000)+'*/');
 const env: Record<string, string>={...process.env,OPEN_TYPORA_DATA_DIR:profile};delete env.ELECTRON_RUN_AS_NODE;delete env.OPEN_TYPORA_DEV_URL;
 let app!: import("playwright").ElectronApplication, page!: import("playwright").Page;const errors: string[]=[],checks: string[]=[];
 const launch=async()=>{app=await electron.launch({...(process.env.OPEN_TYPORA_EXECUTABLE?{executablePath:process.env.OPEN_TYPORA_EXECUTABLE,args:[]}:{args:[process.cwd()]}),env,timeout:30000});page=await app.firstWindow();page.on('pageerror',e=>errors.push(e.message));await expect(page.getByRole('button',{name:'欢迎.md',exact:true})).toBeVisible({timeout:20000});};
@@ -17,7 +18,7 @@ try {
   await app.evaluate(({dialog},folder)=>{Reflect.set(dialog,"showOpenDialog",async(_window: Electron.BaseWindow,options: Electron.OpenDialogOptions)=>{globalThis.packageDialogProperties=options.properties;return {canceled:false,filePaths:[folder]};});},folder);
   const file=path.join(profile,'示例笔记','欢迎.md'), original=await readFile(file,'utf8');
   const singleFile=path.join(data,'Single-file fixture.js');
-  await writeFile(singleFile,'module.exports.plugin=class extends BasePlugin {call(){this.utils.insertText("单文件插件验收");}};');
+  await writeFile(singleFile,'module.exports.plugin=class extends BasePlugin {call(){this.utils.insertText("单文件插件验收");}};\n/*'+'x'.repeat(1_011_934)+'*/');
   await app.evaluate(({dialog},file: string)=>{Reflect.set(dialog,"showOpenDialog",async(_window: Electron.BaseWindow,options: Electron.OpenDialogOptions)=>{globalThis.packageDialogProperties=options.properties;return {canceled:false,filePaths:[file]};});},singleFile);
   await openPlugins();await page.getByRole('button',{name:'安装本地插件…',exact:true}).click();
   await page.getByRole('checkbox',{name:'我信任将要安装的插件源码',exact:true}).check();
@@ -32,13 +33,13 @@ try {
   await page.keyboard.press(process.platform==='darwin'?'Meta+z':'Control+z');await expect.poll(()=>readFile(file,'utf8')).toBe(original);
   await openPlugins();await single.getByRole('checkbox').uncheck();
   await page.getByRole('dialog',{name:'插件管理',exact:true}).getByRole('button',{name:'完成',exact:true}).click();
-  checks.push('Single-file IPC opens a file picker, installs disabled, runs after source removal, and undoes once');
+  checks.push('A 1+ MiB single-file plugin installs disabled, dynamically imports, runs after source removal, and undoes once');
   await app.evaluate(({dialog},folder: string)=>{Reflect.set(dialog,"showOpenDialog",async(_window: Electron.BaseWindow,options: Electron.OpenDialogOptions)=>{globalThis.packageDialogProperties=options.properties;return {canceled:false,filePaths:[folder]};});},folder);
   await openPlugins();await page.getByRole('button',{name:'安装本地插件…',exact:true}).click();
   await page.getByRole('checkbox',{name:'我信任将要安装的插件源码',exact:true}).check();
   await page.getByRole('button',{name:'选择插件文件夹…',exact:true}).click();
   await expect(card()).toBeVisible();assert.deepEqual(await app.evaluate(()=>globalThis.packageDialogProperties),['openDirectory']);
-  await expect(card().getByRole('checkbox')).not.toBeChecked();checks.push('Folder picker installs a real package disabled by default');
+  await expect(card().getByRole('checkbox')).not.toBeChecked();checks.push('Folder picker installs a 4+ MiB package with 1+ MiB sources disabled by default');
   await rm(folder,{recursive:true});
   await card().getByRole('checkbox').check();await expect.poll(()=>page.evaluate(()=>window.packageProbe?.ticks || 0)).toBeGreaterThan(0);
   assert.equal(await page.evaluate(()=>window.packageProbe.cached),true);
@@ -59,6 +60,21 @@ try {
   await openPlugins();await expect(card()).toBeVisible();
   await card().getByRole('checkbox').check();await expect.poll(()=>page.evaluate(()=>window.packageProbe?.cached)).toBe(true);checks.push('Installed package and module loading survive restart without the original folder');
   await card().getByRole('checkbox').uncheck();assert.deepEqual(errors,[]);
+  const oversizedCard=page.locator('.plugin-card').filter({has:page.getByRole('heading',{name:'Single-file fixture',exact:true})});
+  const entries=await page.evaluate(async()=>{const result=await window.desktop!.plugins();if(!result.ok)throw Error(result.error);return result.value;});
+  const installed=entries.find(item=>item.name==='Single-file fixture')!,moduleFile=path.join(profile,'plugins',installed.id+'.mjs'),savedModule=await readFile(moduleFile);
+  try {
+    await truncate(moduleFile,64*1024*1024+1);
+    const response=await page.evaluate(async url=>{const result=await fetch(url);return {status:result.status,text:await result.text()};},installed.url);
+    assert.equal(response.status,413);assert.match(response.text,/64 MiB/);
+    await oversizedCard.getByRole('checkbox').check();
+    await expect(oversizedCard.getByRole('alert')).toContainText('插件构建产物超过 64 MiB');
+    await expect(oversizedCard.getByRole('alert')).not.toContainText('Failed to fetch');
+    await page.screenshot({path:path.join(qa,'plugin-resource-limit.png')});
+    await oversizedCard.getByRole('checkbox').uncheck();
+    checks.push('An oversized installed module returns HTTP 413 and Plugin Manager shows the actual 64 MiB limit before import');
+  }finally{await writeFile(moduleFile,savedModule);}
+  assert.deepEqual(errors,[]);
   await writeFile(path.join(qa,'plugin-package-results.json'),JSON.stringify({platform:process.platform,checks,errors},null,2));
   for(const check of checks)console.log('PASS: '+check);
 }catch(error){await page?.screenshot({path:path.join(qa,'plugin-package-failure.png')}).catch(()=>{});throw error;}

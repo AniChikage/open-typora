@@ -56,6 +56,7 @@ try {
   await cp("shared/en.json", path.join(resources, "en.json"));
   await cp("build/runtime/shared/plugin-loader.mjs", path.join(resources, "plugin-loader.js"));
   await cp("tests/fixtures/plugin-package", path.join(resources, "Plugin-package-fixture"), {recursive:true});
+  for(let i=0;i<3;i++)await writeFile(path.join(resources,"Plugin-package-fixture",`padding-${i}.js`),"/*"+"x".repeat(1_500_000)+"*/");
   await writeFile(path.join(resources, "web-tests.js"), aiOnly ? (await readFile("build/runtime/tests/webkit-ai.js", "utf8")) + "\nreturn runWebKitAITests(uploaderURL.replace(\"/upload\",\"/owned/v1\"));\n" : clipboardOnly ? (await readFile("build/runtime/tests/webkit-clipboard.js", "utf8")) + "\nreturn runWebKitClipboardTests();\n" : (await readFile("build/runtime/tests/webkit.js", "utf8")) + "\nreturn runWebKitTests(uploaderURL);\n");
   await writeFile(
     path.join(contents, "Info.plist"),

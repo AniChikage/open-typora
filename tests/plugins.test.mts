@@ -172,6 +172,14 @@ test("plugin edit events wait for composition and observe only committed Markdow
     composing=false;text='original你';run.documentChanged();run.documentChanged();assert.deepEqual(seen,['original你']);
   }finally {await run.destroy();}
 });
+test("installed plugin preflight failures display the host reason before import and do not execute effects",async()=>{
+  const states: Record<string,PluginState>={};let probes=0;
+  const run=new PluginRuntime({getMarkdown:()=>'',getPath:()=>null,getSelection:()=>'',insert(){throw Error('Unexpected write');},replace(){},setReadOnly(){},notify(){},changed:(id,state)=>states[id]=state,saveConfig(){},validatePlugin:async()=>{probes++;throw Error('插件构建产物超过 64 MiB，请拆分插件或减小构建产物后重新安装。');}});
+  try{await run.setEnabled({id:'local-probe',name:'probe',description:'',config:{},url:'opentypora://app/_plugins/unavailable.mjs'},true);
+    assert.equal(probes,1);assert.equal(states['local-probe'].status,'error');assert.match(states['local-probe'].error!,/64 MiB/);
+    await run.setEnabled({id:'builtin-probe',name:'builtin',description:'',config:{},factory:context=>class extends context.BasePlugin{}},true);assert.equal(probes,1);assert.equal(states['builtin-probe'].status,'ready');
+  }finally{await run.destroy();}
+});
 test("local CommonJS installation preserves original source, is content addressed and rejects invalid input", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "open-typora-plugins-"));
   try {

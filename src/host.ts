@@ -42,6 +42,7 @@ const browser: Host = {
   async themes() { return []; }, async installTheme() { throw new Error("安装主题请使用桌面应用。"); },
   background: () => browserBackground(), chooseBackground: chooseBrowserBackground,
   clearBackground: () => browserBackground(null),
+  async validatePlugin() { throw new Error("安装本地插件请使用桌面应用。"); },
   async plugins() { return []; }, async installPlugin() { throw new Error("安装本地插件请使用桌面应用。"); },
   async removePlugin() { throw new Error("移除本地插件请使用桌面应用。"); },
   async conversionSettings() { return { pandoc: "", word: false }; },

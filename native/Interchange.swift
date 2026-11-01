@@ -3,6 +3,12 @@ import Foundation
 import UniformTypeIdentifiers
 import ImageIO
 
+enum PluginLimits {
+  static let source = 16 * 1024 * 1024, package = 32 * 1024 * 1024, resource = 64 * 1024 * 1024, files = 64
+  static let sourceError = "单个插件源文件超过 16 MiB，请拆分文件后重新安装。"
+  static let packageError = "插件文件夹最多 64 个文件、共 32 MiB，单个文件不超过 16 MiB。"
+  static let resourceError = "插件构建产物超过 64 MiB，请拆分插件或减小构建产物后重新安装。"
+}
 final class Interchange {
   static func background(_ directory: URL) throws -> [String:String]? {
     let file = directory.appendingPathComponent("background.json")
@@ -228,8 +234,10 @@ final class Interchange {
   }
   static func installPlugin(_ file: URL, directory: URL) throws -> [String: String] {
     if (try file.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true { return try installPluginPackage(file, directory: directory) }
-    guard ["js", "cjs"].contains(file.pathExtension.lowercased()), (try file.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 1_000_001) <= 1_000_000 else { throw NativeFailure("请选择小于 1 MB 的 JavaScript 插件。") }
+    guard ["js", "cjs"].contains(file.pathExtension.lowercased()) else { throw NativeFailure("请选择 JavaScript 插件。") }
+    guard (try file.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? Int.max) <= PluginLimits.source else { throw NativeFailure(PluginLimits.sourceError) }
     let bytes = try Data(contentsOf: file)
+    guard bytes.count <= PluginLimits.source else { throw NativeFailure(PluginLimits.sourceError) }
     guard let source = String(data: bytes, encoding: .utf8), !source.contains("\0") else { throw NativeFailure("插件必须使用 UTF-8 编码。") }
     let id = "local-" + hashData(bytes), name = String(file.deletingPathExtension().lastPathComponent.prefix(96))
     let root = directory.appendingPathComponent("plugins")
@@ -243,7 +251,9 @@ final class Interchange {
     ;return module.exports.plugin || module.exports.default || module.exports;
     }
     """
-    try atomicWrite(root.appendingPathComponent(id + ".mjs"), Data(module.utf8))
+    let data = Data(module.utf8)
+    guard data.count <= PluginLimits.resource else { throw NativeFailure(PluginLimits.resourceError) }
+    try atomicWrite(root.appendingPathComponent(id + ".mjs"), data)
     try atomicWrite(root.appendingPathComponent(id + ".json"), JSONSerialization.data(withJSONObject: ["id": id, "name": name]))
     return ["id": id, "name": name, "url": "opentypora://app/_plugins/" + id + ".mjs"]
   }
@@ -258,9 +268,10 @@ final class Interchange {
         guard values.isSymbolicLink != true, contained(base, canonicalFileURL(file)) else { throw NativeFailure("插件文件夹不能包含符号链接或外部路径。") }
         if values.isDirectory == true { try collect(file, depth: depth + 1); continue }
         guard ["js", "cjs", "json", "css"].contains(file.pathExtension.lowercased()) else { continue }
-        guard (values.fileSize ?? 1_000_001) <= 1_000_000, files.count < 64 else { throw NativeFailure("插件文件夹最多 64 个文件、共 4 MB，单文件不超过 1 MB。") }
+        guard (values.fileSize ?? Int.max) <= PluginLimits.source, files.count < PluginLimits.files else { throw NativeFailure(PluginLimits.packageError) }
         let bytes = try Data(contentsOf: file); total += bytes.count
-        guard total <= 4_000_000, let source = String(data: bytes, encoding: .utf8), !source.contains("\0") else { throw NativeFailure("插件文件夹超过 4 MB，或包含无效 UTF-8 文件。") }
+        guard bytes.count <= PluginLimits.source, total <= PluginLimits.package else { throw NativeFailure(PluginLimits.packageError) }
+        guard let source = String(data: bytes, encoding: .utf8), !source.contains("\0") else { throw NativeFailure("插件必须使用无 NUL 的 UTF-8 文件。") }
         files[String(file.path.dropFirst(base.path.count + 1))] = source
       }
     }
@@ -289,7 +300,9 @@ final class Interchange {
     let root = directory.appendingPathComponent("plugins")
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     guard contained(canonicalFileURL(directory), canonicalFileURL(root)) else { throw NativeFailure("插件目录无效。") }
-    try atomicWrite(root.appendingPathComponent(id + ".mjs"), Data((module as String).utf8))
+    let data = Data((module as String).utf8)
+    guard data.count <= PluginLimits.resource else { throw NativeFailure(PluginLimits.resourceError) }
+    try atomicWrite(root.appendingPathComponent(id + ".mjs"), data)
     try atomicWrite(root.appendingPathComponent(id + ".json"), JSONSerialization.data(withJSONObject: ["id": id, "name": name]))
     return ["id": id, "name": name, "url": "opentypora://app/_plugins/" + id + ".mjs"]
   }

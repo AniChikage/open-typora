@@ -15,6 +15,7 @@ interface Options {
   getDocumentId?(): string;
   composing?(): boolean;
   reservedHotkeys?: string[];
+  validatePlugin?(id: string): Promise<unknown>;
 }
 interface Running {
   definition: PluginDefinition; plugin: any; disposed: boolean;
@@ -267,6 +268,8 @@ export class PluginRuntime {
       this.running.set(definition.id, item); this.options.changed(definition.id, { enabled: true, status: "loading" });
       try {
         this.syncDOM();
+        if (!definition.factory && definition.url) await this.options.validatePlugin?.(definition.id);
+        if (item.disposed || this.stopped) return;
         const factory = definition.factory || (definition.url ? (await import(/* @vite-ignore */ definition.url)).default : undefined);
         if (item.disposed || this.stopped) return;
         if (!factory) throw new Error("插件缺少入口。");

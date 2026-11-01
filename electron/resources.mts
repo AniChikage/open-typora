@@ -2,15 +2,28 @@ import type { DocumentStore } from "./store.mjs";
 import { readFile, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkPluginResourceSize } from "../shared/plugin-limits.mjs";
 import { downloadImage } from "./image-actions.mjs";
+async function pluginFile(id: string, profile: string) {
+  if (!/^local-[a-f0-9]{64}$/.test(id)) throw new Error("插件标识无效。");
+  const root = await realpath(path.join(profile, "plugins")), file = await realpath(path.join(root, id + ".mjs"));
+  if (path.dirname(root) !== await realpath(profile) || path.dirname(file) !== root) throw new Error("插件资源路径无效。");
+  const metadata = await stat(file);
+  if (!metadata.isFile()) throw new Error("插件资源必须是普通文件。");
+  checkPluginResourceSize(metadata.size);
+  return { file, bytes: metadata.size };
+}
+export async function validatePlugin(id: string, profile: string) {
+  try { const { bytes } = await pluginFile(id, profile); return { bytes }; }
+  catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new Error('插件文件不可用，请重新安装。'); throw error; }
+}
 export async function pluginResource(address: string, profile: string) {
   const url = new URL(address);
   if (url.protocol !== "opentypora:" || url.host !== "app") throw new Error("资源来源无效。");
   const pathname = decodeURIComponent(url.pathname);
   if (!/^\/_plugins\/local-[a-f0-9]{64}\.mjs$/.test(pathname)) throw new Error("插件资源路径无效。");
-  const root = await realpath(path.join(profile, "plugins")), file = await realpath(path.join(root, path.basename(pathname)));
-  if (path.dirname(root) !== await realpath(profile) || path.dirname(file) !== root) throw new Error("资源路径无效。");
-  const bytes = await readFile(file); if (bytes.length > 1_010_000) throw new Error("资源过大。");
+  const { file } = await pluginFile(path.basename(pathname, '.mjs'), profile);
+  const bytes = await readFile(file); checkPluginResourceSize(bytes.length);
   return { bytes, mime: "application/javascript" };
 }
 

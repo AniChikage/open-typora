@@ -111,7 +111,7 @@ try {
   await wait(() => pluginCard('Native-plugin-fixture'));
   pluginCard('Native-plugin-fixture').querySelector<HTMLInputElement>('input[type="checkbox"]')!.click();
   await wait(() => getComputedStyle(root()).getPropertyValue('--plugin-fixture').trim() === 'loaded');
-  check(true, 'installed CommonJS plugin is dynamically imported by native WebKit under the existing CSP');
+  check(true, 'a 1+ MiB installed CommonJS plugin is dynamically imported by native WebKit under the existing CSP');
   pluginCard('Native-plugin-fixture').querySelector<HTMLButtonElement>('.plugin-actions button')!.click();
   closePlugins(); await wait(() => root().textContent.includes('粗插件体'));
   check(true, 'installed original plugin calls the document adapter and creates a real undoable edit');
@@ -121,7 +121,7 @@ try {
   await wait(()=>pluginCard('Package fixture'));
   pluginCard('Package fixture').querySelector<HTMLInputElement>('input[type="checkbox"]')!.click();
   await wait(()=>window.packageProbe?.ticks>0 && getComputedStyle(root()).getPropertyValue('--package-fixture').trim()==='loaded');
-  check(window.packageProbe.cached && window.packageProbe.marker==='/*__ENTRY__*/ /*__MODULES__*/','native folder modules resolve JS JSON CSS and cache shared dependencies under the existing CSP');
+  check(window.packageProbe.cached && window.packageProbe.marker==='/*__ENTRY__*/ /*__MODULES__*/','native 4+ MiB folder modules resolve JS JSON CSS and cache shared dependencies under the existing CSP');
   pluginCard('Package fixture').querySelector<HTMLButtonElement>('.plugin-actions button')!.click();closePlugins();
   await wait(()=>root().textContent.includes('插件中文😀42'));
   window.__openTypora.command({action:'undo'});check(!root().textContent.includes('插件中文'),'native package command produces a single undoable Unicode edit');
@@ -489,6 +489,17 @@ try {
   check(document.querySelectorAll<HTMLElement>('.document-editor[data-document-id="native-large-qa"] [data-cid]').length<200,'native multi-megabyte rich editor remains viewport-virtualized');
   window.__openTypora.command({action:'outline'});await wait(()=>[...document.querySelectorAll<HTMLButtonElement>('.outline button')].some(button=>button.textContent==='Large native heading'));
   check(true,'large native outline analysis completes through the bundled worker');
+  async function recoveredText(id: string, expected: string, previous: string, label: string) {
+    const started=Date.now(),deadline=started+12000;let pending=false;
+    do {
+      const state=await desktop.testRecovery();if(!state.ok)throw new Error(state.error);
+      const actual=state.value!.documents.find(record=>record.id===id)?.content;
+      if(actual===expected){if(pending)check(true,label+' recovery completed after '+(Date.now()-started)+' ms');return state;}
+      if(actual!==undefined&&actual!==previous){let at=0;while(at<Math.min(actual.length,expected.length)&&actual[at]===expected[at])at++;throw new Error(label+' unexpected persisted content: lengths '+actual.length+'/'+expected.length+', first difference '+at+', actual '+JSON.stringify(actual.slice(Math.max(0,at-25),at+70))+', expected '+JSON.stringify(expected.slice(Math.max(0,at-25),at+70)));}
+      pending=true;await new Promise(resolve=>setTimeout(resolve,250));
+    }while(Date.now()<deadline);
+    throw new Error(label+' recovery did not finish within 12 seconds');
+  }
   const giantCodeSource = '# Native giant code\n\n```javascript\n'+('const value = "native"; // 0123456789abcdef\n').repeat(820000)+'NATIVE-CODE-END\n```\n';
   const giantCodeRecord={id:'native-giant-code-qa',name:'Native-Giant-Code.md',path:null,content:giantCodeSource,savedContent:'',diskHash:null,lineEnding:'\n',encoding:'utf-8',bom:false};
   const registeredGiant=await desktop.registerDraft(giantCodeRecord);if(!registeredGiant.ok)throw new Error(registeredGiant.error);
@@ -499,11 +510,11 @@ try {
   const giantCodeInput=root().querySelector<HTMLElement>('.large-code.fence-editing .cm-content')!,firstCodeLine=(giantCodeInput.querySelector<HTMLElement>('.cm-line')!.firstChild as Text);
   giantCodeInput.focus();getSelection()!.setBaseAndExtent(firstCodeLine,5,firstCodeLine,5);
   document.execCommand('insertText',false,'\nconst extra = `value`;\n');await wait(()=>root()?.textContent.includes('const extra = `value`;'));
-  await new Promise(resolve=>setTimeout(resolve,1600));
-  let giantState=await desktop.testRecovery();if(!giantState.ok)throw new Error(giantState.error);
+  const editedGiant=giantCodeSource.replace('const value','const\nconst extra = `value`;\n value');
+  let giantState=await recoveredText(giantCodeRecord.id,editedGiant,giantCodeSource,'native giant code edit');
   check(giantState.value!.documents.find(record=>record.id===giantCodeRecord.id)!?.content===giantCodeSource.replace('const value','const\nconst extra = `value`;\n value'),'native giant code newline and punctuation persist with every surrounding byte intact');
   window.__openTypora.command({action:'undo'});await wait(()=>!root()?.textContent.includes('const extra = `value`;'));
-  await new Promise(resolve=>setTimeout(resolve,1600));giantState=await desktop.testRecovery();if(!giantState.ok)throw new Error(giantState.error);
+  giantState=await recoveredText(giantCodeRecord.id,giantCodeSource,editedGiant,'native giant code undo');
   check(giantState.value!.documents.find(record=>record.id===giantCodeRecord.id)!?.content===giantCodeSource,'native giant code newline edit undoes to exact original recovery bytes');
   const giantTableSource='| Key | Value |\n|---|---|\n'+Array.from({length:20000},(_,i)=>'| Row-'+i+' | '+(i===19999?'NATIVE-TABLE-END':'Native table value')+' |').join('\n')+'\n';
   const giantTableRecord={id:'native-giant-table-qa',name:'Native-Giant-Table.md',path:null,content:giantTableSource,savedContent:'',diskHash:null,lineEnding:'\n',encoding:'utf-8',bom:false};
@@ -513,7 +524,7 @@ try {
   pointText('NATIVE-TABLE-END','NATIVE-TABLE-END'.length);input('insertText','中国');await wait(()=>root()?.textContent.includes('NATIVE-TABLE-END中国'));check(true,'native giant table Chinese edit committed');
   window.__openTypora.command({action:'undo'});await wait(()=>!root()?.textContent.includes('NATIVE-TABLE-END中国'));check(true,'native giant table edit undone');
   pointText('NATIVE-TABLE-END','NATIVE-TABLE-END'.length);input('deleteContentBackward');await wait(()=>root()?.textContent.includes('NATIVE-TABLE-EN')&&!root()?.textContent.includes('NATIVE-TABLE-END'));
-  await new Promise(resolve=>setTimeout(resolve,1600));const giantTableState=await desktop.testRecovery();if(!giantTableState.ok)throw new Error(giantTableState.error);
+  const giantTableState=await recoveredText(giantTableRecord.id,giantTableSource.replace('NATIVE-TABLE-END','NATIVE-TABLE-EN'),giantTableSource,'native giant table edit');
   check(giantTableState.value!.documents.find(record=>record.id===giantTableRecord.id)!?.content===giantTableSource.replace('NATIVE-TABLE-END','NATIVE-TABLE-EN'),'native giant table Backspace persists only the exact changed character');
   window.__openTypora.command({action:'undo'});await wait(()=>root()?.textContent.includes('NATIVE-TABLE-END'));
   pointText('NATIVE-TABLE-END','NATIVE-TABLE-END'.length);input('insertText','👨‍👩‍👧‍👦');

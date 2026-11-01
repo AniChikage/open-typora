@@ -86,6 +86,7 @@ export interface Host {
   background(): Promise<BackgroundAsset | null>;
   chooseBackground(): Promise<BackgroundAsset | null>;
   clearBackground(): Promise<unknown>;
+  validatePlugin(id: string): Promise<{ bytes: number }>;
   plugins(): Promise<{ id: string; name: string; url: string }[]>;
   installPlugin(folder?: boolean): Promise<{ id: string; name: string; url: string } | null>;
   removePlugin(id: string): Promise<unknown>;
