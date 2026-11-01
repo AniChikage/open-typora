@@ -1,6 +1,6 @@
 # 0.21.1 大型本地插件加载修复验收
 
-2026-11-01，本地候选版针对 [#7](https://github.com/AniChikage/open-typora/issues/7) 完成以下检查。三平台发布与本机安装将在实际完成后补充记录。
+2026-11-01，针对 [#7](https://github.com/AniChikage/open-typora/issues/7) 的补丁已[发布为 0.21.1](https://github.com/AniChikage/open-typora/releases/tag/v0.21.1)，标签对应 `ea336b4`，代码已通过 [PR #8](https://github.com/AniChikage/open-typora/pull/8) 合并。第一轮五项平台验收全部通过；[正式发布流程](https://github.com/AniChikage/open-typora/actions/runs/41283506290)再次通过 macOS、Windows、Linux、Windows 预览、真实 FUSE 和发布六项任务。已[回复提交者](https://github.com/AniChikage/open-typora/issues/7#issuecomment-6554974024)更新地址，问题保留供其复测。
 
 | 检查 | 结果与范围 |
 | --- | --- |
@@ -10,6 +10,11 @@
 | Electron 实际窗口 | 7 组检查通过：1+ MiB 单文件与 4+ MiB 文件夹插件安装、启用、相对 JS／JSON／CSS 模块、文档修改、一次撤销、停用清理、正常退出及重启；故意超限的安装模块返回 HTTP 413，插件管理器直接显示 64 MiB 限制与处理建议 |
 | macOS 原生 | 原生存储与资源读取验证大于旧限制的源文件及模块、16／64 MiB 拒绝信息和跨窗口资源定位；完整 WKWebView 回归实际动态导入上述大插件，并验证命令、中文撤销、模块缓存和停用清理；原有编辑、图表、打印、复杂格式往返、大文件和右键检查继续通过 |
 | 测试等待条件 | 首次完整原生运行的超大代码块断言仍使用固定 1.6 秒等待，读取时恢复提交尚未完成。改为等待实际恢复内容；任何既非旧版又非预期内容立即失败，全文与撤销的精确断言保留。重新完整运行通过 |
+| 安装载荷与 FUSE | Windows NSIS 安装、旧版升级、文件关联和卸载通过；Linux DEB 与 AppImage 的实际载荷均完成大插件及原有功能回归，相同 AppImage 在 Ubuntu 22.04／24.04 真实 FUSE 挂载、沙箱编辑、保存、撤销及正常退出卸载通过 |
+| Windows 大文件异常复核 | 首次正式尝试的超大代码块新行保存检查超时：可见编辑内容已更新，但磁盘仍是原始内容。原因尚未查明，不能称为已修复；同一编辑内核的后续两轮 Windows 完整安装回归，以及本机完整大块回归、延迟前次保存响应和渲染器 CPU 限速 6 倍的诊断均通过，精确保存与撤销断言未放宽，并保留有界保存／输入事件诊断 |
+| 公开下载 | 六个公开安装文件逐个下载并核对 SHA-256，校验清单本身匹配发布资产摘要；公开 macOS DMG／ZIP 与正式 CI 文件一致，标签提交一致 |
+| macOS 安装源 | 最终 CI 的 DMG／ZIP、应用签名与版本 0.21.1 已校验，解压应用的 392 项文件已建立哈希清单 |
+| 本机更新状态 | Mac 锁屏且界面工具无法解锁，尚未正常退出或替换当前 0.21.0。已准备更新前后的文档／会话／设置指纹检查；旧版 DMG／ZIP 已清理；当前应用替换和旧应用副本移除待解锁后完成，不作为本轮已完成项 |
 
 插件原有 API 兼容范围不变。容量放宽不代表提交者插件的完整功能或全部 Typora 插件都已兼容；本轮使用自有夹具验收，不含实体中文候选窗口复测。Browser plugin not available，Electron 界面使用项目 Playwright 套件，原生界面使用真实 WKWebView。
 
