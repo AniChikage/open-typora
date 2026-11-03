@@ -30,7 +30,7 @@ const server = createServer(async (request, response) => {
 });
 await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
 const endpoint = 'http://127.0.0.1:' + (server.address() as import('node:net').AddressInfo).port + '/v1';
-const env: Record<string, string> = { ...process.env, OPEN_TYPORA_DATA_DIR: profile, OPEN_TYPORA_AI_SETTINGS_DIR: profile, OPEN_TYPORA_TEST_HIDDEN: process.env.OPEN_TYPORA_TEST_HIDDEN || '1' }; delete env.ELECTRON_RUN_AS_NODE; delete env.OPEN_TYPORA_DEV_URL;
+const env: Record<string, string> = { ...process.env, OPEN_TYPORA_DATA_DIR: profile, OPEN_TYPORA_AI_SETTINGS_DIR: profile, OPEN_TYPORA_TEST_HIDDEN: process.env.OPEN_TYPORA_TEST_HIDDEN || '0' }; delete env.ELECTRON_RUN_AS_NODE; delete env.OPEN_TYPORA_DEV_URL;
 let app!: ElectronApplication, page!: Page;
 const checks: string[] = [], errors: string[] = [], consoleErrors: string[] = [];
 const pass = (text: string) => { checks.push(text); console.log('PASS: ' + text); };
