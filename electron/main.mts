@@ -22,6 +22,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { imageAction, imageName } from "./image-actions.mjs";
 import { libreOfficePath, pandocPath, convertExport, convertImport, themes, installTheme } from "./interchange.mjs";
+import { EditBatchStore } from "./edit-batches.mjs";
 import { Workspace } from "./workspace.mjs";
 import { randomUUID } from "node:crypto";
 import { atomicWrite, DocumentStore } from "./store.mjs";
@@ -91,6 +92,10 @@ const l = (source: string) => translate(uiLocale, source);
 let buildMenu = () => {};
 const handlers: IpcHandlers = {
   aiSettings: (_, update) => ai.settings(update),
+  editBatches: () => new EditBatchStore(app.getPath('userData')).list(),
+  prepareEditBatch: (_, input) => new EditBatchStore(app.getPath('userData')).prepare(input, store),
+  readEditBatch: (_, id) => new EditBatchStore(app.getPath('userData')).read(id),
+  finishEditBatch: (_, id, applied) => new EditBatchStore(app.getPath('userData')).finish(id, applied),
   aiRewrite: (_, request) => ai.rewrite(request),
   aiCancel: (_, id) => ai.cancel(id),
   validatePlugin: (_, id) => validatePlugin(id, store.dataDir),

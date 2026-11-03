@@ -104,3 +104,71 @@ final class VersionStore {
     }
   }
 }
+
+
+struct EditBatchFile: Codable {
+  var documentId: String, name: String, path: String?, before: String, after: String
+}
+struct EditBatchRecord: Codable {
+  var id: String, createdAt: Double, instruction: String, state: String
+  var files: [EditBatchFile]
+  var names: [String] { files.map { $0.name } }
+  var summary: [String: Any] { ["id": id, "createdAt": createdAt, "instruction": instruction, "state": state, "names": names] }
+  var json: [String: Any] { var value = summary; value["files"] = files.map { ["documentId": $0.documentId, "name": $0.name, "path": $0.path as Any? ?? NSNull(), "before": $0.before, "after": $0.after] }; return value }
+}
+private struct EditBatchEnvelope: Codable { var version = 1; var payload: String, hash: String }
+final class EditBatchStore {
+  private static let lock = NSLock()
+  let root: URL
+  init(_ directory: URL) { root = directory.appendingPathComponent("edit-batches-v1") }
+  private func locked<T>(_ work: () throws -> T) rethrows -> T { Self.lock.lock(); defer { Self.lock.unlock() }; return try work() }
+  private func file(_ id: String) throws -> URL { guard UUID(uuidString: id) != nil else { throw NativeFailure("批次标识无效。") }; return root.appendingPathComponent(id + ".json") }
+  private func load(_ id: String) throws -> EditBatchRecord {
+    do {
+      let url = try file(id), data = try Data(contentsOf: url)
+      guard data.count <= 4 * 1024 * 1024 else { throw NativeFailure("size") }
+      let envelope = try JSONDecoder().decode(EditBatchEnvelope.self, from: data), bytes = Data(envelope.payload.utf8)
+      guard envelope.version == 1, hashData(bytes) == envelope.hash else { throw NativeFailure("integrity") }
+      let batch = try JSONDecoder().decode(EditBatchRecord.self, from: bytes)
+      guard batch.id == id, batch.createdAt.isFinite, ["prepared", "applied"].contains(batch.state), (1...4).contains(batch.files.count) else { throw NativeFailure("format") }
+      return batch
+    } catch { throw NativeFailure("批次记录无法读取或校验失败，原始记录已保留。") }
+  }
+  private func write(_ batch: EditBatchRecord) throws {
+    let payload = String(data: try JSONEncoder().encode(batch), encoding: .utf8)!
+    try atomicWrite(file(batch.id), JSONEncoder().encode(EditBatchEnvelope(payload: payload, hash: hashData(Data(payload.utf8)))), permissions: 0o600)
+  }
+  private func all() throws -> [EditBatchRecord] {
+    guard FileManager.default.fileExists(atPath: root.path) else { return [] }
+    return try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil).filter { $0.pathExtension == "json" && UUID(uuidString: $0.deletingPathExtension().lastPathComponent) != nil }.map { try load($0.deletingPathExtension().lastPathComponent) }.sorted { $0.createdAt > $1.createdAt }
+  }
+  func list() throws -> [[String: Any]] { try locked { try all().map { $0.summary } } }
+  func read(_ id: String) throws -> [String: Any] { try locked { try load(id).json } }
+  func prepare(_ input: [String: Any], store: DocumentStore) throws -> [String: Any] {
+    try locked {
+      guard let instruction = input["instruction"] as? String, instruction.utf16.count <= 8000,
+        let incoming = input["files"] as? [[String: Any]], (1...4).contains(incoming.count) else { throw NativeFailure("批次内容无效。") }
+      var total = 0, ids = Set<String>()
+      let files = try incoming.map { value -> EditBatchFile in
+        guard let id = value["documentId"] as? String, !ids.contains(id), let before = value["before"] as? String, let after = value["after"] as? String, !before.utf8.elementsEqual(after.utf8) else { throw NativeFailure("批次内容无效。") }
+        ids.insert(id); total += before.utf16.count + after.utf16.count
+        guard total <= 400000 else { throw NativeFailure("批次内容无效。") }
+        let record = try store.require(id)
+        return EditBatchFile(documentId: id, name: record.name, path: record.path, before: before, after: after)
+      }
+      try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+      let previous = try all(), pending = previous.filter { $0.state == "prepared" }.count
+      guard pending < 20 else { throw NativeFailure("未完成的批次过多，请先检查批次恢复记录。") }
+      let batch = EditBatchRecord(id: UUID().uuidString, createdAt: Date().timeIntervalSince1970 * 1000, instruction: instruction, state: "prepared", files: files)
+      try write(batch)
+      return batch.json
+    }
+  }
+  func finish(_ id: String, applied: Bool) throws {
+    try locked {
+      var batch = try load(id)
+      if applied { batch.state = "applied"; try write(batch); for old in try all().filter({ $0.state == "applied" }).dropFirst(20) { try FileManager.default.removeItem(at: file(old.id)) } }
+      else { guard batch.state == "prepared" else { throw NativeFailure("已应用批次不能删除恢复点。") }; try FileManager.default.removeItem(at: file(id)) }
+    }
+  }
+}

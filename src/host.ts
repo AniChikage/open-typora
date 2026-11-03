@@ -26,6 +26,10 @@ function download(name: string, text: string, type = "text/markdown;charset=utf-
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 const browser: Host = {
+  async editBatches() { return []; },
+  async prepareEditBatch() { throw new Error('跨文档修改请使用桌面应用。'); },
+  async readEditBatch() { throw new Error('跨文档修改请使用桌面应用。'); },
+  async finishEditBatch() { throw new Error('跨文档修改请使用桌面应用。'); },
   async aiSettings() { throw new Error("模型配置与改写请使用桌面应用。"); },
   async aiRewrite() { throw new Error("AI 改写请使用桌面应用。"); },
   async aiCancel() {},

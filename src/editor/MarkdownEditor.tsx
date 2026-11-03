@@ -1,5 +1,5 @@
 import { t } from "../i18n";
-import { selectionCurrent } from "./aiReview";
+import { selectionCurrent, rewriteGuard } from "./aiReview";
 import type { RewriteSelection } from "./aiReview";
 import { codeSelectionCommand, selectionActions } from "./selectionCommands";
 import { clipboardTable, tableMarkdown, tablePasteBlock } from "./clipboard.ts";
@@ -537,7 +537,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
           const from = Math.min(selection.anchor, selection.head), to = Math.max(selection.anchor, selection.head);
           if (from === to) { callbacks.current.onError(t("请先选中需要改写的文字。")); return null; }
           doc.selection = { anchor: selection.anchor, head: selection.head }; doc.closeGroup();
-          return { documentId: initial.current.id, source: doc.text, from, to, text: doc.text.slice(from, to) };
+          return { documentId: initial.current.id, source: doc.text, from, to, text: doc.text.slice(from, to), ...rewriteGuard(doc.text, from, to, doc.nodes) };
         },
         applyRewrite: (selection, text) => {
           const doc = model.current;

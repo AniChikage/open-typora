@@ -5,7 +5,11 @@ export interface AIContext { id: string; name: string; text: string; fromLine?: 
 export interface ContextDocument { token: string; name: string; path: string | null; content: string; hash: string; bytes: number }
 export interface DocumentVersion { id: string; createdAt: number; name: string; reason: string; hash: string; bytes: number }
 export interface VersionResult { versions: DocumentVersion[]; warning?: string }
-export interface AIRewriteRequest { id: string; instruction: string; text: string; mode?: 'question'; contexts?: AIContext[] }
+export interface AIRewriteRequest { id: string; instruction: string; text: string; mode?: 'question' | 'batch'; contexts?: AIContext[] }
+export interface EditBatchFile { documentId: string; name: string; path: string | null; before: string; after: string }
+export interface EditBatchSummary { id: string; createdAt: number; instruction: string; state: 'prepared' | 'applied'; names: string[] }
+export interface EditBatch extends EditBatchSummary { files: EditBatchFile[] }
+export interface EditBatchInput { instruction: string; files: { documentId: string; before: string; after: string }[] }
 export interface WorkspaceLayout { primaryId: string; secondaryId: string; direction: "columns" | "rows"; ratio: number }
 export interface BackgroundAsset { name: string; dataUrl: string }
 export interface DocumentRecord {
@@ -70,6 +74,10 @@ export interface Command {
 }
 export interface Host {
   native: boolean;
+  editBatches(): Promise<EditBatchSummary[]>;
+  prepareEditBatch(input: EditBatchInput): Promise<EditBatch>;
+  readEditBatch(id: string): Promise<EditBatch>;
+  finishEditBatch(id: string, applied: boolean): Promise<unknown>;
   aiSettings(update?: AISettingsUpdate): Promise<AISettings>;
   aiRewrite(request: AIRewriteRequest): Promise<{ text: string; model: string }>;
   aiCancel(id: string): Promise<unknown>;

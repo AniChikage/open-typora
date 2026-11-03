@@ -1,4 +1,4 @@
-export interface RewriteSelection { documentId: string; source: string; from: number; to: number; text: string }
+export interface RewriteSelection { documentId: string; source: string; from: number; to: number; text: string; guardPrefix?: string; guardSuffix?: string }
 export interface RewriteChange { from: number; to: number; before: string; after: string }
 function spans(text: string) { return Array.from(new Intl.Segmenter(undefined, { granularity: "word" }).segment(text), part => part.segment); }
 function operations(a: string[], b: string[]) {
@@ -62,3 +62,17 @@ export function reviewedText(original: string, changes: RewriteChange[], accepte
 export function selectionCurrent(selection: RewriteSelection, documentId: string, source: string) {
   return documentId === selection.documentId && source === selection.source && source.slice(selection.from, selection.to) === selection.text;
 }
+
+
+export function rewriteGuard(source: string, from: number, to: number, blocks: readonly { from: number; to: number; kind: string }[]) {
+  const block = blocks.find(block => block.from <= from && block.to >= to);
+  if (!block) return {};
+  if (block.to - block.from - (to - from) > 20_000 && ['fence', 'code_block'].includes(block.kind)) {
+    const text = source.slice(from, to); let longest = 2;
+    for (const match of text.matchAll(/~+/g)) longest = Math.max(longest, match[0].length);
+    const fence = '~'.repeat(longest + 1);
+    return { guardPrefix: fence + '\n', guardSuffix: '\n' + fence };
+  }
+  return { guardPrefix: source.slice(Math.max(block.from, from - 10000), from), guardSuffix: source.slice(to, Math.min(block.to, to + 10000)) };
+}
+export function guardedRewrite(selection: RewriteSelection, text: string) { return (selection.guardPrefix || '') + text + (selection.guardSuffix || ''); }

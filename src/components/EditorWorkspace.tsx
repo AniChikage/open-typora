@@ -49,6 +49,7 @@ const DocumentView = memo(function DocumentView(props: EditorProps) {
   </section>;
 });
 interface Props extends Omit<EditorProps, "record" | "active" | "visible" | "slot" | "split" | "rendered"> {
+  retainedIds?: string[];
   documents: DocumentRecord[];
   activeId: string;
   layout: WorkspaceLayout | null;
@@ -86,6 +87,7 @@ export function EditorWorkspace(props: Props) {
     { id: "outline", label: t("显示大纲") }, { id: "autosave", label: t("自动保存已有文件"), checked: props.autosave },
   ] : [];
   const visible = new Set(layout ? [layout.primaryId,layout.secondaryId] : [props.activeId]);
+  for (const id of props.retainedIds || []) visited.current.add(id);
   for (const id of visible) visited.current.add(id);
   const ids = new Set(props.documents.map(record => record.id));
   for (const id of visited.current) if (!ids.has(id)) visited.current.delete(id);

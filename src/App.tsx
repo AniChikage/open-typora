@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import { BatchEditDialog } from './components/BatchEditDialog';
+import type { BatchTarget } from './components/BatchEditDialog';
+import type { EditBatch, DocumentRecord } from '../shared/contracts';
+import type { ReferenceFile } from './knowledge';
+import './batchEdit.css';
 import { KnowledgeDialog } from "./components/KnowledgeDialog";
 import { VersionHistoryDialog } from "./components/VersionHistoryDialog";
 import { referenceFiles, readReference } from "./knowledge";
@@ -66,10 +71,11 @@ export default function App() {
   const [readOnly, setReadOnly] = useState(false);
   const pluginRuntime = useRef<PluginRuntime | null>(null);
   const [typewriter, setTypewriter] = useState(false);
-  const [dialog, setDialog] = useState<"knowledge" | "versions" | "ai-settings" | "preferences" | "plugins" | "quick-open" | "statistics" | "recent" | "global-search" | "encoding" | InsertKind | null>(null);
+  const [dialog, setDialog] = useState<"batch-edit" | "knowledge" | "versions" | "ai-settings" | "preferences" | "plugins" | "quick-open" | "statistics" | "recent" | "global-search" | "encoding" | InsertKind | null>(null);
   const [fileOperation, setFileOperation] = useState<FileOperation | null>(null);
   const [aiSelection, setAISelection] = useState<{ selection: RewriteSelection; id: string } | null>(null);
   const mutationState = useRef({ readOnly, dialog, aiId: aiSelection?.id }); mutationState.current = { readOnly, dialog, aiId: aiSelection?.id };
+  const [batchEditors, setBatchEditors] = useState<string[]>([]);
   const [aiSettingsRevision, setAISettingsRevision] = useState(0);
   function startRewrite() {
     if (!host.native) { session.setMessage(t("AI 改写请使用桌面应用。")); return; }
@@ -115,6 +121,68 @@ export default function App() {
     try { const saved = await host.captureVersion(id, target!.markdown(), reason); if (saved.warning) sessionRef.current.setMessage(saved.warning); }
     catch { sessionRef.current.setMessage(t("修改已应用，但版本快照保存失败；仍可用撤销恢复。")); }
     return true;
+  }
+  async function prepareBatch(files: ReferenceFile[]) {
+    if (composing() || mutationState.current.readOnly || files.length < 1 || files.length > 4) throw new Error(t('请先完成输入法组合输入并关闭只读模式。'));
+    const originalActive = sessionRef.current.activeId, result: DocumentRecord[] = [];
+    for (const file of files) {
+      const current = sessionRef.current;
+      let record = current.documents.find(record => file.token === 'document:' + record.id || file.path && record.path === file.path);
+      if (!record) record = await current.openToken(file.token) || undefined;
+      if (!record) throw new Error(t('原文件已关闭或离开授权范围，请先重新打开文件。'));
+      result.push(record);
+    }
+    if (mutationState.current.dialog !== 'batch-edit' || composing()) throw new Error(t('文档或输入状态已变化，未应用修改。请重新操作。'));
+    flushSync(() => { setBatchEditors(result.map(record => record.id)); sessionRef.current.setActiveId(originalActive); });
+    return result;
+  }
+  async function applyBatch(targets: BatchTarget[], instruction: string): Promise<string | null> {
+    const permitted = () => mutationState.current.dialog === 'batch-edit' && !mutationState.current.readOnly && !composing() && sessionRef.current.canMutate() && targets.length > 0 && targets.length <= 4 && new Set(targets.map(target => target.documentId)).size === targets.length && targets.every(target => {
+      const record = sessionRef.current.documents.find(record => record.id === target.documentId);
+      return record && record.path === target.path && record.content === target.before && !record.conflict && (!editors.current.has(record.id) || editors.current.get(record.id)!.markdown() === target.before);
+    });
+    if (!permitted()) throw new Error(t('文档或输入状态已变化，未应用修改。请重新操作。'));
+    await sessionRef.current.waitForSaves(targets.map(target => target.documentId));
+    // A disk conflict in any target blocks the entire batch, including unsaved edits.
+    const checks = await Promise.all(targets.map(target => host.check(target.documentId)));
+    if (checks.some(Boolean)) throw new Error(t('磁盘文件已变化，未应用整批修改。请先处理冲突。'));
+    if (!permitted()) throw new Error(t('文档或输入状态已变化，未应用修改。请重新操作。'));
+    const batch = await host.prepareEditBatch({ instruction, files: targets.map(({ documentId, before, after }) => ({ documentId, before, after })) });
+    const changedOnDisk = (await Promise.all(targets.map(target => host.check(target.documentId)))).some(Boolean);
+    if (changedOnDisk) { await host.finishEditBatch(batch.id, false); throw new Error(t('磁盘文件已变化，未应用整批修改。请先处理冲突。')); }
+    if (!permitted()) { await host.finishEditBatch(batch.id, false); throw new Error(t('文档或输入状态已变化，未应用修改。请重新操作。')); }
+    const changed: BatchTarget[] = [];
+    const focused = document.activeElement as HTMLElement | null;
+    try {
+      // There are no awaits between final validation and the last buffer edit.
+      // All targets are mounted, including background tabs, to preserve their undo.
+      flushSync(() => setBatchEditors(targets.map(target => target.documentId)));
+      if (!permitted() || targets.some(target => !editors.current.has(target.documentId))) throw new Error(t('文档或输入状态已变化，未应用修改。请重新操作。'));
+      flushSync(() => {
+        for (const target of targets) {
+          const editor = editors.current.get(target.documentId)!;
+          try { editor.transform(() => target.after.replace(/\r\n/g, '\n')); }
+          finally { if (editor.markdown() !== target.before) changed.push(target); }
+          if (editor.markdown() !== target.after) throw new Error(t('无法应用整批修改，已恢复原文。'));
+        }
+      });
+    } catch (error) {
+      flushSync(() => { for (const target of changed.reverse()) editors.current.get(target.documentId)?.undo(); });
+      await host.finishEditBatch(batch.id, false); throw error;
+    } finally { if (focused?.isConnected) focused.focus({ preventScroll: true }); }
+    try {
+      await host.finishEditBatch(batch.id, true);
+      await host.persist({ documents: sessionRef.current.documents, activeId: sessionRef.current.activeId, workspace: sessionRef.current.workspace });
+    } catch { sessionRef.current.setMessage(t('修改已应用，但恢复状态未完全保存。请保存文档；批次原文已保留。')); }
+    return batch.id;
+  }
+  async function restoreBatch(batch: EditBatch) {
+    const targets = batch.files.map(file => {
+      const record = sessionRef.current.documents.find(record => file.path ? record.path === file.path : record.id === file.documentId && !record.path);
+      if (!record) throw new Error(t('请先重新打开该批次的全部原文档，再恢复。'));
+      return { documentId: record.id, name: record.name, path: record.path, before: file.after, after: file.before };
+    });
+    return !!await applyBatch(targets, t('整批恢复') + ' · ' + batch.id);
   }
   async function navigateEvidence(source: Evidence) {
     const current = sessionRef.current;
@@ -297,7 +365,7 @@ export default function App() {
   commands.current = ({ action, document: opened, anchor, line, message }) => {
     if (action === "newWindow" && window.desktop?.windowAction) { void host.windowAction(action).catch((error: Error) => session.setMessage(error.message)); return; }
     const context = commandsByAction.get(action)?.context;
-    if (readOnly && ((context && context !== "document") || ["ai-rewrite", "delete-word", "pagebreak", "indent", "outdent", "undo", "redo", "paste-plain", "image", "table", "link", "reference-link", "footnote", "copy-all-images", "move-all-images", "upload-all-images"].includes(action))) { session.setMessage(t("只读模式已开启，请先在插件管理中关闭或切换只读效果。")); return; }
+    if (readOnly && ((context && context !== "document") || ["ai-rewrite", "batch-edit", "delete-word", "pagebreak", "indent", "outdent", "undo", "redo", "paste-plain", "image", "table", "link", "reference-link", "footnote", "copy-all-images", "move-all-images", "upload-all-images"].includes(action))) { session.setMessage(t("只读模式已开启，请先在插件管理中关闭或切换只读效果。")); return; }
     if (context && !active) return;
     if (["rich", "table"].includes(context || "") && !editor()?.richMode()) return;
     if (action === "notice") { if (message) session.setMessage(message); }
@@ -308,7 +376,7 @@ export default function App() {
     else if (action === "folder") void session.openFolder();
     else if (action === "save") void session.save();
     else if (action === "ai-rewrite") startRewrite();
-    else if (action === "knowledge" || action === "versions") { if (host.native) setDialog(action); else session.setMessage(t("目录问答和版本历史请使用桌面应用。")); }
+    else if (action === "batch-edit" || action === "knowledge" || action === "versions") { if (host.native) setDialog(action); else session.setMessage(t(action === "batch-edit" ? "跨文档修改请使用桌面应用。" : "目录问答和版本历史请使用桌面应用。")); }
     else if (action === "ai-models") setDialog("ai-settings");
     else if (action === "encoding") setDialog("encoding");
     else if (action === "saveAs") void session.save(true);
@@ -482,7 +550,7 @@ export default function App() {
         ) : (
           <>
             <div className={"writing-content" + (aiSelection ? " with-ai" : "")}>
-            <EditorWorkspace documents={session.documents} activeId={session.activeId} layout={session.workspace} modes={modes}
+            <EditorWorkspace retainedIds={batchEditors} documents={session.documents} activeId={session.activeId} layout={session.workspace} modes={modes}
               preferences={preferences} readOnly={readOnly} typewriter={typewriter} select={selectDocument} register={registerEditor} change={changeDocument} error={session.setMessage} cursor={cursorDocument} selection={selectionDocument} compositionEnd={compositionDocument} mode={modeDocument} closePane={closePane} command={commandDocument} tabAction={tabAction} autosave={session.autosave} composing={composing}
               create={() => void session.create()} close={id => void session.close(id)} reorder={session.reorder} split={direction => void session.split(direction)} swap={session.swapPanes} resize={session.resizeWorkspace} />
             {aiSelection && <AIReviewPanel key={aiSelection.id} selection={aiSelection.selection} documentName={session.documents.find(document => document.id === aiSelection.selection.documentId)?.name || t("已关闭文档")}
@@ -492,7 +560,7 @@ export default function App() {
                 const id = aiSelection.selection.documentId;
                 return historyMutation(id, "ai", () => mutationState.current.aiId === aiSelection.id && !!editors.current.get(id)?.rewriteCurrent(aiSelection.selection), target => {
                   if (!target.applyRewrite(aiSelection.selection, text)) return false;
-                  const selection = { ...aiSelection.selection, source: target.markdown(), to: aiSelection.selection.from + text.length, text };
+                  const selection = { ...aiSelection.selection, source: target.markdown().replace(/\r\n/g, "\n"), to: aiSelection.selection.from + text.length, text };
                   setAISelection(previous => previous?.id === aiSelection.id ? { ...previous, selection } : previous);
                   return true;
                 });
@@ -526,6 +594,7 @@ export default function App() {
         </div>
       )}
       {fileOperation && <FileOperationDialog operation={fileOperation} files={session.files} folder={session.folder} run={session.fileOperation} close={() => setFileOperation(null)} />}
+      {dialog === "batch-edit" && <BatchEditDialog documents={session.documents} files={references} composing={composing} prepare={prepareBatch} apply={applyBatch} restore={restoreBatch} settings={() => setDialog('ai-settings')} close={closeDialog} />}
       {dialog === "knowledge" && <KnowledgeDialog documents={session.documents} files={session.files} folder={session.folder} targetPath={active?.path || null} composing={composing} navigate={navigateEvidence} insert={insertAnswer} settings={() => setDialog("ai-settings")} close={closeDialog} />}
       {dialog === "versions" && active && <VersionHistoryDialog key={active.id} record={active} composing={composing} restore={content => historyMutation(active.id, "restore", () => mutationState.current.dialog === "versions", target => target.transform(() => content))} close={closeDialog} />}
       {dialog === "ai-settings" && <AISettingsDialog saved={() => setAISettingsRevision(value => value + 1)} close={closeDialog} />}

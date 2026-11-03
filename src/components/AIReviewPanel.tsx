@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { RewriteConstraints, ConstraintWarnings } from './RewriteConstraints';
+import { defaultConstraints, constraintInstruction, constraintViolations } from '../../shared/rewrite-constraints.mts';
 import { X, Settings2 } from "lucide-react";
 import type { ContextPickerHandle } from "./ContextPicker";
 import { ContextPicker } from "./ContextPicker";
@@ -7,7 +9,7 @@ import type { ReferenceFile } from "../knowledge";
 import { t } from "../i18n";
 import type { DocumentRecord, AISettings } from "../../shared/contracts";
 import type { RewriteSelection } from "../editor/aiReview";
-import { reviewedText, rewriteChanges } from "../editor/aiReview";
+import { reviewedText, rewriteChanges, guardedRewrite } from "../editor/aiReview";
 import { host } from "../host";
 import { imeKey } from "../editor/composition";
 
@@ -16,6 +18,7 @@ export function AIReviewPanel({ selection, documentName, current, composing, fil
   files: ReferenceFile[]; documents: DocumentRecord[];
   apply(text: string): Promise<boolean>; recapture(): void; settings(): void; settingsRevision: number; close(): void; notify(message: string): void;
 }) {
+  const [constraints, setConstraints] = useState(() => ({ ...defaultConstraints, terms: [] as string[] }));
   const [instruction, setInstruction] = useState(() => t("改善表达，保持原意和 Markdown 格式。"));
   const [references, setReferences] = useState<ReferenceFile[]>([]), [mention, setMention] = useState<string | null>(null), [applying, setApplying] = useState(false);
   const retrieval = useRef<AbortController | null>(null), picker = useRef<ContextPickerHandle>(null);
@@ -29,6 +32,7 @@ export function AIReviewPanel({ selection, documentName, current, composing, fil
   const changes = useMemo(() => result === null ? [] : rewriteChanges(selection.text, result), [selection.text, result]);
   const chosen = changes.length - rejected.size;
   const combined = useMemo(() => result === null ? "" : reviewedText(selection.text, changes, changes.map((_, index) => !rejected.has(index))), [selection.text, result, changes, rejected]);
+  const violations = useMemo(() => result === null ? [] : constraintViolations(guardedRewrite(selection, selection.text), guardedRewrite(selection, combined), constraints), [selection, combined, constraints, result]);
   function blocked() { if (!composing() && !promptComposing.current) return false; notify(t("请先完成当前输入法组合输入。")); return true; }
   async function generate() {
     if (busy || configLoading || blocked() || !instruction.trim() || !selection.text.trim() || !current) return;
@@ -39,12 +43,12 @@ export function AIReviewPanel({ selection, documentName, current, composing, fil
       const context = references.length ? await retrieve(references, documents, instruction, abort.signal, true) : null;
       if (!alive.current || pending.current !== id) return;
       if (context && (context.skipped || context.limited || !context.evidence.length)) throw new Error(t("部分参考资料无法读取，请移除后重试。未发送任何资料。"));
-      const response = await host.aiRewrite({ id, instruction, text: selection.text, ...(context ? { contexts: modelContexts(context.evidence) } : {}) }); if (alive.current && pending.current === id) setResult(response.text); }
+      const response = await host.aiRewrite({ id, instruction: instruction + constraintInstruction(constraints), text: selection.text, ...(context ? { contexts: modelContexts(context.evidence) } : {}) }); if (alive.current && pending.current === id) setResult(response.text); }
     catch (error) { if (alive.current && pending.current === id) setError((error as Error).message); }
     finally { if (alive.current && pending.current === id) { pending.current = ""; setBusy(false); } }
   }
   async function accept() {
-    if (blocked() || applying || !current || !chosen || result === null) return;
+    if (blocked() || applying || !current || !chosen || violations.length || result === null) return;
     setApplying(true);
     try { if (!await apply(combined) || !alive.current) return; setApplied(chosen); setResult(null); setRejected(new Set()); setError(""); }
     catch (error) { if (alive.current) setError((error as Error).message); }
@@ -59,12 +63,14 @@ export function AIReviewPanel({ selection, documentName, current, composing, fil
       {!current && <div className="ai-stale" role="status">{t("原文或当前文档已变化，重新选择后再生成或应用。")}<button onPointerDown={event => event.preventDefault()} onClick={() => { if (!blocked()) recapture(); }}>{t("读取当前选区")}</button></div>}
       {applied > 0 && current && <div className="ai-applied" role="status"><strong>{t("已应用 {0} 处修改", applied)}</strong><p>{selection.text.trim() ? t("可调整要求继续改写，也可读取其他选区。") : t("选区已清空，请选择其他文字后读取当前选区。")}</p><button onPointerDown={event => event.preventDefault()} onClick={() => { if (!blocked()) recapture(); }}>{t("读取当前选区")}</button></div>}
       <details className="ai-original"><summary>{applied ? t("查看当前选区") : t("查看原始选区")}</summary><pre>{selection.text}</pre></details>
-      <label className="ai-instruction">{t("改写要求")}<textarea ref={prompt} aria-label={t("AI 改写要求")} rows={3} maxLength={8000} value={instruction} onChange={event => { setInstruction(event.target.value); const match = event.target.value.match(/@([^@\s\n]*)$/u); setMention(!promptComposing.current && match ? match[1] : null); }} onCompositionStart={() => { promptComposing.current = true; }} onCompositionEnd={() => { promptComposing.current = false; }} onKeyDown={event => { if (picker.current?.keyDown(event)) return; if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !imeKey(event.nativeEvent)) { event.preventDefault(); void generate(); } }} /></label>
+      <label className="ai-instruction">{t("改写要求")}<textarea ref={prompt} aria-label={t("AI 改写要求")} rows={3} maxLength={6000} value={instruction} onChange={event => { setInstruction(event.target.value); const match = event.target.value.match(/@([^@\s\n]*)$/u); setMention(!promptComposing.current && match ? match[1] : null); }} onCompositionStart={() => { promptComposing.current = true; }} onCompositionEnd={() => { promptComposing.current = false; }} onKeyDown={event => { if (picker.current?.keyDown(event)) return; if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !imeKey(event.nativeEvent)) { event.preventDefault(); void generate(); } }} /></label>
       <ContextPicker ref={picker} files={files} selected={references} disabled={busy || applying} mention={mention} dismissed={() => setMention(null)} consumed={() => { if (mention !== null) setInstruction(value => value.replace(/@[^@\s\n]*$/u, "")); setMention(null); prompt.current?.focus(); }} change={value => { setReferences(value); setResult(null); setApplied(0); }} />
+      <RewriteConstraints composition={active => { promptComposing.current = active; }} value={constraints} change={setConstraints} disabled={busy || applying} />
       <div className="ai-presets">{[["更简洁", "更简洁，保留原意和数字"], ["润色", "润色，保持原有语气"], ["译为英文", "翻译成英文，保留 Markdown 格式"]].map(([label, value]) => <button key={label} disabled={busy} onClick={() => setInstruction(t(value))}>{t(label)}</button>)}</div>
       <div className="ai-generate"><span className="dialog-note">{configLoading ? t("正在读取模型配置…") : config?.model || t("尚未配置模型")}</span>{busy ? <button onClick={cancel}>{t("取消生成")}</button> : <button className="primary-button" disabled={configLoading || !current || !selection.text.trim() || !instruction.trim()} onPointerDown={event => { if (composing() || promptComposing.current) event.preventDefault(); }} onClick={() => void generate()}>{configLoading ? t("正在读取配置…") : config?.model ? result === null ? applied ? t("继续改写") : t("生成改写") : t("重新生成") : t("配置模型…")}</button>}</div>
       {busy && <p role="status" className="ai-status">{t("正在生成，你可以继续编辑；原文变化后需重新选择。")}</p>}
       {error && <p className="form-error" role="alert">{t(error)}</p>}
+      <ConstraintWarnings violations={violations} />
       {result !== null && <section className="ai-diff" aria-label={t("改写差异")}>
         <div className="ai-diff-heading"><h3>{changes.length ? t("{0} 处修改", changes.length) : t("与原文一致")}</h3>{changes.length > 0 && <><button onClick={() => setRejected(new Set())}>{t("全部采用")}</button><button onClick={() => setRejected(new Set(changes.map((_, index) => index)))}>{t("全部保留原文")}</button></>}</div>
         {changes.map((change, index) => <div className={"ai-change" + (rejected.has(index) ? " rejected" : "")} key={index}>
@@ -74,6 +80,6 @@ export function AIReviewPanel({ selection, documentName, current, composing, fil
         </div>)}
       </section>}
     </div>
-    {result !== null && <div className="ai-panel-footer"><button onClick={() => void host.writeClipboard(combined).then(() => notify(t("已复制审阅后的选区。"))).catch(error => setError(error.message))}>{t("复制结果")}</button><button className="primary-button" disabled={applying || !current || !chosen} onPointerDown={event => { event.preventDefault(); }} onClick={() => void accept()}>{t("应用 {0} 处修改", chosen)}</button></div>}
+    {result !== null && <div className="ai-panel-footer"><button onClick={() => void host.writeClipboard(combined).then(() => notify(t("已复制审阅后的选区。"))).catch(error => setError(error.message))}>{t("复制结果")}</button><button className="primary-button" disabled={applying || !current || !chosen || !!violations.length} onPointerDown={event => { event.preventDefault(); }} onClick={() => void accept()}>{t("应用 {0} 处修改", chosen)}</button></div>}
   </aside>;
 }
