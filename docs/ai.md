@@ -19,7 +19,7 @@ The compatible interface uses non-streaming `POST /chat/completions`; a root URL
 
 For OpenRouter, copy an exact model ID from its [current catalog](https://openrouter.ai/models), and use your own OpenRouter key. Availability, pricing and [request limits](https://openrouter.ai/docs/api/reference/limits) are controlled by the provider. Open Typora sends the configured model ID without substituting another model.
 
-Other proprietary API formats are not supported unless the service offers an OpenAI-compatible chat endpoint. This release does not include tool calling, browsing or a whole-folder agent.
+Other proprietary API formats are not supported unless the service offers an OpenAI-compatible chat endpoint. Reviewed edits to up to four selected documents are available in [multi-document editing](workspace.md#edit-multiple-documents). This release does not include tool calling, browsing or an autonomous whole-folder agent.
 
 ## Rewrite and review
 
@@ -34,6 +34,12 @@ By default, only the selected text, your instruction and the editor's fixed pres
 You can keep writing while generation runs. If the document text or active document changes, the proposal cannot be applied until the exact original is current again, or you select fresh text and generate again. Switching to another split pane cannot write the proposal into that pane. Read-only plugins prevent AI writes. Cancel stops the pending request and late results are ignored.
 
 AI capture, apply and keyboard submission are guarded during IME composition. The review panel does not move focus when a response arrives. Finish the candidate input before starting or applying an edit.
+
+## Preservation constraints
+
+Both selection rewriting and multi-document review offer **Preservation constraints**. Numbers/common dates and times, link/image destinations and code contents are protected by default. Add exact terms one per line when terminology must stay unchanged. Changes in these tokens block Apply; reject the relevant differences or explicitly relax the constraint to proceed. Checks use the combined result of the changes you actually selected, so rejected suggestions do not block a safe result. Enter used to confirm a Chinese candidate cannot submit a rewrite.
+
+The checks compare token values and counts. They are conservative and do not understand factual equivalence, all date/unit forms, or every Markdown extension. A reformatted value may be flagged; a semantic error may go undetected. Review the result yourself.
 
 ## Credentials and data
 

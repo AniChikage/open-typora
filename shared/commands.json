@@ -51,6 +51,7 @@
     {"label":"搜索文件夹内容…","action":"global-search","key":"Mod-Shift-F"},
     {"label":"AI 改写选区…","action":"ai-rewrite","key":"Mod-Shift-R","context":"document"},
     {"label":"目录问答…","action":"knowledge"},
+    {"label":"跨文档修改…","action":"batch-edit"},
     {"label":"模型设置…","action":"ai-models"}
   ]},
   {"title":"段落","items":[

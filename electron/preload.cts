@@ -7,6 +7,10 @@ type Command = import("../shared/contracts.js").Command;
 type PathChange = import("../shared/contracts.js").PathChange;
 const call = <K extends keyof IpcRequests>(name: K, ...args: Parameters<IpcRequests[K]>): Promise<BridgeResponse<Awaited<ReturnType<IpcRequests[K]>>>> => ipcRenderer.invoke(`document:${name}`, ...args);
 contextBridge.exposeInMainWorld("desktop", {
+  editBatches: () => call('editBatches'),
+  prepareEditBatch: input => call('prepareEditBatch', input),
+  readEditBatch: id => call('readEditBatch', id),
+  finishEditBatch: (id, applied) => call('finishEditBatch', id, applied),
   aiSettings: update => call("aiSettings", update),
   aiRewrite: request => call("aiRewrite", request),
   aiCancel: id => call("aiCancel", id),

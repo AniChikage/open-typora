@@ -53,6 +53,29 @@ async function runWebKitAITests(endpoint:string) {
     check(root()===beforeLocale&&document.documentElement.lang==='en','native English UI switches without replacing the rich editor');
     await desktop.setLocale('en');
     window.__openTypora.command({action:'save'});let saved=false;for(let i=0;i<200;i++){const state=await desktop.testRecovery();if(state.ok&&state.value.documents[0].savedContent===original&&state.value.documents[0].content===original){saved=true;break;}await new Promise(resolve=>setTimeout(resolve,30));}check(saved&&errors.length===0,'native AI editor persists exact bytes without runtime errors');
+    const batchOriginals = ['# Proposal\r\n\r\nOld Product writes Markdown.\r\n', '# FAQ\n\nOld Product works offline.\n', '# Guide\n\nOld Product uses local files.\n'];
+    const batchRecords = batchOriginals.map((content, index): import('../shared/contracts.js').DocumentRecord => ({ id: 'native-batch-' + index, name: 'batch-' + index + '.md', path: null, content, savedContent: '', diskHash: null, lineEnding: index ? '\n' : '\r\n' }));
+    for (const record of batchRecords) { check((await desktop.registerDraft(record)).ok, 'native batch draft uses a registered document ID'); window.__openTypora.command({ action: 'opened', document: record }); await wait(() => !!document.querySelector('[role="tab"][aria-selected="true"]')?.textContent?.includes(record.name)); }
+    window.__openTypora.command({ action: 'batch-edit' }); await wait(() => !!document.querySelector('.batch-edit-dialog'));
+    let batchDialog = document.querySelector<HTMLElement>('.batch-edit-dialog')!;
+    for (const record of batchRecords) batchDialog.querySelector<HTMLInputElement>('[aria-label="Edit document ' + record.name + '"]')!.click();
+    const batchPrompt = batchDialog.querySelector<HTMLTextAreaElement>('[aria-label="Multi-document instructions"]')!;
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(batchPrompt, 'Update the product name across the selected documents.'); batchPrompt.dispatchEvent(new Event('input', { bubbles: true }));
+    click(batchDialog, 'Generate edit plan'); await wait(() => !![...batchDialog.querySelectorAll('button')].find(button => button.textContent === 'Review file changes'));
+    check(!batchDialog.querySelector('[role="alert"]') && batchDialog.textContent!.includes('Update the product name.'), 'native batch mode reaches URLSession and validates an exact three-document plan');
+    click(batchDialog, 'Review file changes'); await wait(() => !!batchDialog.querySelector('.batch-file-diff'));
+    batchDialog.querySelector<HTMLInputElement>('[aria-label="Accept document batch-2.md"]')!.click(); click(batchDialog, 'Apply to 2 documents');
+    await wait(() => !!batchDialog.querySelector('[role="status"]')?.textContent?.includes('Updated 2 documents'));
+    const batchState = await desktop.testRecovery(); check(batchState.ok && batchRecords.every((record, index) => batchState.value.documents.find(value => value.id === record.id)?.content === (index < 2 ? record.content.replace('Old Product', 'New Product') : record.content)), 'native selective batch apply preserves exact CRLF and leaves rejected files unchanged');
+    click(batchDialog, '×'); await wait(() => !document.querySelector('.batch-edit-dialog'));
+    document.querySelector<HTMLButtonElement>('[role="tab"][aria-label="' + batchRecords[0].name + '"]')!.click(); await wait(() => !!root()?.textContent?.includes('New Product')); window.__openTypora.command({ action: 'undo' }); await assertSource(batchOriginals[0].replace(/\r\n/g, '\n')); window.__openTypora.command({ action: 'redo' }); await assertSource(batchOriginals[0].replace(/\r\n/g, '\n').replace('Old Product', 'New Product'));
+    check(true, 'native multi-document approval uses one isolated undo/redo transaction per file');
+    window.__openTypora.command({ action: 'batch-edit' }); await wait(() => !!document.querySelector('.batch-edit-dialog')); batchDialog = document.querySelector<HTMLElement>('.batch-edit-dialog')!; click(batchDialog, 'Batch recovery'); await wait(() => !!batchDialog.querySelector('.batch-history-list button')); batchDialog.querySelector<HTMLButtonElement>('.batch-history-list button')!.click(); await wait(() => !!batchDialog.querySelector('.batch-restore'));
+    batchDialog.querySelector<HTMLInputElement>('.batch-restore input[type=checkbox]')!.click(); click(batchDialog, 'Restore all documents'); await wait(() => !!batchDialog.querySelector('[role="status"]')?.textContent?.includes('Batch restored'));
+    const nativeBatches = await desktop.editBatches(); check(nativeBatches.ok && nativeBatches.value.length === 2, 'native batch restoration retains a second recovery point before restoring the originals');
+    const restoredBatchState = await desktop.testRecovery(); check(restoredBatchState.ok && batchRecords.every(record => restoredBatchState.value.documents.find(value => value.id === record.id)?.content === record.content), 'native batch restoration restores all accepted documents without changing rejected files');
+    click(batchDialog, '×'); await wait(() => !document.querySelector('.batch-edit-dialog'));
+    check(errors.length === 0, 'native batch UI has no unhandled renderer errors');
     return {aiOnly:true,fixtureOnly:true,actualModelInference:false,passed,errors,source:original};
   }catch(error){return {aiOnly:true,passed,errors,error:String(error),source:original,body:document.body.textContent?.slice(-1400)};}
 }

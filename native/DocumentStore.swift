@@ -130,8 +130,9 @@ final class DocumentStore {
     }
     return (text, bom, encoding)
   }
-  func open(_ file: URL, id: String? = nil, encoding: String? = nil) throws -> DocumentRecord {
+  func open(_ file: URL, id: String? = nil, encoding: String? = nil, authorizedPath: String? = nil) throws -> DocumentRecord {
     let resolved = canonicalFileURL(file)
+    if let authorizedPath, resolved.path != authorizedPath { throw NativeFailure("资料已不在当前授权范围，请刷新后重试。") }
     if id == nil, let existing = records.values.first(where: { $0.path == resolved.path }) { return existing }
     guard ["md", "markdown", "mdown"].contains(resolved.pathExtension.lowercased()) else {
       throw NativeFailure("请选择 Markdown 文件。")
@@ -139,6 +140,10 @@ final class DocumentStore {
     let values = try resolved.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
     guard values.isRegularFile == true else { throw NativeFailure("请选择普通 Markdown 文件。") }
     let bytes = try Data(contentsOf: resolved)
+    if let authorizedPath {
+      let isLink = try file.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink == true
+      guard canonicalFileURL(file).path == authorizedPath && !isLink else { throw NativeFailure("资料已不在当前授权范围，请刷新后重试。") }
+    }
     let (text, bom, detected) = try decode(bytes, encoding: encoding)
     let record = DocumentRecord(
       id: id ?? records.values.first(where: { $0.path == resolved.path })?.id ?? UUID().uuidString,
@@ -283,6 +288,12 @@ final class DocumentStore {
     return ["folder": root.path, "files": files, "truncated": truncated, "skipped": skipped]
   }
 
+  func authorizedToken(_ token: String) throws -> URL {
+    guard let file = tokens[token], let folder, contained(folder, file), canonicalFileURL(file).path == file.path,
+      (try file.resourceValues(forKeys: [.isSymbolicLinkKey, .isRegularFileKey])).isSymbolicLink != true,
+      (try file.resourceValues(forKeys: [.isRegularFileKey])).isRegularFile == true else { throw NativeFailure("资料已不在当前授权范围，请刷新后重试。") }
+    return file
+  }
   struct ContextAccess {
     let token: String, file: URL?, root: URL?, name: String, encoding: String?, draft: String?
   }
@@ -349,7 +360,7 @@ final class DocumentStore {
       for var record in session.documents {
         records[record.id] = record
         if record.path != nil, let changed = try check(record.id) {
-          if record.content == record.savedContent, let text = changed["content"] as? String,
+          if let text = changed["content"] as? String, record.content.utf8.elementsEqual(record.savedContent.utf8) || record.content.utf8.elementsEqual(text.utf8),
             let digest = changed["diskHash"] as? String
           {
             record = try accept(record.id, content: text, digest: digest)

@@ -319,5 +319,32 @@ func runStoreTests() throws {
   try fm.removeItem(at: grantFile); try fm.createSymbolicLink(at: grantFile, withDestinationURL: outsideFile)
   do { _ = try historyStore.readContext(historyStore.contextAccess(token)); throw NativeFailure("Unexpected context escape") }
   catch { try expect(error.localizedDescription.contains("授权"), "native context tokens reject replaced symlinks") }
+  do { _ = try historyStore.authorizedToken(token); throw NativeFailure("Unexpected token escape") }
+  catch { try expect(error.localizedDescription.contains("授权"), "native scanned file tokens reject replaced symlinks before opening") }
+  let checkpointDirectory = directory.appendingPathComponent("interrupted-save"), checkpointStore = DocumentStore(checkpointDirectory)
+  let checkpointFile = directory.appendingPathComponent("checkpoint.md")
+  try atomicWrite(checkpointFile, Data("old".utf8))
+  let checkpointOriginal = try checkpointStore.open(checkpointFile)
+  var checkpointDirty = checkpointOriginal; checkpointDirty.content = "刚保存的中文\r\n"
+  try checkpointStore.persist(SessionRecord(documents: [checkpointDirty], activeId: checkpointDirty.id))
+  _ = try checkpointStore.save(checkpointOriginal.id, text: checkpointDirty.content)
+  let checkpointRecovered = try DocumentStore(checkpointDirectory).restore()!.documents[0]
+  try expect(checkpointRecovered.conflict != true && checkpointRecovered.savedContent == checkpointDirty.content, "native recovery recognizes a completed save before the session checkpoint")
+  try atomicWrite(checkpointFile, Data("external".utf8))
+  let trueConflict = try DocumentStore(checkpointDirectory).restore()!.documents[0]
+  try expect(trueConflict.conflict == true && trueConflict.content == checkpointDirty.content, "native recovery still preserves genuinely conflicting dirty text")
+  let batchStore = EditBatchStore(directory.appendingPathComponent("batch-data"))
+  let batchInput: [String: Any] = ["instruction": "统一名称", "files": [["documentId": record.id, "before": "原文\r\n你好，中国", "after": "新版\r\n你好，中国"]]]
+  let preparedBatch = try batchStore.prepare(batchInput, store: store), batchID = preparedBatch["id"] as! String
+  try expect(preparedBatch["state"] as? String == "prepared", "native writes a complete recovery point before buffer application")
+  try batchStore.finish(batchID, applied: true)
+  let reopenedBatchStore = EditBatchStore(directory.appendingPathComponent("batch-data")), loadedBatch = try reopenedBatchStore.read(batchID)
+  try expect((loadedBatch["files"] as! [[String: Any]])[0]["before"] as? String == "原文\r\n你好，中国", "native batch recovery survives a new host with exact CRLF and Chinese text")
+  let batchMode = try fm.attributesOfItem(atPath: batchStore.root.appendingPathComponent(batchID + ".json").path)[.posixPermissions] as! NSNumber
+  try expect(batchMode.intValue == 0o600, "native batch recovery records are owner-only")
+  do { _ = try batchStore.read("../../outside"); throw NativeFailure("Unexpected batch traversal") } catch { try expect(error.localizedDescription.contains("校验"), "native batch IDs cannot escape the recovery directory") }
+  let pendingBatch = try batchStore.prepare(batchInput, store: store)
+  try batchStore.finish(pendingBatch["id"] as! String, applied: false)
+  try expect(try batchStore.list().count == 1, "native cancelled preparation removes only the unused recovery point")
   print("Native document store checks passed. Artifacts: \(directory.path)")
 }

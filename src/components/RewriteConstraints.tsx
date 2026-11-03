@@ -1,0 +1,11 @@
+import type { RewriteConstraints as Constraints, ConstraintViolation } from '../../shared/rewrite-constraints.mts';
+import { t } from '../i18n';
+const labels = { numbers: '数字、日期和单位', links: '链接和图片地址', code: '代码内容', terms: '指定术语' };
+export function RewriteConstraints({ value, change, disabled = false, composition }: { value: Constraints; change(value: Constraints): void; disabled?: boolean; composition?(active: boolean): void }) {
+  return <details className="rewrite-constraints"><summary>{t('改写约束')}</summary><p className="dialog-note">{t('检测到锁定内容变化时将阻止采纳。需要修改这些内容时，请先解除对应约束。')}</p><div className="constraint-options">{(['numbers', 'links', 'code'] as const).map(kind => <label className="checkbox-option" key={kind}><input type="checkbox" checked={value[kind]} disabled={disabled} onChange={event => change({ ...value, [kind]: event.target.checked })}/>{t(labels[kind])}</label>)}</div><label>{t('指定术语（每行一个）')}<textarea aria-label={t('指定术语（每行一个）')} value={value.terms.join('\n')} rows={2} maxLength={1000} onCompositionStart={() => composition?.(true)} onCompositionEnd={() => composition?.(false)} disabled={disabled} onChange={event => change({ ...value, terms: event.target.value.split('\n').slice(0, 50) })}/></label></details>;
+}
+export function ConstraintWarnings({ violations }: { violations: ConstraintViolation[] }) {
+  if (!violations.length) return null;
+  const grouped = [...new Set(violations.map(item => item.kind))].map(kind => ({ kind, removed: violations.filter(item => item.kind === kind).flatMap(item => item.removed), added: violations.filter(item => item.kind === kind).flatMap(item => item.added) }));
+  return <div className="constraint-warnings" role="alert"><strong>{t('锁定内容发生变化，暂不能采纳。')}</strong>{grouped.map(violation => <details key={violation.kind}><summary>{t(labels[violation.kind])} · {t('减少 {0} / 新增 {1}', violation.removed.length, violation.added.length)}</summary>{violation.removed.length > 0 && <p>{t('减少：')}{violation.removed.slice(0, 8).map(item => item.slice(0, 180)).join(' · ')}</p>}{violation.added.length > 0 && <p>{t('新增：')}{violation.added.slice(0, 8).map(item => item.slice(0, 180)).join(' · ')}</p>}</details>)}<p>{t('可取消相关修改，或明确解除对应约束后再采纳。检查不代表事实已经核实。')}</p></div>;
+}

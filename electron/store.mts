@@ -87,12 +87,14 @@ export class DocumentStore {
     this.dataDir = dataDir;
     this.versions = new VersionStore(dataDir);
   }
-  async open(file: string, reload = false, encoding?: string): Promise<DocumentRecord & { path: string }> {
+  async open(file: string, reload = false, encoding?: string, authorizedPath?: string): Promise<DocumentRecord & { path: string }> {
     const resolved = await realpath(file);
+    if (authorizedPath && resolved !== authorizedPath) throw new Error('资料已不在当前授权范围，请刷新后重试。');
     if (!markdown.test(resolved)) throw new Error("请选择 Markdown 文件。");
     const metadata = await stat(resolved);
     if (!metadata.isFile()) throw new Error("请选择普通 Markdown 文件。");
     const bytes = await readFile(resolved);
+    if (authorizedPath && (await realpath(file) !== authorizedPath || (await lstat(file)).isSymbolicLink())) throw new Error('资料已不在当前授权范围，请刷新后重试。');
     const existing = [...this.records.values()].find(record => record.path === resolved);
     if (existing && !reload) return { ...existing } as DocumentRecord & { path: string };
     const decoded = decodeText(bytes, encoding);
@@ -283,7 +285,8 @@ export class DocumentStore {
   async openToken(token: string) {
     const file = this.fileTokens.get(token);
     if (!file) throw new Error("目录已更新，请刷新后重试。");
-    return this.open(file);
+    if (!this.folder || !within(this.folder, file) || (await lstat(file)).isSymbolicLink() || await realpath(file) !== file) throw new Error('资料已不在当前授权范围，请刷新后重试。');
+    return this.open(file, false, undefined, file);
   }
   async check(id: string): Promise<DiskChange | null> {
     const record = this.require(id);
@@ -369,7 +372,7 @@ export class DocumentStore {
           this.records.set(record.id, record);
           const changed = await this.check(record.id);
           if (changed && !changed.error) {
-            if (record.content === record.savedContent) {
+            if (record.content === record.savedContent || record.content === changed.content) {
               record.content = changed.content;
               record.savedContent = changed.content;
               record.diskHash = changed.diskHash;

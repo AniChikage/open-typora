@@ -20,11 +20,12 @@
 
 Open Typora is an open-source Markdown editor inspired by Typora's inline editing experience. Write directly in the rendered document, switch to source when you need it, and save ordinary `.md` files in your own folders.
 
-**Status:** early development, version **0.21.1**. Release builds support **macOS 14+ on Apple Silicon**, **Windows 10/11 x64**, and **Linux x64**. The interface supports Simplified Chinese and English (Preferences → Language). This is an independent project, unaffiliated with Typora; full feature and behavior parity is still in progress.
+**Status:** early development, version **0.22.0**. Release builds support **macOS 14+ on Apple Silicon**, **Windows 10/11 x64**, and **Linux x64**. The interface supports Simplified Chinese and English (Preferences → Language). This is an independent project, unaffiliated with Typora; full feature and behavior parity is still in progress.
 
 ## Features
 
 - **Optional AI editing** — connect your own OpenAI-compatible API, OpenRouter, LM Studio or Ollama; rewrite a selection, review individual changes, and apply with one-step undo. [Setup, privacy and limits](docs/ai.md).
+- **Reviewed multi-document edits** — choose up to four documents, generate a plan, review each file and change, then apply. Preserve numbers, dates, links, code and exact terms; restore an accepted batch across restarts if no later edits conflict. [Workflow and limits](docs/workspace.md#edit-multiple-documents).
 - **References and folder Q&A** — mention local files with `@`, inspect relevant excerpts before sending, and get answers with checked source quotes. Insert portable Markdown citations with one-step undo. [Workflow and limits](docs/workspace.md).
 - **Version history** — browse local snapshots across restarts, capture a version before experimenting, and restore earlier text while retaining the current content and undo.
 - **Live Markdown editing** — headings, inline formatting, lists, tasks, tables, links, footnotes, and YAML front matter. Edit code and formulas in place, or switch to the full source view.
@@ -59,18 +60,18 @@ The demo keeps documents in the current tab's memory; it does not upload or pers
 
 | Platform | Installer | Alternative |
 | --- | --- | --- |
-| Windows 10/11 · x64 | **[Download Setup.exe](https://github.com/AniChikage/open-typora/releases/download/v0.21.1/Open-Typora-0.21.1-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.21.1/Open-Typora-0.21.1-windows-x64.zip) |
-| macOS 14+ · Apple Silicon | **[Download DMG](https://github.com/AniChikage/open-typora/releases/download/v0.21.1/Open-Typora-0.21.1-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.21.1/Open-Typora-0.21.1-arm64.zip) |
-| Linux · x64 | **[Download DEB](https://github.com/AniChikage/open-typora/releases/download/v0.21.1/Open-Typora-0.21.1-linux-x64.deb)** | [AppImage](https://github.com/AniChikage/open-typora/releases/download/v0.21.1/Open-Typora-0.21.1-linux-x64.AppImage) |
+| Windows 10/11 · x64 | **[Download Setup.exe](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/Open-Typora-0.22.0-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/Open-Typora-0.22.0-windows-x64.zip) |
+| macOS 14+ · Apple Silicon | **[Download DMG](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/Open-Typora-0.22.0-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/Open-Typora-0.22.0-arm64.zip) |
+| Linux · x64 | **[Download DEB](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/Open-Typora-0.22.0-linux-x64.deb)** | [AppImage](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/Open-Typora-0.22.0-linux-x64.AppImage) |
 
-[SHA-256 checksums](https://github.com/AniChikage/open-typora/releases/download/v0.21.1/SHA256SUMS.txt) · [All releases](https://github.com/AniChikage/open-typora/releases)
+[SHA-256 checksums](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/SHA256SUMS.txt) · [All releases](https://github.com/AniChikage/open-typora/releases)
 
 ### Install on Linux
 
 Ubuntu 22.04 or a compatible x64 distribution is the tested baseline. Download the DEB and install it with:
 
 ```sh
-sudo apt install ./Open-Typora-0.21.1-linux-x64.deb
+sudo apt install ./Open-Typora-0.22.0-linux-x64.deb
 ```
 
 The desktop launcher and Markdown file association are included. Uninstalling with `sudo apt remove open-typora` retains your documents and recovery data.
@@ -89,7 +90,7 @@ The Windows build is currently **not code-signed**. Windows may display an unkno
 
 ### Install on macOS
 
-1. Download **[Open-Typora-0.21.1-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.21.1/Open-Typora-0.21.1-arm64.dmg)** from [Releases](https://github.com/AniChikage/open-typora/releases/latest).
+1. Download **[Open-Typora-0.22.0-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/Open-Typora-0.22.0-arm64.dmg)** from [Releases](https://github.com/AniChikage/open-typora/releases/latest).
 2. Open the DMG and drag **Open Typora** into **Applications**.
 3. Launch Open Typora from Applications.
 
@@ -203,7 +204,7 @@ More editor and desktop suites, test isolation, and build details are in [CONTRI
 - Format conversion can change layout or unsupported document structures. Some RTF image formats are rejected explicitly. Keep the original file when importing.
 - Windows/Linux DOC/RTF import requires both Pandoc and LibreOffice. Embedded WMF/EMF images need conversion to PNG/JPEG first.
 - Physical IME checks for 0.20.0 cover Sogou Pinyin on macOS, including AI instructions, rich-text locations and undo/redo. Other physical IMEs and Windows/Linux candidate windows still need manual acceptance; synthetic composition is separate. See the [versioned verification record](docs/verification.md).
-- AI requires your own service and human review of the result. This release edits selections; it does not include whole-folder agents, browsing or tool calling. Ollama protocol tests use a controlled server; the real-model acceptance used a custom API, not local model weights.
+- AI requires your own service and human review of the result. This release edits selections and up to four explicitly selected documents; it does not include autonomous whole-folder agents, browsing or tool calling. Ollama protocol tests use a controlled server. Live-provider acceptance is recorded per version in the [verification notes](docs/verification.md); automated protocol tests use controlled servers. No local model weights are bundled.
 - Third-party themes, embedded media, input methods, and image-host integrations vary in compatibility. Consult the [checklist](docs/feature-parity.md) before depending on a specific workflow.
 
 ## Contributing

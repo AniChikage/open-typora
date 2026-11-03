@@ -1,3 +1,4 @@
+import { digest } from "../build/runtime/electron/store.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -215,4 +216,30 @@ test("reopening an untitled tab restores its clean content without reading a nul
   const {store}=await setup(); const draft=store.registerDraft({id:"closed-draft",name:"Untitled.md",content:"discarded content"});
   const reopened=await store.reopen(draft.id);assert.equal(reopened.path,null);assert.equal(reopened.content,"");assert.equal(store.require(draft.id).content,"");
   await assert.rejects(store.reopen("unknown"));
+});
+
+
+test("recovery accepts an interrupted save only when disk exactly matches the recovered dirty text", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "open-typora-save-checkpoint-"));
+  try {
+    const file = path.join(directory, "note.md"); await writeFile(file, "old");
+    const store = new DocumentStore(path.join(directory, "data")), record = await store.open(file);
+    await store.persist({ documents: [{ ...record, content: "刚保存的中文\r\n" }], activeId: record.id });
+    await store.save(record.id, "刚保存的中文\r\n");
+    const reopened = (await new DocumentStore(store.dataDir).restore())!.documents[0];
+    assert.equal(reopened.conflict, undefined); assert.equal(reopened.savedContent, "刚保存的中文\r\n"); assert.equal(reopened.diskHash, digest(await readFile(file)));
+    await writeFile(file, "another change"); const conflicting = (await new DocumentStore(store.dataDir).restore())!.documents[0];
+    assert.equal(conflicting.conflict, true); assert.equal(conflicting.content, "刚保存的中文\r\n");
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+
+test("scanned file tokens reject replacement symlinks before opening a new document", { skip: process.platform === 'win32' ? 'Symlink privilege is not assumed on Windows' : false }, async () => {
+  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), 'open-typora-token-open-')));
+  try {
+    const folder = path.join(directory, 'notes'), file = path.join(folder, 'note.md'), privateFile = path.join(directory, 'private.md');
+    await mkdir(folder); await writeFile(file, 'public'); await writeFile(privateFile, 'private');
+    const store = new DocumentStore(path.join(directory, 'profile')), scan = await store.scan(folder), token = scan.files[0].token;
+    await rm(file); await symlink(privateFile, file); await assert.rejects(store.openToken(token), /授权/); assert.equal(store.records.size, 0);
+  } finally { await rm(directory, { recursive: true, force: true }); }
 });

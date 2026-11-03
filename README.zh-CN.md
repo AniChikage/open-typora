@@ -20,11 +20,12 @@
 
 Open Typora 是一款开源 Markdown 编辑器，受 Typora 的行内编辑体验启发。直接修改排版后的正文，需要时切换源码，文档以普通 `.md` 文件保存在自己的文件夹中。
 
-**项目状态：**当前为早期开发版本 **0.21.1**，发布目标为 **macOS 14+、Apple Silicon**、**Windows 10/11 x64** 和 **Linux x64**，支持简体中文和英文界面，可在偏好设置中切换。本项目独立实现，与 Typora 无隶属关系；功能和交互仍在持续完善。
+**项目状态：**当前为早期开发版本 **0.22.0**，发布目标为 **macOS 14+、Apple Silicon**、**Windows 10/11 x64** 和 **Linux x64**，支持简体中文和英文界面，可在偏好设置中切换。本项目独立实现，与 Typora 无隶属关系；功能和交互仍在持续完善。
 
 ## 功能
 
 - **可选 AI 编辑**：接入自定义 OpenAI 兼容 API、OpenRouter、LM Studio 或 Ollama，改写选区、逐项审阅差异，并作为一次修改应用与撤销；[配置、隐私与边界](docs/ai.zh-CN.md)。
+- **跨文档修改与整批恢复**：明确选择最多四篇文档，先看计划、再逐文件逐项审阅；默认保护数字、日期、链接和代码，可锁定术语。批次恢复点跨重启保留，后续内容变化时阻止整批覆盖。[流程和限制](docs/workspace.zh-CN.md#跨文档修改)。
 - **参考资料与目录问答**：通过 `@文件` 添加上下文，本机检索后选择发送的片段，回答引用核对原文；插入 Markdown 脚注并支持一次撤销。[使用方式与限制](docs/workspace.zh-CN.md)。
 - **版本历史**：跨重启查看本地快照，修改前手动留存，恢复旧版本时也保留当前内容，支持撤销。
 - **即时渲染编辑**：标题、行内格式、列表、任务、表格、链接、脚注和 YAML 前言；代码与公式支持局部编辑，也可切换完整源码。
@@ -59,18 +60,18 @@ Open Typora 是一款开源 Markdown 编辑器，受 Typora 的行内编辑体�
 
 | 平台 | 安装包 | 其他方式 |
 | --- | --- | --- |
-| Windows 10/11 · x64 | **[下载 Setup.exe](https://github.com/AniChikage/open-typora/releases/download/v0.21.1/Open-Typora-0.21.1-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.21.1/Open-Typora-0.21.1-windows-x64.zip) |
-| macOS 14+ · Apple Silicon | **[下载 DMG](https://github.com/AniChikage/open-typora/releases/download/v0.21.1/Open-Typora-0.21.1-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.21.1/Open-Typora-0.21.1-arm64.zip) |
-| Linux · x64 | **[下载 DEB](https://github.com/AniChikage/open-typora/releases/download/v0.21.1/Open-Typora-0.21.1-linux-x64.deb)** | [AppImage](https://github.com/AniChikage/open-typora/releases/download/v0.21.1/Open-Typora-0.21.1-linux-x64.AppImage) |
+| Windows 10/11 · x64 | **[下载 Setup.exe](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/Open-Typora-0.22.0-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/Open-Typora-0.22.0-windows-x64.zip) |
+| macOS 14+ · Apple Silicon | **[下载 DMG](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/Open-Typora-0.22.0-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/Open-Typora-0.22.0-arm64.zip) |
+| Linux · x64 | **[下载 DEB](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/Open-Typora-0.22.0-linux-x64.deb)** | [AppImage](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/Open-Typora-0.22.0-linux-x64.AppImage) |
 
-[SHA-256 校验文件](https://github.com/AniChikage/open-typora/releases/download/v0.21.1/SHA256SUMS.txt) · [所有版本](https://github.com/AniChikage/open-typora/releases)
+[SHA-256 校验文件](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/SHA256SUMS.txt) · [所有版本](https://github.com/AniChikage/open-typora/releases)
 
 ### 安装 Linux 版
 
 以 Ubuntu 22.04 x64 为验收基线，下载 DEB 后运行：
 
 ```sh
-sudo apt install ./Open-Typora-0.21.1-linux-x64.deb
+sudo apt install ./Open-Typora-0.22.0-linux-x64.deb
 ```
 
 安装后可从桌面启动器打开，并关联 Markdown 文件。`sudo apt remove open-typora` 卸载保留文档和恢复数据。
@@ -89,7 +90,7 @@ Windows 版目前**没有代码签名证书**，系统可能显示未知发布�
 
 ### 安装 macOS 版
 
-1. 从 [Releases](https://github.com/AniChikage/open-typora/releases/latest) 下载 **[Open-Typora-0.21.1-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.21.1/Open-Typora-0.21.1-arm64.dmg)**。
+1. 从 [Releases](https://github.com/AniChikage/open-typora/releases/latest) 下载 **[Open-Typora-0.22.0-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/Open-Typora-0.22.0-arm64.dmg)**。
 2. 打开 DMG，把 **Open Typora** 拖入 **Applications（应用程序）**。
 3. 从应用程序中启动 Open Typora。
 
@@ -203,7 +204,7 @@ npm run test:ai-webkit    # 原生 WebKit AI 审阅与历史测试
 - 格式转换可能改变排版或不支持的文档结构；部分 RTF 图片格式会明确拒绝。导入时请保留原文件。
 - Windows/Linux 的旧 DOC/RTF 导入依赖 Pandoc 和 LibreOffice；嵌入的 WMF/EMF 图片需先转换为 PNG/JPEG。
 - 0.20.0 的实体输入法实测覆盖 macOS 搜狗拼音，包括 AI 要求、正文各编辑位置及撤销重做；其他实体输入法与 Windows/Linux 候选窗仍需人工验收。自动化组合输入单独记录，见[版本化验收记录](docs/verification.md)。
-- AI 需要自行配置模型服务，输出需要人工审阅；本版仅处理选区，未提供全文件夹代理、联网浏览或工具调用。Ollama 使用可控服务完成协议测试，真实模型验收使用自定义 API，未运行本地模型权重。
+- AI 需要自行配置模型服务，输出需要人工审阅；本版处理选区和明确选择的最多四篇文档，未提供自主全文件夹代理、联网浏览或工具调用。协议自动化使用可控服务；真实服务按版本记录在[验收说明](docs/verification.md)中，应用不内置本地模型权重。
 - 第三方主题、嵌入媒体、输入法和图床服务存在兼容性差异，具体工作流请先查阅[功能清单](docs/feature-parity.md)。
 
 ## 参与贡献

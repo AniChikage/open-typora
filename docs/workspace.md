@@ -23,7 +23,7 @@ Review the resulting changes before applying them. Applying is a single undo tra
 
 The model must return known source IDs and quotes that occur in the supplied excerpts. Unknown IDs, invented quotes, missing citations, and malformed responses are rejected before insertion. If the model reports insufficient evidence, insertion is disabled. Quote matching checks correspondence with the provided text; it does **not** establish that the answer's reasoning is correct. Review the conclusion yourself.
 
-Retrieval uses lexical terms, including Chinese character pairs. It is not an embedding index, a web search, or an autonomous agent. Questions that use different vocabulary from the files may need more specific keywords. The app does not execute instructions found in source files or automatically edit multiple files.
+Retrieval uses lexical terms, including Chinese character pairs. It is not an embedding index, a web search, or an autonomous agent. Questions that use different vocabulary from the files may need more specific keywords. The app does not execute instructions found in source files. Multi-document edits use the separate reviewed workflow below; folder Q&A never writes multiple files.
 
 ### Retrieval limits
 
@@ -38,6 +38,29 @@ Retrieval uses lexical terms, including Chinese character pairs. It is not an em
 Skipped files and a reached budget are reported in the dialog. Narrow the folder or use open documents when the search is incomplete. These limits apply to reference retrieval, not to opening, editing, or saving large documents. Directory access remains limited to granted files and rejects replaced symlinks. Reading a reference does not open it or add it to the recovery session.
 
 File names and excerpts are sent as context. Host authority metadata, absolute filesystem paths, file tokens, and hashes are not added to the model payload. Text inside the excerpts may itself contain personal information, paths, or secrets: inspect it before sending. Source and model output are treated as text, not commands. Nothing is inserted automatically.
+
+## Edit multiple documents
+
+Choose **Edit → Edit multiple documents…**. This is a bounded review workflow for existing Markdown documents, not an autonomous agent.
+
+1. Select up to **4 documents**, from open tabs or the currently authorized folder, and write an instruction. Folder files open before generation; an open document uses its current unsaved text. Only these explicitly selected texts, display names, your instruction and preservation settings are sent to your configured model. Document IDs and absolute filesystem paths are not added to the request.
+2. Review the returned **edit plan**. Generating it does not edit or save documents. Each proposed replacement must match one unique, non-overlapping passage in a known target; unknown files, ambiguous passages and malformed output stop the workflow.
+3. Open **Review file changes**. Accept or reject a whole file or individual changes. By default, changes to numeric tokens, common date/time forms, link/image destinations and code contents block application. You can also list exact terms to preserve. To change protected content intentionally, explicitly relax its constraint. These are deterministic comparisons, **not fact-checking**: they do not prove semantic accuracy or cover every natural-language date, unit or link syntax.
+4. Click **Apply to … documents**. A complete local recovery record is written before any buffer changes. All selected targets are rechecked for source text, document identity, read-only state, composition, and disk changes. A changed target blocks the whole batch. Approved edits use one isolated undo step per file, including background tabs; the original tab/pane remains selected.
+5. Edits land in **editor buffers** and follow your existing autosave setting. With autosave off, save each document normally. This is not a filesystem-wide atomic save: existing per-file saving and external-change protection still apply.
+
+**Batch recovery** is in the same dialog. Open the original documents, choose a recovery point, inspect its original text and confirm restoration. Every affected document must still match that batch's approved result, including files that were saved and reopened. If one has later changes or a disk conflict, **nothing is restored**. A restore first creates its own recovery point, so it can be reversed the same way. Normal per-document Undo also remains available while its editor stays open. Closing a document and reopening it does not restore in-memory undo history.
+
+Recovery records live in `edit-batches-v1` in the application data folder, with plaintext before/after content, names and local paths; owner-only permissions are used where supported. Integrity checks reject damaged records without rewriting them. Keep the latest **20 completed batches**, including completed restores; pending records are retained separately (at most 20). An interrupted application can leave a pending record even if edits reached buffers. Inspect it before restoring or explicitly removing it; removal only deletes that recovery point. This is bounded local recovery, not a replacement for backups.
+
+Batch restore matches saved documents by their original path and drafts by their original ID. Reopen closed originals first. Moving, renaming, deleting or saving a draft under a new path does not migrate a batch recovery record. The preview shows at most 12,000 characters per original; restoration uses the complete stored text.
+
+### Multi-document limits
+
+- Up to 50,000 UTF-16 units per input document, 120,000 total; the model service may impose a smaller context limit. Ordinary editor file sizes are unaffected.
+- One plan request, with no automatic retry or hidden folder-wide scan. Cancellation ignores late results. No browsing, tool execution, automatic new files or autonomous writes.
+- Up to 200 unique replacement passages across the plan. Output and request limits from the [AI guide](ai.md) also apply.
+- Changes to captured document text during generation require generating a new plan. Paragraph-level conflict merging, source-change impact tracking, semantic retrieval and historical Q&A are future work.
 
 ## Persistent version history
 

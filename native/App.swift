@@ -427,15 +427,15 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
     }
     return value
   }
-  static func openEncoded(_ file: URL, store: DocumentStore) throws -> DocumentRecord {
-    do { return try store.open(file) }
+  static func openEncoded(_ file: URL, store: DocumentStore, authorizedPath: String? = nil) throws -> DocumentRecord {
+    do { return try store.open(file, authorizedPath: authorizedPath) }
     catch let error as NativeFailure where error.code == "INVALID_ENCODING" {
       let alert = NSAlert(); alert.messageText = l("选择文本编码"); alert.informativeText = l("此文件没有可识别的 Unicode 编码。请选择创建文件时使用的编码，打开后可在底部更改。")
       let selector = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 260, height: 26))
       selector.addItems(withTitles: DocumentStore.encodings.map { $0.uppercased() }); selector.selectItem(at: 3)
       alert.accessoryView = selector; alert.addButton(withTitle: l("打开")); alert.addButton(withTitle: l("取消"))
       guard alert.runModal() == .alertFirstButtonReturn else { throw NativeFailure("已取消打开。", "CANCELLED") }
-      return try store.open(file, encoding: DocumentStore.encodings[selector.indexOfSelectedItem])
+      return try store.open(file, encoding: DocumentStore.encodings[selector.indexOfSelectedItem], authorizedPath: authorizedPath)
     }
   }
   func chooseFile(_ saving: Bool, name: String? = nil, folder: Bool = false) -> URL? {
@@ -575,8 +575,8 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
     case "scan": return try store.scan()
     case "openToken":
       let token = try arg(args, 0, String.self)
-      guard let file = store.tokens[token] else { throw NativeFailure("目录已更新，请刷新后重试。") }
-      let record = try Self.openEncoded(file, store: store); try owner.workspace.remember(file, folder: false)
+      let file = try store.authorizedToken(token)
+      let record = try Self.openEncoded(file, store: store, authorizedPath: file.path); try owner.workspace.remember(file, folder: false)
       return try jsonValue(record)
     case "reopen": return try jsonValue(store.reopen(arg(args, 0, String.self)))
     case "readResource":
@@ -642,6 +642,10 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       #endif
       try atomicWrite(destination, Data(html.utf8))
       return destination.path
+    case "editBatches": return try owner.editBatches.list()
+    case "prepareEditBatch": return try owner.editBatches.prepare(arg(args, 0, [String: Any].self), store: store)
+    case "readEditBatch": return try owner.editBatches.read(arg(args, 0, String.self))
+    case "finishEditBatch": try owner.editBatches.finish(arg(args, 0, String.self), applied: arg(args, 1, Bool.self)); return nil
     case "save":
       let id = try arg(args, 0, String.self)
       let text = try arg(args, 1, String.self)
@@ -836,6 +840,7 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
 final class NativeApplication: NSObject, NSApplicationDelegate, NSMenuItemValidation {
   lazy var ai = NativeAIService(ProcessInfo.processInfo.environment["OPEN_TYPORA_AI_SETTINGS_DIR"].map { URL(fileURLWithPath: $0) } ?? directory)
   lazy var workspace = Workspace(directory)
+  lazy var editBatches = EditBatchStore(directory)
   var uiLocale = "zh-CN"
   var fileOperationRunning = false
   var recentClosedFiles: [(url: URL, group: String?)] = []
