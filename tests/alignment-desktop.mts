@@ -29,6 +29,17 @@ try {
   await page.getByRole("button", { name: "对齐验收.md", exact: true }).click(); await richMode();
   await page.keyboard.press("ControlOrMeta+f"); await page.getByLabel("查找内容", { exact: true }).fill("a(\\d+)"); await page.getByRole("button", { name: "正则表达式", exact: true }).click(); await page.getByLabel("替换内容", { exact: true }).fill("N$1"); await page.getByRole("button", { name: "全部替换", exact: true }).click(); await expect(page.getByRole("status").filter({ hasText: "已替换 2 处" })).toBeVisible(); await page.getByRole("button", { name: "关闭查找" }).click(); assert.ok((await source()).includes("N12 N34")); await richMode(); await rich.press("ControlOrMeta+z"); assert.ok((await source()).includes("A12 a34")); await richMode();
   passed.push("rich regex capture replacement is case insensitive and one-step undo restores exact text");
+  for (const [query, replacement] of [["a(\\d+)", "$<digits>"], ["a(?<digits>\\d+)", "N$<digits>"], ["a(?<digits>\\d+)", "$<missing>-$<digits>"]]) {
+    await page.keyboard.press("ControlOrMeta+f"); await page.getByLabel("查找内容", { exact: true }).fill(query);
+    const regex = page.getByRole("button", { name: "正则表达式", exact: true }); if (await regex.getAttribute("aria-pressed") !== "true") await regex.click();
+    await page.getByLabel("替换内容", { exact: true }).fill(replacement); await page.getByRole("button", { name: "全部替换", exact: true }).click(); await page.getByRole("button", { name: "关闭查找" }).click();
+    const expected = content.replace(new RegExp(query, "gmiu"), replacement);
+    assert.equal(await source(), expected); await richMode(); await rich.press("ControlOrMeta+z"); assert.equal(await source(), content);
+    await richMode(); await rich.press("ControlOrMeta+Shift+z"); assert.equal(await source(), expected);
+    await richMode(); await rich.press("ControlOrMeta+z"); assert.equal(await source(), content); await richMode();
+  }
+  passed.push("named regex replacements preserve literal references without named groups and restore exact Markdown through one-step undo/redo");
+
   await rich.locator("table td").first().click();
   await rich.locator("table td").first().evaluate(element => { const transfer = new DataTransfer(); transfer.setData("text/plain", "1\t2\t3\nx|y\tz\t4"); element.dispatchEvent(new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData: transfer })); });
   await expect(rich.locator("table th")).toHaveCount(3); await expect(rich.locator("table tr")).toHaveCount(3); assert.ok((await source()).includes("x\\|y")); await richMode(); await rich.press("ControlOrMeta+z");

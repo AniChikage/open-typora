@@ -36,6 +36,7 @@
     "test:indentation": "node tests/indentation-desktop.mts",
     "test:next": "node tests/next-desktop.mts",
     "test:preview": "node tests/preview-desktop.mts",
+    "test:demo": "node tests/demo-browser.mts",
     "test:huge": "node tests/huge-blocks-desktop.mts",
     "test:menus": "node tests/context-menu-desktop.mts",
     "test:spreadsheet": "node tests/spreadsheet-desktop.mts",

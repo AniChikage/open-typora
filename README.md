@@ -194,10 +194,12 @@ More editor and desktop suites, test isolation, and build details are in [CONTRI
 | [Performance](docs/performance.md) | Large documents, code blocks, tables and measured limits |
 | [Printing](docs/printing.md) · [Windows preview](docs/windows-preview.md) · [Linux AppImage](docs/linux-appimage.md) | Pagination, Everything/File Explorer and FUSE setup |
 | [Feature checklist](docs/feature-parity.md) · [Verification record](docs/verification.md) | Implemented workflows, issue regressions and version-specific test coverage |
+| [Functional test plan](docs/test-plan.md) | 152 test cases, 128 menu commands, execution results and manual/platform gaps |
 | [Architecture](docs/architecture.md) · [Contributing](CONTRIBUTING.md) | Editing model, native hosts, development and release checks |
 
 ## Current limitations
 
+- In 0.22.0, a rich-text regex replacement containing `$<name>` without named capture groups can drop that literal. The source fix is not yet released; see the [audit findings](docs/test-plan.md#本轮发现与处理).
 - Markdown open/save/recovery has no fixed 20 MiB cap. Large documents use viewport rendering, large code blocks use an inner CodeMirror viewport, and large tables mount visible rows. Available memory, initial parsing and runtime string limits still apply; [tested sizes and remaining limits](docs/performance.md). Converted imports and media keep separate resource budgets.
 - Legacy encodings without a BOM require an explicit encoding choice.
 - Rich editing and source editing have separate undo histories; changes made in source mode join the rich history as one transaction when returning.

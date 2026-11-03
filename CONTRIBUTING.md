@@ -46,6 +46,8 @@ npm test
 npm run build
 ```
 
+The [functional test checklist](docs/test-plan.md) lists 152 cases, all 128 shared menu commands, execution tiers, platform/manual gaps, and the latest audit findings. A suite passing covers its recorded fixtures, not every row/platform combination.
+
 Additional suites:
 
 | Command | Coverage | Environment |
@@ -66,8 +68,9 @@ Additional suites:
 | `npm run test:ai` | Model settings, scoped requests, diff review, history, stale results, cancellation, IME guards, read-only and splits | Electron desktop; local HTTP fixtures, no API key |
 | `npm run test:ai-native` | URLSession transport, file permissions, restart/session credentials, legacy migration, protocol errors and limits | macOS; local HTTP fixtures, no API key |
 | `npm run test:ai-webkit` | Native bridge, review/apply and history in WKWebView | macOS; local HTTP fixtures, no API key |
+| `npm run test:demo` | Standalone web demo import limits, actual download, edit history, confirmation branches and compact layout | Run `npm run build:demo` first; Playwright Chromium, or `OPEN_TYPORA_BROWSER_EXECUTABLE` pointing to installed Chrome/Chromium |
 
-Automated desktop suites use isolated temporary application data. To keep screenshots and reports outside the checkout, set `OPEN_TYPORA_QA_DIR` to an absolute output directory. Synthetic composition tests do not replace manual input-method checks.
+Automated desktop suites use isolated temporary application data. To keep screenshots and reports outside the checkout, set `OPEN_TYPORA_QA_DIR` to an absolute output directory. Synthetic composition tests do not replace manual input-method checks. Native UI suites use visible isolated windows by default so WebKit timers and the native responder chain participate normally. Set `OPEN_TYPORA_TEST_HIDDEN=1` only for explicit hidden-window diagnostics; record that condition separately from release acceptance.
 
 For AI changes, keep deterministic acceptance on the owned HTTP fixtures. Never require contributors to supply a paid key or send their documents to a provider. Check the request payload, unchanged source during generation, partial acceptance, one-step undo/redo, stale/cancelled responses, read-only guards, split targets and composition. Record any real-provider or physical-IME check separately, with its app version and environment; see the [AI guide](docs/ai.md) and [versioned verification](docs/verification.md).
 

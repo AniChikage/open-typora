@@ -194,10 +194,12 @@ npm run test:ai-webkit    # 原生 WebKit AI 审阅与历史测试
 | [编辑性能](docs/performance.md) | 大文件、代码块、表格和实测边界 |
 | [打印分页](docs/printing.md) · [Windows 预览](docs/windows-preview.md) · [Linux AppImage](docs/linux-appimage.md) | 分页、Everything／资源管理器及 FUSE 配置 |
 | [功能清单](docs/feature-parity.md) · [验收记录](docs/verification.md) | 已实现流程、问题回归和各版本测试范围 |
+| [完整测试清单](docs/test-plan.md) | 152 条用例、128 项菜单命令、执行结果与人工／平台缺口 |
 | [编辑架构](docs/architecture.md) · [贡献指南](CONTRIBUTING.md) | 编辑模型、原生宿主、开发和发布检查 |
 
 ## 当前限制
 
+- 0.22.0 的正文正则替换在没有命名捕获组时，可能吞掉替换文字中的 `$<name>` 字面量；源码修复尚未发布，见[审计发现](docs/test-plan.md#本轮发现与处理)。
 - Markdown 打开、保存和恢复已无固定 20 MiB 限制；大文档按视口渲染，大代码块和表格也采用局部视口。可用内存、初始解析和运行时字符串上限仍然适用，见[性能说明](docs/performance.md)。复杂转换和媒体另有资源预算。
 - 没有 BOM 的传统编码需要手动选择。
 - 正文和源码具有独立撤销历史；返回正文时，源码修改合并为一次事务。

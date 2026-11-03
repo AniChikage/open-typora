@@ -15,6 +15,20 @@ test("regex find/replace handles captures, unicode words, zero-width, and exact 
   assert.equal(replaceTextMatches("ab", textMatches("ab", "(?=.)", "-", options)), "-a-b");
   assert.throws(() => textMatches(text, "[", "", options), SyntaxError);
 });
+test("regex replacements preserve literal named references without named captures", () => {
+  const samples = [
+    { text: "alpha alpha", query: "alpha", replacement: "$<name>" },
+    { text: "alpha alpha", query: "(alpha)", replacement: "$<name>/$1/$$" },
+    { text: "alpha alpha", query: "(?<name>alpha)", replacement: "$<name>/$<missing>" },
+    { text: "b ab", query: "(?<name>a)?b", replacement: "[$<name>]" },
+    { text: "A12 a34", query: "a(\\d+)", replacement: "$10:$1:$&:$$" },
+    { text: "中文😀", query: "(?=.)", replacement: "$<name>" },
+  ];
+  for (const { text, query, replacement } of samples) {
+    const expected = text.replace(new RegExp(query, "gmiu"), replacement);
+    assert.equal(replaceTextMatches(text, textMatches(text, query, replacement, options)), expected, query);
+  }
+});
 test("workspace rename/move/undo preserves a dirty BOM draft and refuses overwrite/traversal", async () => {
   const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), "open-typora-workspace-"))), file = path.join(directory, "original.md");
   await writeFile(file, "\uFEFF# original\r\n"); await mkdir(path.join(directory, "child"));
