@@ -21,6 +21,6 @@ SHA-256 checksums are included. macOS is locally signed, not notarized; Windows 
 
 ## Scope
 
-A plan accepts up to 50,000 UTF-16 units per document and 120,000 in total. Model-service limits may be smaller. Restore requires original paths or draft IDs and unchanged approved results; renamed/moved files must be handled separately. See the [workflow and privacy guide](workspace.md#edit-multiple-documents).
+A plan accepts up to 50,000 UTF-16 units per document and 120,000 in total. Model-service limits may be smaller. Restore requires original paths or draft IDs and unchanged approved results; renamed/moved files must be handled separately. See the [workflow and privacy guide](https://github.com/AniChikage/open-typora/blob/v0.22.0/docs/workspace.md#edit-multiple-documents).
 
 Semantic retrieval, autonomous tool execution, paragraph conflict merging, source-change impact tracking and historical Q&A are not included. Existing plugin compatibility boundaries remain unchanged.

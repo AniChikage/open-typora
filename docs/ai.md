@@ -54,7 +54,7 @@ The browser demo does not accept model keys or call model services. Existing doc
 
 ## Limits and errors
 
-One request accepts up to **200,000 UTF-16 code units** of selected text and **8,000** of instructions; the provider may have a smaller token/context limit. Returned text has the same 200,000-unit limit, with a 2 MiB HTTP response cap and a 180-second timeout. Four requests may run concurrently per application service. There is no automatic retry loop.
+The selection and multi-document instruction fields accept up to **6,000 UTF-16 code units**. The host request accepts up to **200,000** units of selected text and **8,000** units of instructions, including preservation instructions added by the app; the provider may have a smaller token/context limit. Returned text has the same 200,000-unit limit, with a 2 MiB HTTP response cap and a 180-second timeout. Four requests may run concurrently per application service. There is no automatic retry loop.
 
 Truncated responses and empty results cannot be applied. Authentication, endpoint and rate-limit failures leave the document unchanged; provider error bodies are not echoed into the editor. A failed connection test saves the valid configuration but reports the request failure so it can be corrected.
 
@@ -80,4 +80,4 @@ The [0.20.0 verification record](verification.md) separately records a real cust
 
 ## Local knowledge and recovery
 
-Version 0.21.0 adds opt-in reference files, folder Q&A with checked quotes, and persistent version snapshots around approved AI edits. The [workspace guide](workspace.md) explains the local retrieval step, exactly what is sent, citation limitations, and bounded history retention. Interface language is available in Preferences; documents are never translated by switching it.
+Version 0.21.0 adds opt-in reference files, folder Q&A with checked quotes, and persistent version snapshots around approved AI selection edits. Version 0.22.0 adds reviewed multi-document changes with separate batch recovery records. The [workspace guide](workspace.md) explains the local retrieval step, exactly what is sent, citation limitations, and bounded history retention. Interface language is available in Preferences; documents are never translated by switching it.

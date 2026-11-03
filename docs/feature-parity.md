@@ -1,6 +1,6 @@
 # Typora 功能对齐清单
 
-当前候选版本：**0.22.0，macOS arm64 / Windows x64 / Linux x64**。基准为本机 Typora 1.14.10 的菜单、实际交互和官方公开文档。功能存在、自动化通过与完整等价是不同结论；未验证的组合不写成已对齐。当前发布及 GitHub 问题回归范围见[版本化验收记录](verification.md)。
+当前已发布版本：**0.22.0，macOS arm64 / Windows x64 / Linux x64**。基准为本机 Typora 1.14.10 的菜单、实际交互和官方公开文档。功能存在、自动化通过与完整等价是不同结论；未验证的组合不写成已对齐。当前发布及 GitHub 问题回归范围见[版本化验收记录](verification.md)。
 
 公开依据：[Markdown](https://support.typora.io/Markdown-Reference/)、[文件管理](https://support.typora.io/File-Management/)、[图片](https://support.typora.io/Images/)、[导出](https://support.typora.io/Export/)、[HTML](https://support.typora.io/HTML/)、[快捷键](https://support.typora.io/Shortcut-Keys/)。REA 的静态证据及覆盖边界见 [research.md](research.md)。
 

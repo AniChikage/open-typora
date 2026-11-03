@@ -1,4 +1,4 @@
-# References, folder Q&A, and version history
+# References, folder Q&A, multi-document editing, and version history
 
 English · [简体中文](workspace.zh-CN.md)
 
@@ -66,7 +66,7 @@ Batch restore matches saved documents by their original path and drafts by their
 
 Choose **File → Version history…** to browse local snapshots. Save a manual snapshot before an experiment, inspect an earlier version, or restore it. Before a restore, the current content is captured too; one undo returns to that content. Viewing a version never writes the document.
 
-Snapshots are captured when opening and saving, after eight seconds of idle unsaved editing, around approved AI edits, and around version restores. Consecutive save/automatic snapshots within 30 seconds are coalesced when an older baseline exists; identical latest content does not create another entry. App-managed Save As and rename/move operations carry history forward. Renaming a file outside the app does not migrate its history automatically.
+Snapshots are captured when opening and saving, after eight seconds of idle unsaved editing, around approved AI selection edits, and around version restores. Multi-document edits use the separate batch recovery records described above. Consecutive save/automatic snapshots within 30 seconds are coalesced when an older baseline exists; identical latest content does not create another entry. App-managed Save As and rename/move operations carry history forward. Renaming a file outside the app does not migrate its history automatically.
 
 History lives under `versions-v1` in the application's data directory, independently of session recovery and in-memory undo. Each document retains up to **50 versions / 128 MiB** of unique text; all history shares a **512 MiB** budget. Oldest versions are pruned when necessary. The preview shows the first 24,000 characters; a restore uses the full stored version. A document exceeding the history budget remains editable and saveable, but cannot get a snapshot at that size.
 
