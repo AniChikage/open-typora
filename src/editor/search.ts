@@ -11,7 +11,7 @@ export function textMatches(text: string, query: string, replacement: string, op
       if (group === "&") return match[0];
       if (group === "`") return text.slice(0, match.index);
       if (group === "'") return text.slice(match.index + match[0].length);
-      if (named) return match.groups?.[named] ?? "";
+      if (named) return match.groups ? match.groups[named] ?? "" : raw;
       const index = Number(group); if (index > 0 && index < match.length) return match[index] || "";
       if (group.length === 2 && Number(group[0]) > 0 && Number(group[0]) < match.length) return (match[Number(group[0])] || "") + group[1];
       return raw;

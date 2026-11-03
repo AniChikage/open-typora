@@ -79,6 +79,24 @@ try {
   const originalResponse = await desktop.restore();
   if (!originalResponse.ok) throw new Error(originalResponse.error);
   const original = originalResponse.value!.documents[0].content;
+  for (const [query, replacement] of [["普(通)", "$<word>"], ["普(?<word>通)", "字$<word>"], ["普(?<word>通)", "$<missing>-$<word>"]]) {
+    window.__openTypora.command({ action: "find" }); await wait(() => document.querySelector(".rich-search"));
+    const field = (label: string, value: string) => {
+      const element = document.querySelector<HTMLInputElement>('.rich-search [aria-label="' + label + '"]')!;
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(element, value); element.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+    field("查找内容", query); field("替换内容", replacement);
+    const regex = document.querySelector<HTMLButtonElement>('.rich-search [aria-label="正则表达式"]')!; if (regex.getAttribute("aria-pressed") !== "true") regex.click();
+    await new Promise(resolve => setTimeout(resolve, 40));
+    [...document.querySelectorAll<HTMLButtonElement>(".rich-search button")].find(button => button.textContent === "全部替换")!.click();
+    document.querySelector<HTMLButtonElement>('.rich-search [aria-label="关闭查找"]')!.click();
+    const expected = original.replace(new RegExp(query, "gmiu"), replacement);
+    await sourceMode(true); check(readSource() === expected, "native named/literal regex replacement keeps exact Markdown");
+    await sourceMode(false); window.__openTypora.command({ action: "undo" }); await sourceMode(true); check(readSource() === original, "native regex replacement undoes once to exact source");
+    await sourceMode(false); window.__openTypora.command({ action: "redo" }); await sourceMode(true); check(readSource() === expected, "native regex replacement redoes once to exact source");
+    await sourceMode(false); window.__openTypora.command({ action: "undo" }); await sourceMode(true); check(readSource() === original, "native regex fixture restored for subsequent checks"); await sourceMode(false);
+  }
+
   const openPreferences = async () => { window.__openTypora.command({action:"preferences"}); await wait(() => document.querySelector<HTMLElement>('[aria-label="关闭偏好设置"]')!); };
   const preferenceButton = (text: string) => [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(button => button.textContent === text)!;
   await openPreferences(); preferenceButton('选择图片…').click();
