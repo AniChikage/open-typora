@@ -40,7 +40,11 @@ try {
   assert.equal(identity.originalDirectory,'Open Typora','The retained legacy data-directory name matches Electron itself');
   const ciphertext=(await readFile(cipherFile)).toString('base64');
   app=await electron.launch({args:[process.cwd(),'--password-store=gnome-libsecret'],env,timeout:30000});
+  app.process().stderr?.on('data',chunk=>process.stderr.write(chunk));
   const page=await app.firstWindow();await expect(page.locator('.rich-document').first()).toBeVisible({timeout:20000});
+  const provider=await app.evaluate(({app,safeStorage})=>({name:app.getName(),ready:app.isReady(),backend:safeStorage.getSelectedStorageBackend(),available:safeStorage.isEncryptionAvailable(),passwordStore:app.commandLine.getSwitchValue('password-store')}));
+  console.log('Owned keyring provider state: '+JSON.stringify(provider));
+  assert.equal(provider.backend,'gnome_libsecret');assert.equal(provider.available,true);
   const actual=await app.evaluate(({app,safeStorage},ciphertext)=>({name:app.getName(),backend:safeStorage.getSelectedStorageBackend(),available:safeStorage.isEncryptionAvailable(),text:safeStorage.decryptString(Buffer.from(ciphertext,'base64'))}),ciphertext);
   assert.equal(actual.name,'Open Markdown Lane');
   assert.equal(actual.backend,'gnome_libsecret');assert.equal(actual.available,true);assert.equal(actual.text,secret);
