@@ -7,7 +7,7 @@ import { DocumentStore } from '../build/runtime/electron/store.mjs';
 const root=await mkdtemp(path.join(os.tmpdir(),'markdown-lane-upgrade-'));
 const profile=path.join(root,'profile'), file=path.join(root,'文档.md');
 await mkdir(profile); await writeFile(file,'磁盘原文');
-const env: NodeJS.ProcessEnv={...process.env,OPEN_TYPORA_DATA_DIR:profile};
+const env: Record<string,string>={...process.env,OPEN_TYPORA_DATA_DIR:profile};
 delete env.OPEN_MARKDOWN_LANE_DATA_DIR; delete env.ELECTRON_RUN_AS_NODE;
 let app: import('playwright').ElectronApplication | undefined;
 const errors: string[]=[];
