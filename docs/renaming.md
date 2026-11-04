@@ -33,12 +33,15 @@ with Typora; please support the [official product](https://typora.io/) if you ca
 
 ## Published links and third-party compatibility
 
-The 0.22.0 release assets retain their original names and checksums. The existing
-web-demo hostname is also retained until its hosting address is migrated. Do not
-rewrite historical links to filenames or hosts that have not been published.
+Release 0.23.0 ships renamed macOS, Windows and Linux installers. The public
+web demo uses https://open-markdown-lane.comicyueyu.chatgpt.site. Previous
+release binaries are retired; source tags and historical verification remain.
+Upgrade acceptance downloads the current public release and verifies its checksums,
+so future builds do not depend on retired release assets.
 
 Historical verification records, third-party plugin provenance, upstream licenses,
 Typora theme selectors and supported `typora-*` Markdown metadata retain their
 original names. Renaming those would falsify history or break interoperability.
 
-The rename itself does not publish a new release or replace an installed app.
+Install the current release to update an existing application. Keep the original
+documents and application-data directory in place.

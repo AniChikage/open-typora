@@ -1,26 +1,24 @@
-Open Typora 0.22.0 adds reviewed edits across selected Markdown documents, persistent batch recovery, and preservation constraints for AI editing.
+Open Markdown Lane 0.23.0 is the first desktop release under the new project name.
 
 This is an independent, unofficial project, unaffiliated with Typora. If you can afford it, please [buy Typora](https://store.typora.io/) and support its official developers.
 
 ## Downloads
 
-- macOS 14+, Apple Silicon: `Open-Typora-0.22.0-arm64.dmg` or ZIP.
-- Windows 10/11 x64: `Open-Typora-0.22.0-windows-x64-Setup.exe` or ZIP.
-- Linux x64: `Open-Typora-0.22.0-linux-x64.deb` or AppImage.
+- macOS 14+, Apple Silicon: `Open-Markdown-Lane-0.23.0-arm64.dmg` or ZIP.
+- Windows 10/11 x64: `Open-Markdown-Lane-0.23.0-windows-x64-Setup.exe` or ZIP.
+- Linux x64: `Open-Markdown-Lane-0.23.0-linux-x64.deb` or AppImage.
 
-SHA-256 checksums are included. macOS is locally signed, not notarized; Windows is unsigned. Updates preserve documents, preferences, model settings, and recovery data.
+Verify downloads with `SHA256SUMS.txt`. macOS is locally signed, not notarized; Windows is unsigned.
 
 ## Changes
 
-- **Edit multiple documents:** choose up to four open or authorized-folder documents, generate a plan, review file-by-file and change-by-change, then explicitly apply. Unknown files, ambiguous passages, overlapping edits and malformed model plans are rejected. Generation does not change files; only the selected document texts are sent.
-- **Preservation constraints:** protect numbers/common date and time forms, link/image destinations and code by default; optionally lock exact terms. Unexpected changes block application until rejected or explicitly allowed. Checks compare extracted values and counts; they do not verify factual correctness or all syntax variants.
-- **Batch recovery:** save complete before/after text locally before applying. Keep the latest 20 completed batches and separate pending records. Recovery survives restart, checks every target for later edits or disk conflicts, and retains a recovery point before restoration too. Each affected editor also has a separate undo step.
-- Preserve the current tab and split layout, background-tab history, unsaved text and existing autosave behavior. Edits update buffers; ordinary per-file saving still applies. This does not provide a filesystem-wide atomic save or an autonomous writing agent.
-- Fix a false conflict after a save reaches disk before its session checkpoint: recovery accepts it only when disk text exactly matches the recovered buffer. Genuine conflicts still retain the draft.
-- Revalidate scanned folder entries before opening them; reject entries replaced by symlinks rather than opening a file outside the granted folder.
+- Rename application menus, dialogs, exports, installers, documentation and the browser demo to **Open Markdown Lane**. Repository: https://github.com/AniChikage/open-markdown-lane.
+- Preserve existing documents, drafts, tabs, split views, version history, themes, plugins and model configuration. Existing application-data folders and internal compatibility identifiers remain stable. Linux retains the original encryption namespace so saved model credentials remain decryptable.
+- Migrate browser preference keys before rendering, with the existing new keys taking precedence and fallback reads if storage is full.
+- Replace the previous macOS application only after verifying the new bundle; installation failure restores the previous bundle. Windows removes the old executable; the Linux package replaces the previous package.
+- Fix rich-text regex replacement dropping a literal `$<name>` when the expression has no named capture groups.
+- Upgrade acceptance now verifies the current public installer's checksum rather than depending on retired release downloads.
 
 ## Scope
 
-A plan accepts up to 50,000 UTF-16 units per document and 120,000 in total. Model-service limits may be smaller. Restore requires original paths or draft IDs and unchanged approved results; renamed/moved files must be handled separately. See the [workflow and privacy guide](https://github.com/AniChikage/open-typora/blob/v0.22.0/docs/workspace.md#edit-multiple-documents).
-
-Semantic retrieval, autonomous tool execution, paragraph conflict merging, source-change impact tracking and historical Q&A are not included. Existing plugin compatibility boundaries remain unchanged.
+This release preserves the existing editing, AI review, multi-document changes and recovery workflows. It does not add new model services or expand third-party plugin compatibility. See the [upgrade guide](https://github.com/AniChikage/open-markdown-lane/blob/v0.23.0/docs/renaming.md) and [verification record](https://github.com/AniChikage/open-markdown-lane/blob/v0.23.0/docs/verification.md) for platform-specific coverage and manual input-method limits.

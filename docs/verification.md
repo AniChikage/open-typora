@@ -1,4 +1,14 @@
-# 0.22.0 全功能审计与源码修复（尚未发布）
+# 0.23.0 更名与本机升级验收
+
+2026-11-04，产品、仓库、安装包、菜单、导出与网页试玩统一为 **Open Markdown Lane**。三平台安装包采用 `Open-Markdown-Lane-0.23.0-*`；[网页试玩](https://open-markdown-lane.comicyueyu.chatgpt.site) 已迁移到新网址。内部数据目录、WebKit origin、应用 ID 和 Linux 密钥加密命名空间为升级兼容保留。
+
+- 严格 TypeScript 检查、241 项单元测试通过；浏览器试玩 9 项检查通过。
+- macOS 0.23.0 DMG 构建与镜像校验通过；正常退出旧版后使用事务安装脚本替换，实际关于窗口显示新名称与 0.23.0。
+- 替换前后数据指纹完全相同。实际启动后，23 份会话、33 条文档记录、22 个外部路径状态与文件哈希、83 个托管文件、原生偏好和模型配置保持一致，密钥文件权限为 0600。10 项浏览器偏好原样复制到新前缀，两份未保存草稿与活动标签恢复。
+- 真实系统候选窗和外部模型服务未在本轮重新人工验收；本轮不扩展既有输入法与插件兼容性结论。此前隔离自动化的组合输入、精确撤销和模型协议回归与实体输入法记录分别保留。
+- 升级测试改为下载当前公开正式版并核对其 SHA-256，避免清理旧发布包后破坏后续 CI。旧 Release 二进制退休不删除 Git 源码标签与历史验收记录。
+
+# 0.22.0 全功能审计与源码修复（修复随 0.23.0 发布）
 
 2026-11-03，在 `ea04d3b` 基线上盘点全部现有功能、共享菜单及四条用户 Issue，形成[完整测试清单](test-plan.md)：**24 个模块、152 条用例、128 个菜单命令**。用例设计、自动化套件、人工验收和发布平台记录分别标明，登记不等于每种组合都已通过。
 
@@ -19,7 +29,7 @@
 
 # 0.22.0 跨文档 AI 审阅与恢复验收
 
-2026-11-03，跨文档计划／审阅、确定性改写约束与持久批次恢复已[发布为 0.22.0](https://github.com/AniChikage/open-typora/releases/tag/v0.22.0)，标签对应 `a013b6e`，代码经 [PR #9](https://github.com/AniChikage/open-typora/pull/9) 合并。[正式发布流程 #144](https://github.com/AniChikage/open-typora/actions/runs/41639901120)的 macOS、Windows、Linux、Windows 预览、真实 FUSE 和发布六项任务全部通过。以下分别记录受控模型夹具与真实服务的验收范围。
+2026-11-03，跨文档计划／审阅、确定性改写约束与持久批次恢复已[发布为 0.22.0](https://github.com/AniChikage/open-markdown-lane/releases/tag/v0.22.0)，标签对应 `a013b6e`，代码经 [PR #9](https://github.com/AniChikage/open-markdown-lane/pull/9) 合并。[正式发布流程 #144](https://github.com/AniChikage/open-markdown-lane/actions/runs/41639901120)的 macOS、Windows、Linux、Windows 预览、真实 FUSE 和发布六项任务全部通过。以下分别记录受控模型夹具与真实服务的验收范围。
 
 | 检查 | 结果与范围 |
 | --- | --- |
@@ -43,7 +53,7 @@ Browser plugin not available；自动化使用项目 Playwright／Electron 流�
 
 # 0.21.1 大型本地插件加载修复验收
 
-2026-11-01，针对 [#7](https://github.com/AniChikage/open-typora/issues/7) 的补丁已[发布为 0.21.1](https://github.com/AniChikage/open-typora/releases/tag/v0.21.1)，标签对应 `ea336b4`，代码已通过 [PR #8](https://github.com/AniChikage/open-typora/pull/8) 合并。第一轮五项平台验收全部通过；[正式发布流程](https://github.com/AniChikage/open-typora/actions/runs/41283506290)再次通过 macOS、Windows、Linux、Windows 预览、真实 FUSE 和发布六项任务。已[回复提交者](https://github.com/AniChikage/open-typora/issues/7#issuecomment-6554974024)更新地址，问题保留供其复测。
+2026-11-01，针对 [#7](https://github.com/AniChikage/open-markdown-lane/issues/7) 的补丁已[发布为 0.21.1](https://github.com/AniChikage/open-markdown-lane/releases/tag/v0.21.1)，标签对应 `ea336b4`，代码已通过 [PR #8](https://github.com/AniChikage/open-markdown-lane/pull/8) 合并。第一轮五项平台验收全部通过；[正式发布流程](https://github.com/AniChikage/open-markdown-lane/actions/runs/41283506290)再次通过 macOS、Windows、Linux、Windows 预览、真实 FUSE 和发布六项任务。已[回复提交者](https://github.com/AniChikage/open-markdown-lane/issues/7#issuecomment-6554974024)更新地址，问题保留供其复测。
 
 | 检查 | 结果与范围 |
 | --- | --- |
@@ -64,7 +74,7 @@ Browser plugin not available；自动化使用项目 Playwright／Electron 流�
 
 # 0.21.0 参考资料、目录问答与持久版本验收
 
-2026-10-30，0.21.0 已[发布](https://github.com/AniChikage/open-typora/releases/tag/v0.21.0)并更新本机安装。标签 `v0.21.0` 对应 `0dc5181`；[正式发布流程](https://github.com/AniChikage/open-typora/actions/runs/41075134229)的 macOS、Windows、Linux、Windows 预览、真实 FUSE 和发布六项任务全部通过。代码已通过 PR #6 合并到 main。
+2026-10-30，0.21.0 已[发布](https://github.com/AniChikage/open-markdown-lane/releases/tag/v0.21.0)并更新本机安装。标签 `v0.21.0` 对应 `0dc5181`；[正式发布流程](https://github.com/AniChikage/open-markdown-lane/actions/runs/41075134229)的 macOS、Windows、Linux、Windows 预览、真实 FUSE 和发布六项任务全部通过。代码已通过 PR #6 合并到 main。
 
 | 检查 | 结果与范围 |
 | --- | --- |
@@ -85,7 +95,7 @@ Browser plugin not available；自动化使用项目 Playwright／Electron 流�
 
 # 0.20.2 macOS 配置文件密钥与更新验收
 
-2026-10-28，0.20.2 已[发布](https://github.com/AniChikage/open-typora/releases/tag/v0.20.2)并更新本机安装。正式标签对应 `27d896e`；[正式发布流程](https://github.com/AniChikage/open-typora/actions/runs/40662418403)的 macOS、Windows、Linux、Windows 预览、真实 FUSE 及发布六项任务全部通过。六个公开二进制下载均核对 SHA-256；公开 macOS DMG／ZIP 与本机安装使用的 CI 文件逐字节一致。
+2026-10-28，0.20.2 已[发布](https://github.com/AniChikage/open-markdown-lane/releases/tag/v0.20.2)并更新本机安装。正式标签对应 `27d896e`；[正式发布流程](https://github.com/AniChikage/open-markdown-lane/actions/runs/40662418403)的 macOS、Windows、Linux、Windows 预览、真实 FUSE 及发布六项任务全部通过。六个公开二进制下载均核对 SHA-256；公开 macOS DMG／ZIP 与本机安装使用的 CI 文件逐字节一致。
 
 | 检查 | 结果与范围 |
 | --- | --- |
@@ -104,7 +114,7 @@ macOS 的正常设置、改写和重启只读本机文件；旧式钥匙串仅�
 
 # 0.20.1 AI 连续改写与更新验收
 
-2026-10-28，0.20.1 已[发布](https://github.com/AniChikage/open-typora/releases/tag/v0.20.1)并替换本机 0.20.0。代码标签 v0.20.1 对应 `0af679e`；[正式发布流程](https://github.com/AniChikage/open-typora/actions/runs/40646981743)的 macOS、Windows、Linux、Windows 预览、真实 FUSE 及发布六项任务全部通过。六个公开二进制下载均逐个核对 SHA-256，校验文件与发布资源信息一致。
+2026-10-28，0.20.1 已[发布](https://github.com/AniChikage/open-markdown-lane/releases/tag/v0.20.1)并替换本机 0.20.0。代码标签 v0.20.1 对应 `0af679e`；[正式发布流程](https://github.com/AniChikage/open-markdown-lane/actions/runs/40646981743)的 macOS、Windows、Linux、Windows 预览、真实 FUSE 及发布六项任务全部通过。六个公开二进制下载均逐个核对 SHA-256，校验文件与发布资源信息一致。
 
 | 检查 | 结果与范围 |
 | --- | --- |
@@ -123,7 +133,7 @@ macOS 的正常设置、改写和重启只读本机文件；旧式钥匙串仅�
 
 # 0.20.0 AI 编辑与安装验收
 
-2026-10-28，0.20.0 已发布并覆盖本机 0.19.0 安装。对应代码为标签 v0.20.0（23ef7be），[正式发布构建](https://github.com/AniChikage/open-typora/actions/runs/40636548271) 的 macOS、Windows、Linux、Windows 预览、真实 FUSE 和发布任务全部通过。七个公开下载文件均完成 SHA-256 校验。
+2026-10-28，0.20.0 已发布并覆盖本机 0.19.0 安装。对应代码为标签 v0.20.0（23ef7be），[正式发布构建](https://github.com/AniChikage/open-markdown-lane/actions/runs/40636548271) 的 macOS、Windows、Linux、Windows 预览、真实 FUSE 和发布任务全部通过。七个公开下载文件均完成 SHA-256 校验。
 
 | 检查 | 结果与范围 |
 | --- | --- |
@@ -138,9 +148,9 @@ macOS 的正常设置、改写和重启只读本机文件；旧式钥匙串仅�
 
 | 问题 | 0.20.0 回归内容 | 实测边界 |
 | --- | --- | --- |
-| [#1 Linux 安装与缩进](https://github.com/AniChikage/open-typora/issues/1) | DEB 无空格安装路径、文件关联、带中文／空格路径，以及列表、源码、局部代码缩进和撤销 | 本轮安装验收基线为 Ubuntu 22.04，真实 FUSE 为 Ubuntu 22.04／24.04；完整 Kubuntu 26.04 桌面记录仍对应下方的 0.13.4，未在 0.20.0 重跑 |
-| [#3 标签、正文与表格右键](https://github.com/AniChikage/open-typora/issues/3) | 8 组右键检查覆盖标签批量关闭、正文编辑、表格行列及分屏目标保护 | 原生 WebKit 与 Chromium／安装载荷回归；未穷尽所有跨应用剪贴板和实体输入法组合 |
-| [#5 Excel/WPS 表格粘贴](https://github.com/AniChikage/open-typora/issues/5) | 7 组剪贴板检查覆盖 HTML／TSV／图片候选、正文／源码、表格与保存、撤销 | 本轮使用自有剪贴板样本；Excel 和 WPS 应用内复制实测对应 0.19.0，不据此宣称各 Office 版本均重新人工验收 |
+| [#1 Linux 安装与缩进](https://github.com/AniChikage/open-markdown-lane/issues/1) | DEB 无空格安装路径、文件关联、带中文／空格路径，以及列表、源码、局部代码缩进和撤销 | 本轮安装验收基线为 Ubuntu 22.04，真实 FUSE 为 Ubuntu 22.04／24.04；完整 Kubuntu 26.04 桌面记录仍对应下方的 0.13.4，未在 0.20.0 重跑 |
+| [#3 标签、正文与表格右键](https://github.com/AniChikage/open-markdown-lane/issues/3) | 8 组右键检查覆盖标签批量关闭、正文编辑、表格行列及分屏目标保护 | 原生 WebKit 与 Chromium／安装载荷回归；未穷尽所有跨应用剪贴板和实体输入法组合 |
+| [#5 Excel/WPS 表格粘贴](https://github.com/AniChikage/open-markdown-lane/issues/5) | 7 组剪贴板检查覆盖 HTML／TSV／图片候选、正文／源码、表格与保存、撤销 | 本轮使用自有剪贴板样本；Excel 和 WPS 应用内复制实测对应 0.19.0，不据此宣称各 Office 版本均重新人工验收 |
 
 ## 修复与本机安装
 
@@ -154,7 +164,7 @@ macOS 的正常设置、改写和重启只读本机文件；旧式钥匙串仅�
 
 # 0.13.4 Kubuntu 26.04 回归验收
 
-2026-10-22，在完整的 Kubuntu 26.04 x86-64 虚拟机桌面中，检查 [Issue #1](https://github.com/AniChikage/open-typora/issues/1) 的两项修复。环境为 KDE Plasma 6.6.4、Wayland、英文 US 键盘布局，使用公开发布的 `Open-Typora-0.13.4-linux-x64.deb` 安装版；安装包 SHA-256 与发布的校验文件一致。
+2026-10-22，在完整的 Kubuntu 26.04 x86-64 虚拟机桌面中，检查 [Issue #1](https://github.com/AniChikage/open-markdown-lane/issues/1) 的两项修复。环境为 KDE Plasma 6.6.4、Wayland、英文 US 键盘布局，使用公开发布的 `Open-Typora-0.13.4-linux-x64.deb` 安装版；安装包 SHA-256 与发布的校验文件一致。
 
 | 检查 | 结果 | 实测范围 |
 | --- | --- | --- |

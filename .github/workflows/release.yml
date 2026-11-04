@@ -58,6 +58,10 @@ jobs:
         run: npm run package:linux
       - name: Verify rename upgrade preserves drafts and settings
         run: xvfb-run -a npm run test:branding
+      - name: Verify current public linux upgrade fixture
+        run: node scripts/download-upgrade-fixture.mts linux
+        env:
+          GH_TOKEN: ${{ github.token }}
       - name: Install DEB, exercise both packaged payloads, and uninstall
         run: xvfb-run -a node tests/linux-install.mts
         env:
@@ -129,6 +133,10 @@ jobs:
         run: npm run package:win
       - name: Verify rename upgrade preserves drafts and settings
         run: npm run test:branding
+      - name: Verify current public windows upgrade fixture
+        run: node scripts/download-upgrade-fixture.mts windows
+        env:
+          GH_TOKEN: ${{ github.token }}
       - name: Install, exercise the installed app, and uninstall
         shell: pwsh
         run: ./tests/windows-install.ps1
@@ -328,3 +336,6 @@ jobs:
           fi
           gh release upload "$RELEASE_TAG" release-assets/*.dmg release-assets/*-Setup.exe release-assets/*.zip release-assets/*.deb release-assets/*.AppImage release-assets/SHA256SUMS.txt
           gh release edit "$RELEASE_TAG" --draft=false --latest
+      - name: Retire legacy releases after verifying all published replacement assets
+        if: env.RELEASE_TAG == 'v0.23.0'
+        run: node scripts/retire-legacy-releases.mts

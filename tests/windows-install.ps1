@@ -4,9 +4,9 @@ $installer = Join-Path $PWD "release/windows/Open-Markdown-Lane-$version-windows
 $destination = Join-Path $env:RUNNER_TEMP 'OpenMarkdownLaneInstalled'
 $env:OPEN_MARKDOWN_LANE_QA_DIR = Join-Path $env:RUNNER_TEMP 'open-markdown-lane-windows-qa'
 New-Item -ItemType Directory -Force $env:OPEN_MARKDOWN_LANE_QA_DIR | Out-Null
-$previous = Join-Path $env:RUNNER_TEMP 'Open-Typora-0.15.0-Setup.exe'
-curl.exe --fail --location --silent --show-error --retry 3 --connect-timeout 30 --max-time 180 'https://github.com/AniChikage/open-markdown-lane/releases/download/v0.15.0/Open-Typora-0.15.0-windows-x64-Setup.exe' --output $previous
-if ($LASTEXITCODE -ne 0 -or (Get-FileHash $previous -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'f0563c64e25fd7b116c61d761a2d48233b28857401e8ae79ba49293f9369e59e') { throw 'Previous public installer download verification failed' }
+$fixture = Get-Content 'build/upgrade-fixtures/windows.json' -Raw | ConvertFrom-Json
+$previous = $fixture.file
+if ((Get-FileHash $previous -Algorithm SHA256).Hash.ToLowerInvariant() -ne $fixture.sha256) { throw 'Previous public installer checksum mismatch' }
 $prior = Start-Process -FilePath $previous -ArgumentList @('/S', "/D=$destination") -Wait -PassThru
 if ($prior.ExitCode -ne 0) { throw 'Previous-version installation failed' }
 $process = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$destination") -Wait -PassThru
@@ -78,5 +78,5 @@ if (Test-Path (Join-Path $destination 'resources/markdown-preview/MarkdownPrevie
 if ((Get-Item $previewMapping).GetValue('') -ne $previousPreview) { throw 'Uninstall did not restore the previous preview handler' }
 if (Test-Path 'HKCU:\Software\Classes\CLSID\{726747EB-6A31-4BF2-898F-11620814C1F2}') { throw 'Uninstall retained preview component registration' }
 if ((Get-FileHash $sessionFile -Algorithm SHA256).Hash -ne $sessionHash) { throw 'Uninstall changed document recovery data' }
-@{ upgradeFrom = '0.15.0'; install = 'passed'; installedRegression = 'passed'; fileAssociation = 'passed'; uninstall = 'passed'; recoveryPreserved = $true } | ConvertTo-Json | Set-Content (Join-Path $env:OPEN_MARKDOWN_LANE_QA_DIR 'installer-results.json')
+@{ upgradeFrom = $fixture.tag; install = 'passed'; installedRegression = 'passed'; fileAssociation = 'passed'; uninstall = 'passed'; recoveryPreserved = $true } | ConvertTo-Json | Set-Content (Join-Path $env:OPEN_MARKDOWN_LANE_QA_DIR 'installer-results.json')
 Write-Output 'PASS: NSIS install, installed application tests, Markdown association and uninstall with retained recovery data'

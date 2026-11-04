@@ -1,0 +1,17 @@
+name: Retire legacy branded releases
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  retire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Verify replacement and retire only the frozen legacy release list
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: node scripts/retire-legacy-releases.mts
