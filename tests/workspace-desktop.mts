@@ -9,7 +9,7 @@ const qa=process.env.OPEN_MARKDOWN_LANE_QA_DIR || path.join(data,'evidence');awa
 const texts=['# Long document\n\n'+Array.from({length:700},(_,i)=>`Paragraph ${i}. 中文 **Markdown** editing.`).join('\n\n')+'\n','# Second document\n\nSecond input: end\n','# Third document\n\nThird input: end\n'];
 const names=['Long.md','Second.md','Third.md'];
 const records: (import("../shared/contracts.js").DocumentRecord & {path: string})[]=[];for(let i=0;i<3;i++){const file=path.join(data,names[i]);await writeFile(file,texts[i]);records.push({id:'workspace-'+i,path:file,name:names[i],content:texts[i],savedContent:texts[i],diskHash:createHash('sha256').update(texts[i]).digest('hex'),lineEnding:'\n',encoding:'utf-8',bom:false});}
-await writeFile(path.join(profile,'session.json'),JSON.stringify({version:1,documents:records,activeId:records[0].id}));
+await writeFile(path.join(profile,'session.json'),JSON.stringify({version:1,folder:data,documents:records,activeId:records[0].id}));
 const env: Record<string, string>={...process.env,OPEN_MARKDOWN_LANE_DATA_DIR:profile};delete env.ELECTRON_RUN_AS_NODE;delete env.OPEN_MARKDOWN_LANE_DEV_URL;
 let app!: import("playwright").ElectronApplication, page!: import("playwright").Page;const errors: string[]=[],checks: string[]=[];const mod=process.platform==='darwin'?'Meta':'Control';
 async function launch(){app=await electron.launch({...(process.env.OPEN_MARKDOWN_LANE_EXECUTABLE?{executablePath:process.env.OPEN_MARKDOWN_LANE_EXECUTABLE,args:[]}:{args:[process.cwd()]}),env,timeout:30000});page=await app.firstWindow();page.on('pageerror',error=>errors.push(error.message));await page.setViewportSize({width:1380,height:900});await expect(page.getByRole('tab',{name:'Long.md',exact:true})).toBeVisible({timeout:20000});}
@@ -20,6 +20,25 @@ async function point(id: string,text: string,offset=0){await pane(id).locator('.
 const session=async()=>JSON.parse(await readFile(path.join(profile,'session.json'),'utf8'));
 try{
  await launch();await expect(tab('Long.md')).toHaveAttribute('aria-selected','true');await expect(page.getByRole('tab')).toHaveCount(3);await expect(page.locator('.document-editor')).toHaveCount(1);
+
+ const actionBounds=await page.locator('.quick-actions').boundingBox();assert.ok(actionBounds&&actionBounds.y>=28,'interactive controls stay outside the native window-drag strip');
+ await page.getByRole('group',{name:'侧栏视图',exact:true}).getByRole('button',{name:'文件树',exact:true}).click();await expect(page.getByRole('tree',{name:'文件树',exact:true})).toBeVisible();
+ await page.getByRole('group',{name:'侧栏视图',exact:true}).getByRole('button',{name:'文件',exact:true}).click();
+ await pane(records[0].id).locator('.rich-document').evaluate(element=>element.dataset.uiIdentity='retained');
+ await page.getByRole('button',{name:'右侧大纲',exact:true}).click();await expect(page.getByRole('navigation',{name:'右侧文档大纲',exact:true}).getByRole('button',{name:'Long document',exact:true})).toBeVisible();
+ await page.getByRole('navigation',{name:'右侧文档大纲',exact:true}).getByRole('button',{name:'Long document',exact:true}).click();
+ await page.screenshot({path:path.join(qa,'workspace-outline-light.png')});
+ await page.getByRole('button',{name:'切换主题',exact:true}).click();await expect(page.locator('html')).toHaveAttribute('data-appearance','dark');
+ await page.screenshot({path:path.join(qa,'workspace-outline-dark.png')});await page.getByRole('button',{name:'切换主题',exact:true}).click();
+ await page.setViewportSize({width:780,height:780});
+ const bounds=await page.locator('.right-tools').boundingBox();assert.ok(bounds&&bounds.width>200&&bounds.height>=180);
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+ await page.screenshot({path:path.join(qa,'workspace-outline-compact.png')});
+ await page.setViewportSize({width:1380,height:900});await page.getByRole('button',{name:'收起右侧栏',exact:true}).click();
+ assert.equal(await pane(records[0].id).locator('.rich-document').getAttribute('data-ui-identity'),'retained');
+ await page.getByRole('button',{name:'版本历史',exact:true}).click();await expect(page.getByRole('dialog',{name:'版本历史',exact:true})).toBeVisible();await page.getByRole('button',{name:'关闭版本历史',exact:true}).click();
+ assert.equal(await readFile(records[0].path,'utf8'),texts[0]);
+ checks.push('Direct sidebar navigation, right outline, history entry, light/dark and compact layouts preserve the editor and exact file.');
  await pane(records[0].id).locator('.rich-document > p').last().evaluate(element=>element.dataset.qaStable='true');
  await point(records[0].id,'Paragraph 2.',10);await page.keyboard.insertText('你好');await expect.poll(()=>readFile(records[0].path,'utf8')).toContain('Paragraph 你好2.');
  assert.equal(await pane(records[0].id).locator('[data-qa-stable]').count(),1);

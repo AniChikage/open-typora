@@ -23,7 +23,7 @@ const menu=(label: string)=>page.getByRole('menu',{name:label,exact:true});
 const item=(scope: import("playwright").Locator,label: string)=>scope.getByRole('menuitem',{name:label,exact:true});
 async function command(action: string){await app.evaluate(({BrowserWindow},action: string)=>BrowserWindow.getAllWindows()[0].webContents.send('app:command',{action}),action);}
 async function saved(file: string,text: string){await command('save');await expect.poll(()=>readFile(file,'utf8'),{timeout:20000}).toBe(text);}
-async function tabMenu(name: string){await tab(name).click({button:'right'});await expect(menu('标签页菜单')).toBeVisible();return menu('标签页菜单');}
+async function tabMenu(name: string){await tab(name).scrollIntoViewIfNeeded();await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));await tab(name).click({button:'right'});await expect(menu('标签页菜单')).toBeVisible();return menu('标签页菜单');}
 async function chooseTab(name: string,label: string){await item(await tabMenu(name),label).click();await expect(menu('标签页菜单')).toHaveCount(0);}
 async function editorMenu(target: import("playwright").Locator,kind='正文编辑菜单'){await target.click({button:'right'});await expect(menu(kind)).toBeVisible();return menu(kind);}
 async function chooseEditor(target: import("playwright").Locator,label: string,group: string | undefined = undefined,kind='正文编辑菜单'){
@@ -39,7 +39,7 @@ async function selectedMenu(){const rect=await page.evaluate(()=>{const r=getSel
 try{
  app=await electron.launch({...(process.env.OPEN_MARKDOWN_LANE_EXECUTABLE?{executablePath:process.env.OPEN_MARKDOWN_LANE_EXECUTABLE,args:[]}:{args:[process.cwd()]}),env,timeout:60000});
  page=await app.firstWindow();page.on('pageerror',error=>errors.push(error.message));await page.setViewportSize({width:1300,height:900});
- if(process.platform==='darwin')await app.evaluate(({app,BrowserWindow})=>{const win=BrowserWindow.getAllWindows()[0];win.show();app.focus({steal:true});win.focus();});
+ if(process.platform==='darwin'&&process.env.OPEN_MARKDOWN_LANE_TEST_HIDDEN!=='1')await app.evaluate(({app,BrowserWindow})=>{const win=BrowserWindow.getAllWindows()[0];win.show();app.focus({steal:true});win.focus();});
  await expect(tab(names[0])).toHaveAttribute('aria-selected','true',{timeout:20000});await expect(page.getByRole('tab')).toHaveCount(4);
  assert.match(await page.title(),/Alpha 中国\.md — Open Markdown Lane/);await expect(pane('menus-0').locator('.rich-document')).toContainText('First paragraph:');
  const initialMenu=await tabMenu(names[0]),initialAuto=initialMenu.getByRole('menuitemcheckbox',{name:'自动保存已有文件',exact:true});
