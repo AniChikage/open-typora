@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { _electron as electron, expect } from 'playwright/test';
+import { chromium, expect } from 'playwright/test';
+import { createServer } from 'node:http';
+import type { ChildProcess } from 'node:child_process';
 import { spawn, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdtemp, mkdir, readFile, writeFile, rm, stat } from 'node:fs/promises';
@@ -14,7 +16,14 @@ const env: Record<string,string>={...process.env,XDG_RUNTIME_DIR:path.join(root,
 delete env.ELECTRON_RUN_AS_NODE;
 const daemon=spawn('gnome-keyring-daemon',['--foreground','--unlock','--components=secrets','--control-directory='+path.join(root,'control')],{env,stdio:['pipe','pipe','pipe']});
 daemon.stdin.end('owned-ephemeral-keyring-password\n');
-let app: import('playwright').ElectronApplication | undefined;
+let browser: import('playwright').Browser | undefined, application: ChildProcess | undefined;
+let closeServer: (()=>Promise<void>) | undefined;
+async function stop(child: ChildProcess) {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  const ended=new Promise<void>(resolve=>child.once('exit',()=>resolve()));
+  const deadline=setTimeout(()=>child.kill('SIGKILL'),2000);
+  child.kill('SIGTERM');await ended;clearTimeout(deadline);
+}
 try {
   // --unlock creates the private login keyring but does not initialize a full
   // session. Initialize it before any D-Bus call can auto-start another daemon.
@@ -39,22 +48,44 @@ try {
   const identity=JSON.parse(await readFile(path.join(root,'legacy-identity.json'),'utf8'));
   assert.equal(identity.originalDirectory,'Open Typora','The retained legacy data-directory name matches Electron itself');
   const ciphertext=(await readFile(cipherFile)).toString('base64');
-  app=await electron.launch({args:[process.cwd(),'--password-store=gnome-libsecret'],env,timeout:30000});
-  app.process().stderr?.on('data',chunk=>process.stderr.write(chunk));
-  const page=await app.firstWindow();await expect(page.locator('.rich-document').first()).toBeVisible({timeout:20000});
-  const provider=await app.evaluate(({app,safeStorage})=>({name:app.getName(),ready:app.isReady(),backend:safeStorage.getSelectedStorageBackend(),available:safeStorage.isEncryptionAvailable(),passwordStore:app.commandLine.getSwitchValue('password-store')}));
-  console.log('Owned keyring provider state: '+JSON.stringify(provider));
-  assert.equal(provider.backend,'gnome_libsecret');assert.equal(provider.available,true);
-  const actual=await app.evaluate(({app,safeStorage},ciphertext)=>({name:app.getName(),backend:safeStorage.getSelectedStorageBackend(),available:safeStorage.isEncryptionAvailable(),text:safeStorage.decryptString(Buffer.from(ciphertext,'base64'))}),ciphertext);
-  assert.equal(actual.name,'Open Markdown Lane');
-  assert.equal(actual.backend,'gnome_libsecret');assert.equal(actual.available,true);assert.equal(actual.text,secret);
-  console.log('PASS: the renamed application retains a real libsecret encryption key from the old product while exposing the new application name; no plaintext fallback');
+  // The Playwright Electron launcher forces --password-store=basic. Start the
+  // actual application normally and attach over loopback CDP instead.
+  let requests=0, fixtureError: unknown;
+  const server=createServer(async(request,response)=>{
+    try {
+      let body='';for await(const chunk of request)body+=chunk;
+      assert.equal(request.url,'/v1/chat/completions');assert.equal(request.method,'POST');
+      assert.equal(request.headers.authorization,'Bearer '+secret);
+      assert.equal(JSON.parse(body).model,'owned-keyring-fixture');requests++;
+      response.writeHead(200,{'Content-Type':'application/json'});
+      response.end(JSON.stringify({choices:[{message:{content:'owned-credential-roundtrip'},finish_reason:'stop'}]}));
+    } catch(error) {fixtureError=error;response.writeHead(500);response.end('{}');}
+  });
+  await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+  closeServer=()=>new Promise<void>(resolve=>server.close(()=>resolve()));
+  const baseUrl='http://127.0.0.1:'+(server.address() as import('node:net').AddressInfo).port+'/v1';
+  await writeFile(path.join(root,'current/ai-settings.json'),JSON.stringify({version:1,protocol:'openai',baseUrl,model:'owned-keyring-fixture',keyCipher:ciphertext}),{mode:0o600});
+  const endpoint=await new Promise<string>((resolve,reject)=>{
+    let output='';const deadline=setTimeout(()=>reject(Error('Owned Electron CDP endpoint did not start')),30000);
+    application=spawn(path.resolve('node_modules/.bin/electron'),[process.cwd(),'--remote-debugging-address=127.0.0.1','--remote-debugging-port=0','--password-store=gnome-libsecret'],{env,stdio:['ignore','ignore','pipe']});
+    application.on('error',error=>{clearTimeout(deadline);reject(error);});
+    application.on('exit',code=>{clearTimeout(deadline);reject(Error('Owned Electron exited before CDP: '+code));});
+    application.stderr!.on('data',chunk=>{output+=chunk.toString();const found=output.match(/DevTools listening on (ws:\/\/[^\s]+)/);if(found){clearTimeout(deadline);resolve(found[1]);}});
+  });
+  browser=await chromium.connectOverCDP(endpoint);
+  const context=browser.contexts()[0], page=context.pages()[0] || await context.waitForEvent('page');
+  await expect(page.locator('.rich-document').first()).toBeVisible({timeout:20000});
+  await expect.poll(()=>page.title()).toMatch(/Open Markdown Lane/);
+  const settings=await page.evaluate(()=>window.desktop!.aiSettings());
+  assert.ok(settings.ok);assert.equal(settings.value.secureStorage,true);assert.equal(settings.value.keyStorage,'system');
+  const result=await page.evaluate(()=>window.desktop!.aiRewrite({id:crypto.randomUUID(),instruction:'Use the owned fixture',text:'owned text'}));
+  assert.ok(result.ok,result.ok?'':result.error);assert.equal(result.value.text,'owned-credential-roundtrip');
+  assert.equal(fixtureError,undefined);assert.equal(requests,1);
+  console.log('PASS: a normal application launch decrypts an old real-libsecret credential and authenticates exactly one owned model request; the UI uses the new name and plaintext fallback is unavailable');
 } finally {
-  await app?.close();
-  if (daemon.exitCode === null && daemon.signalCode === null) {
-    const ended=new Promise<void>(resolve=>daemon.once('exit',()=>resolve()));
-    const deadline=setTimeout(()=>daemon.kill('SIGKILL'),2000);
-    daemon.kill('SIGTERM');await ended;clearTimeout(deadline);
-  }
+  await browser?.close();
+  if(application)await stop(application);
+  await closeServer?.();
+  await stop(daemon);
   await rm(root,{recursive:true,force:true});
 }
