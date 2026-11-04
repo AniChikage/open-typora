@@ -4,7 +4,7 @@ import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { execFileSync, spawn } from "node:child_process";
-const directory = await mkdtemp(path.join(os.tmpdir(), "open-typora-ai-native-"));
+const directory = await mkdtemp(path.join(os.tmpdir(), "open-markdown-lane-ai-native-"));
 const calls: { url: string; authorized: boolean; format: string }[] = [];
 const server = createServer(async (request, response) => {
   try {
@@ -39,5 +39,5 @@ try {
   assert.equal(calls[0].url, "/vendor/v1/chat/completions"); assert.equal(calls[0].authorized, true);
   assert.equal(calls[1].url, "/api/chat"); assert.equal(calls[1].authorized, false);
   assert.equal(calls.some(call => call.url === "/collected"), false);
-  if (process.env.OPEN_TYPORA_QA_DIR) { await mkdir(process.env.OPEN_TYPORA_QA_DIR, { recursive: true }); await writeFile(path.join(process.env.OPEN_TYPORA_QA_DIR, "native-ai-transport.json"), JSON.stringify({ fixtureOnly: true, actualModelInference: false, requests: calls, passed: true }, null, 2)); }
+  if (process.env.OPEN_MARKDOWN_LANE_QA_DIR) { await mkdir(process.env.OPEN_MARKDOWN_LANE_QA_DIR, { recursive: true }); await writeFile(path.join(process.env.OPEN_MARKDOWN_LANE_QA_DIR, "native-ai-transport.json"), JSON.stringify({ fixtureOnly: true, actualModelInference: false, requests: calls, passed: true }, null, 2)); }
 } finally { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); await rm(directory, { recursive: true, force: true }); }

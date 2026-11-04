@@ -30,7 +30,7 @@ if (!available) {
   throw new Error("开发服务器未能启动。");
 }
 const electron = child("node_modules/.bin/electron", ["."], {
-  env: { ...process.env, OPEN_TYPORA_DEV_URL: "http://127.0.0.1:5186" },
+  env: { ...process.env, OPEN_MARKDOWN_LANE_DEV_URL: "http://127.0.0.1:5186" },
 });
 const close = () => {
   for (const process of children) process.kill("SIGTERM");

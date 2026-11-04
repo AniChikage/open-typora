@@ -44,24 +44,24 @@ jobs:
         run: sudo modprobe fuse && test -c /dev/fuse
       - name: Prepare actual PDF content validation
         run: |
-          python3 -m venv "$RUNNER_TEMP/open-typora-pdf"
-          "$RUNNER_TEMP/open-typora-pdf/bin/python" -m pip install --disable-pip-version-check pypdf==6.1.1
-          echo "OPEN_TYPORA_PDF_PYTHON=$RUNNER_TEMP/open-typora-pdf/bin/python" >> "$GITHUB_ENV"
+          python3 -m venv "$RUNNER_TEMP/open-markdown-lane-pdf"
+          "$RUNNER_TEMP/open-markdown-lane-pdf/bin/python" -m pip install --disable-pip-version-check pypdf==6.1.1
+          echo "OPEN_MARKDOWN_LANE_PDF_PYTHON=$RUNNER_TEMP/open-markdown-lane-pdf/bin/python" >> "$GITHUB_ENV"
       - run: npm test
         env:
-          OPEN_TYPORA_REQUIRE_CONVERTERS: "1"
+          OPEN_MARKDOWN_LANE_REQUIRE_CONVERTERS: "1"
       - name: Build Linux x64 DEB and AppImage
         run: npm run package:linux
       - name: Install DEB, exercise both packaged payloads, and uninstall
         run: xvfb-run -a node tests/linux-install.mts
         env:
-          OPEN_TYPORA_QA_DIR: ${{ runner.temp }}/open-typora-linux-qa
+          OPEN_MARKDOWN_LANE_QA_DIR: ${{ runner.temp }}/open-markdown-lane-linux-qa
       - name: Save Linux acceptance evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: linux-acceptance
-          path: ${{ runner.temp }}/open-typora-linux-qa
+          path: ${{ runner.temp }}/open-markdown-lane-linux-qa
           retention-days: 7
       - name: Save tested Linux packages
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -111,14 +111,14 @@ jobs:
       - name: Prepare actual PDF content validation
         shell: pwsh
         run: |
-          $pdfEnvironment = Join-Path $env:RUNNER_TEMP 'open-typora-pdf'
+          $pdfEnvironment = Join-Path $env:RUNNER_TEMP 'open-markdown-lane-pdf'
           python -m venv $pdfEnvironment
           $pdfPython = Join-Path $pdfEnvironment 'Scripts/python.exe'
           & $pdfPython -m pip install --disable-pip-version-check pypdf==6.1.1
-          "OPEN_TYPORA_PDF_PYTHON=$pdfPython" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "OPEN_MARKDOWN_LANE_PDF_PYTHON=$pdfPython" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - run: npm test
         env:
-          OPEN_TYPORA_REQUIRE_CONVERTERS: "1"
+          OPEN_MARKDOWN_LANE_REQUIRE_CONVERTERS: "1"
       - name: Build Windows x64 installer and ZIP
         run: npm run package:win
       - name: Install, exercise the installed app, and uninstall
@@ -129,7 +129,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: windows-acceptance
-          path: ${{ runner.temp }}/open-typora-windows-qa
+          path: ${{ runner.temp }}/open-markdown-lane-windows-qa
           retention-days: 7
       - name: Save tested Windows packages
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -163,14 +163,14 @@ jobs:
           ./scripts/build-windows-preview.ps1
           ./tests/windows-preview.ps1
         env:
-          OPEN_TYPORA_PREVIEW_COMPONENT: ${{ github.workspace }}/build/windows-preview
-          OPEN_TYPORA_QA_DIR: ${{ runner.temp }}/open-typora-preview-qa
+          OPEN_MARKDOWN_LANE_PREVIEW_COMPONENT: ${{ github.workspace }}/build/windows-preview
+          OPEN_MARKDOWN_LANE_QA_DIR: ${{ runner.temp }}/open-markdown-lane-preview-qa
       - name: Save native component acceptance evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: windows-preview-acceptance
-          path: ${{ runner.temp }}/open-typora-preview-qa
+          path: ${{ runner.temp }}/open-markdown-lane-preview-qa
           retention-days: 7
 
   macos:
@@ -242,27 +242,27 @@ jobs:
           cd ../..
           python3 - <<'PYPROFILE'
           import os,pathlib,json
-          root=pathlib.Path(os.environ['RUNNER_TEMP']);version=json.loads(pathlib.Path('package.json').read_text())['version'];image=pathlib.Path('release/linux',f'Open-Typora-{version}-linux-x64.AppImage').resolve();image.chmod(0o755)
-          (root/'open-typora-appimage.apparmor').write_text('abi <abi/4.0>,\ninclude <tunables/global>\nprofile open-typora-appimage-ci "'+str(image)+'" flags=(unconfined) {\n  userns,\n}\n')
-          with open(os.environ['GITHUB_ENV'],'a') as out:out.write('OPEN_TYPORA_APPIMAGE='+str(image)+'\n')
+          root=pathlib.Path(os.environ['RUNNER_TEMP']);version=json.loads(pathlib.Path('package.json').read_text())['version'];image=pathlib.Path('release/linux',f'Open-Markdown-Lane-{version}-linux-x64.AppImage').resolve();image.chmod(0o755)
+          (root/'open-markdown-lane-appimage.apparmor').write_text('abi <abi/4.0>,\ninclude <tunables/global>\nprofile open-markdown-lane-appimage-ci "'+str(image)+'" flags=(unconfined) {\n  userns,\n}\n')
+          with open(os.environ['GITHUB_ENV'],'a') as out:out.write('OPEN_MARKDOWN_LANE_APPIMAGE='+str(image)+'\n')
           PYPROFILE
-          sudo apparmor_parser -r "$RUNNER_TEMP/open-typora-appimage.apparmor"
+          sudo apparmor_parser -r "$RUNNER_TEMP/open-markdown-lane-appimage.apparmor"
           test "$(sysctl -n kernel.apparmor_restrict_unprivileged_userns)" = 1
       - name: Exercise actual FUSE runtime and sandboxed editing
-        run: xvfb-run -a node tests/linux-appimage-fuse.mts "$OPEN_TYPORA_APPIMAGE"
+        run: xvfb-run -a node tests/linux-appimage-fuse.mts "$OPEN_MARKDOWN_LANE_APPIMAGE"
         env:
-          OPEN_TYPORA_QA_DIR: ${{ runner.temp }}/open-typora-real-fuse-qa
-          OPEN_TYPORA_FUSE_APPARMOR: app-specific profile for verified AppImage; global restriction remains enabled
+          OPEN_MARKDOWN_LANE_QA_DIR: ${{ runner.temp }}/open-markdown-lane-real-fuse-qa
+          OPEN_MARKDOWN_LANE_FUSE_APPARMOR: app-specific profile for verified AppImage; global restriction remains enabled
       - name: Remove temporary application profile
         if: always()
         run: |
-          if [ -f "$RUNNER_TEMP/open-typora-appimage.apparmor" ]; then sudo apparmor_parser -R "$RUNNER_TEMP/open-typora-appimage.apparmor"; fi
+          if [ -f "$RUNNER_TEMP/open-markdown-lane-appimage.apparmor" ]; then sudo apparmor_parser -R "$RUNNER_TEMP/open-markdown-lane-appimage.apparmor"; fi
       - name: Save real FUSE acceptance evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: linux-fuse-ubuntu-24.04
-          path: ${{ runner.temp }}/open-typora-real-fuse-qa
+          path: ${{ runner.temp }}/open-markdown-lane-real-fuse-qa
           retention-days: 7
 
   publish:
@@ -314,7 +314,7 @@ jobs:
               exit 1
             fi
           else
-            gh release create "$RELEASE_TAG" --draft --verify-tag --title "Open Typora ${RELEASE_TAG#v}" --notes-file docs/release-notes.md
+            gh release create "$RELEASE_TAG" --draft --verify-tag --title "Open Markdown Lane ${RELEASE_TAG#v}" --notes-file docs/release-notes.md
           fi
           gh release upload "$RELEASE_TAG" release-assets/*.dmg release-assets/*-Setup.exe release-assets/*.zip release-assets/*.deb release-assets/*.AppImage release-assets/SHA256SUMS.txt
           gh release edit "$RELEASE_TAG" --draft=false --latest

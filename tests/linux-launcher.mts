@@ -9,28 +9,28 @@ import os from 'node:os';
 const exec=promisify(execFile);
 assert.equal(process.platform,'linux');
 // D-Bus-activated KDE helpers must inherit the same isolated profile as the app.
-if(!process.env.OPEN_TYPORA_LAUNCHER_ROOT){
- const data=await mkdtemp(path.join(os.tmpdir(),'open-typora-launcher-'));
+if(!process.env.OPEN_MARKDOWN_LANE_LAUNCHER_ROOT){
+ const data=await mkdtemp(path.join(os.tmpdir(),'open-markdown-lane-launcher-'));
  for(const name of ['config','cache','profile'])await mkdir(path.join(data,name));
- const env: Record<string, string>={...process.env,OPEN_TYPORA_LAUNCHER_ROOT:data,OPEN_TYPORA_DATA_DIR:path.join(data,'profile'),XDG_CONFIG_HOME:path.join(data,'config'),XDG_CACHE_HOME:path.join(data,'cache')};
+ const env: Record<string, string>={...process.env,OPEN_MARKDOWN_LANE_LAUNCHER_ROOT:data,OPEN_MARKDOWN_LANE_DATA_DIR:path.join(data,'profile'),XDG_CONFIG_HOME:path.join(data,'config'),XDG_CACHE_HOME:path.join(data,'cache')};
  const child=await exec('dbus-run-session',['--',process.execPath,fileURLToPath(import.meta.url)],{env,timeout:120000,maxBuffer:2*1024*1024});
  process.stdout.write(child.stdout);process.stderr.write(child.stderr);
 }else{
- const data=process.env.OPEN_TYPORA_LAUNCHER_ROOT!,qa=process.env.OPEN_TYPORA_QA_DIR!;await mkdir(qa,{recursive:true});
- const desktop='/usr/share/applications/open-typora.desktop';
+ const data=process.env.OPEN_MARKDOWN_LANE_LAUNCHER_ROOT!,qa=process.env.OPEN_MARKDOWN_LANE_QA_DIR!;await mkdir(qa,{recursive:true});
+ const desktop='/usr/share/applications/open-markdown-lane.desktop';
  const desktopText=await readFile(desktop,'utf8');
- const mimeXml=await readFile('/usr/share/mime/packages/open-typora.xml','utf8');
+ const mimeXml=await readFile('/usr/share/mime/packages/open-markdown-lane.xml','utf8');
  for(const extension of ['md','markdown','mdown'])assert.ok(mimeXml.includes(`*.${extension}`));
- assert.match(desktopText,/^Name=Open Typora$/m);assert.match(desktopText,/^Exec="?\/opt\/Open-Typora\/open-typora"? %U$/m);
+ assert.match(desktopText,/^Name=Open Markdown Lane$/m);assert.match(desktopText,/^Exec="?\/opt\/Open-Markdown-Lane\/open-markdown-lane"? %U$/m);
  await exec('desktop-file-validate',[desktop]);
- await writeFile(path.join(process.env.XDG_CONFIG_HOME!,'mimeapps.list'),'[Default Applications]\ntext/markdown=open-typora.desktop;\ntext/x-markdown=open-typora.desktop;\n');
+ await writeFile(path.join(process.env.XDG_CONFIG_HOME!,'mimeapps.list'),'[Default Applications]\ntext/markdown=open-markdown-lane.desktop;\ntext/x-markdown=open-markdown-lane.desktop;\n');
  await exec('kbuildsycoca5',['--noincremental'],{timeout:30000});
  const names=['Initial.md','中文 notes.md','符号 #% &.md','KDE 中文.md'],files=[];
  for(const [i,name] of names.entries()){const file=path.join(data,name);await writeFile(file,`# Launcher ${i}\n\nKeep Unicode, spaces and punctuation intact.\n`);files.push(file);}
- const env={...process.env} as Record<string, string>;delete env.ELECTRON_RUN_AS_NODE;delete env.OPEN_TYPORA_DEV_URL;
+ const env={...process.env} as Record<string, string>;delete env.ELECTRON_RUN_AS_NODE;delete env.OPEN_MARKDOWN_LANE_DEV_URL;
  let app!: import("playwright").ElectronApplication, page!: import("playwright").Page;const errors: string[]=[];
  try{
-  app=await electron.launch({executablePath:process.env.OPEN_TYPORA_EXECUTABLE,args:[files[0]],env,timeout:30000});page=await app.firstWindow();page.on('pageerror',e=>errors.push(e.message));
+  app=await electron.launch({executablePath:process.env.OPEN_MARKDOWN_LANE_EXECUTABLE,args:[files[0]],env,timeout:30000});page=await app.firstWindow();page.on('pageerror',e=>errors.push(e.message));
   await expect(page.getByRole('heading',{name:'Launcher 0',exact:true})).toBeVisible({timeout:20000});
   await exec('gio',['launch',desktop,...files.slice(1,3).map((file: string)=>pathToFileURL(file).href)],{env,timeout:30000});
   for(const name of names.slice(1,3))await expect(page.getByRole('tab',{name,exact:true})).toBeVisible({timeout:20000});

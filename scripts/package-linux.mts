@@ -22,18 +22,18 @@ await build({
       await chmod(launcher, 0o755);
     },
     appImage: { executableArgs: [] },
-    deb: { fpm: [`${path.resolve("scripts/linux-mime.xml")}=/usr/share/mime/packages/open-typora.xml`] },
+    deb: { fpm: ["--replaces", "open-typora", "--conflicts", "open-typora", `${path.resolve("scripts/linux-mime.xml")}=/usr/share/mime/packages/open-markdown-lane.xml`] },
     linux: {
       desktop: { entry: { Name: pkg.build.productName } },
-      executableName: "open-typora", icon: "build/icon.png", category: "Office",
-      artifactName: "Open-Typora-${version}-linux-x64.${ext}",
+      executableName: "open-markdown-lane", icon: "build/icon.png", category: "Office",
+      artifactName: "Open-Markdown-Lane-${version}-linux-x64.${ext}",
       maintainer: "AniChikage <15864698+AniChikage@users.noreply.github.com>",
       mimeTypes: ["text/markdown", "text/x-markdown"],
       syncDesktopName: true,
     },
   },
 });
-const names = [`Open-Typora-${pkg.version}-linux-x64.deb`, `Open-Typora-${pkg.version}-linux-x64.AppImage`];
+const names = [`Open-Markdown-Lane-${pkg.version}-linux-x64.deb`, `Open-Markdown-Lane-${pkg.version}-linux-x64.AppImage`];
 const sums = [];
 for (const name of names) {
   const bytes = await readFile(path.join("release/linux", name));
@@ -42,6 +42,6 @@ for (const name of names) {
 }
 await writeFile("release/linux/SHA256SUMS-linux-x64.txt", sums.join("\n") + "\n");
 for (const name of await readdir("release/linux")) {
-  if (/^Open-Typora-\d[\w.-]*\.(deb|AppImage)$/.test(name) && !names.includes(name)) await rm(path.join("release/linux", name));
+  if (/^Open-Markdown-Lane-\d[\w.-]*\.(deb|AppImage)$/.test(name) && !names.includes(name)) await rm(path.join("release/linux", name));
 }
 console.log(sums.join("\n"));

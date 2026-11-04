@@ -1,5 +1,5 @@
 name: Feature request
-description: Describe a writing workflow you want Open Typora to support.
+description: Describe a writing workflow you want Open Markdown Lane to support.
 title: "[Feature]: "
 body:
   - type: textarea

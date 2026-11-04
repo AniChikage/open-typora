@@ -1,4 +1,4 @@
-# Open Typora 品牌标记
+# Open Markdown Lane 品牌标记
 
 唯一矢量源是 [icon.svg](icon.svg)。定制衬线字母 M 对应 Markdown，双侧竖画和中间斜画构成清晰、稳定的轮廓。墨蓝主体与一小段灰蓝顶边置于纸白底座，不加入文档折角或小尺寸细节。
 

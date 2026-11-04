@@ -7,8 +7,8 @@ import path from 'node:path';
 import os from 'node:os';
 import iconv from 'iconv-lite';
 import { createHash } from 'node:crypto';
-const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), 'open-typora-batch-ui-'))), profile = path.join(directory, 'profile'), notes = path.join(directory, 'notes');
-const qa = process.env.OPEN_TYPORA_QA_DIR || path.join(directory, 'evidence');
+const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), 'open-markdown-lane-batch-ui-'))), profile = path.join(directory, 'profile'), notes = path.join(directory, 'notes');
+const qa = process.env.OPEN_MARKDOWN_LANE_QA_DIR || path.join(directory, 'evidence');
 await Promise.all([mkdir(profile), mkdir(notes), mkdir(qa, { recursive: true })]);
 const folderLabel = path.join('manual', 'README.md');
 const originals = ['# Proposal\r\n\r\nOld Product helps writing.\r\n\r\n预算 30万元。\r\n', '# FAQ\n\nOld Product works offline.\n\n预算 30万元。\n', '# Guide\n\nOld Product has local files.\n\n预算 30万元。\n'];
@@ -31,11 +31,11 @@ const server = createServer(async (request, response) => {
 });
 await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
 const endpoint = 'http://127.0.0.1:' + (server.address() as import('node:net').AddressInfo).port + '/v1';
-const env: Record<string, string> = { ...process.env, OPEN_TYPORA_DATA_DIR: profile, OPEN_TYPORA_AI_SETTINGS_DIR: profile, OPEN_TYPORA_TEST_HIDDEN: process.env.OPEN_TYPORA_TEST_HIDDEN || '0' }; delete env.ELECTRON_RUN_AS_NODE; delete env.OPEN_TYPORA_DEV_URL;
+const env: Record<string, string> = { ...process.env, OPEN_MARKDOWN_LANE_DATA_DIR: profile, OPEN_MARKDOWN_LANE_AI_SETTINGS_DIR: profile, OPEN_MARKDOWN_LANE_TEST_HIDDEN: process.env.OPEN_MARKDOWN_LANE_TEST_HIDDEN || '0' }; delete env.ELECTRON_RUN_AS_NODE; delete env.OPEN_MARKDOWN_LANE_DEV_URL;
 let app!: ElectronApplication, page!: Page;
 const checks: string[] = [], errors: string[] = [], consoleErrors: string[] = [];
 const pass = (text: string) => { checks.push(text); console.log('PASS: ' + text); };
-async function launch() { app = await electron.launch({ ...(process.env.OPEN_TYPORA_EXECUTABLE ? { executablePath: process.env.OPEN_TYPORA_EXECUTABLE, args: [] } : { args: [process.cwd()] }), env, timeout: 30000 }); page = await app.firstWindow(); page.setDefaultTimeout(10000); page.on('pageerror', error => errors.push(error.message)); page.on('console', message => { if (message.type() === 'error') consoleErrors.push(message.text()); }); await expect(page.getByRole('tab', { name: 'proposal.md', exact: true })).toBeVisible(); }
+async function launch() { app = await electron.launch({ ...(process.env.OPEN_MARKDOWN_LANE_EXECUTABLE ? { executablePath: process.env.OPEN_MARKDOWN_LANE_EXECUTABLE, args: [] } : { args: [process.cwd()] }), env, timeout: 30000 }); page = await app.firstWindow(); page.setDefaultTimeout(10000); page.on('pageerror', error => errors.push(error.message)); page.on('console', message => { if (message.type() === 'error') consoleErrors.push(message.text()); }); await expect(page.getByRole('tab', { name: 'proposal.md', exact: true })).toBeVisible(); }
 async function command(action: string) { await app.evaluate(({ BrowserWindow }, action) => BrowserWindow.getAllWindows()[0].webContents.send('app:command', { action }), action); }
 const dialog = () => page.getByRole('dialog', { name: 'Edit multiple documents', exact: true });
 async function state() { return JSON.parse(await readFile(path.join(profile, 'session.json'), 'utf8')).documents as typeof records; }
@@ -49,10 +49,10 @@ async function closeDialog() { await dialog().getByRole('button', { name: 'Close
 async function historyFirst() { await command('batch-edit'); await dialog().getByRole('button', { name: 'Batch recovery', exact: true }).click(); await expect(dialog().locator('.batch-history-list button').first()).toBeVisible(); await dialog().locator('.batch-history-list button').first().click(); await expect(dialog().getByRole('heading', { name: 'Documents to restore', exact: true })).toBeVisible(); await dialog().getByLabel('I reviewed these documents and want to restore the entire batch.', { exact: true }).check(); }
 try {
   await launch();
-  await page.evaluate(() => { localStorage.setItem('open-typora-autosave', 'false'); const preferences = JSON.parse(localStorage.getItem('open-typora-preferences') || '{}'); preferences.language = 'en'; localStorage.setItem('open-typora-preferences', JSON.stringify(preferences)); }); await page.reload();
+  await page.evaluate(() => { localStorage.setItem('open-markdown-lane-autosave', 'false'); const preferences = JSON.parse(localStorage.getItem('open-markdown-lane-preferences') || '{}'); preferences.language = 'en'; localStorage.setItem('open-markdown-lane-preferences', JSON.stringify(preferences)); }); await page.reload();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en'); await expect(page.getByRole('tab', { name: 'proposal.md', exact: true })).toBeVisible();
   await page.evaluate(async endpoint => { const response = await window.desktop!.aiSettings({ protocol: 'openai', baseUrl: endpoint, model: 'owned-batch-fixture', rememberKey: false }); if (!response.ok) throw Error(response.error); }, endpoint);
-  assert.match(page.url(), /index\.html/); assert.match(await page.title(), /Open Typora/); assert.ok((await page.locator('body').innerText()).includes('Old Product')); await expect(page.locator('vite-error-overlay')).toHaveCount(0);
+  assert.match(page.url(), /index\.html/); assert.match(await page.title(), /Open Markdown Lane/); assert.ok((await page.locator('body').innerText()).includes('Old Product')); await expect(page.locator('vite-error-overlay')).toHaveCount(0);
   await choose('Update the product name consistently.'); const before = requests.length; assert.equal(before, 0); await plan(); assert.equal(requests.length, 1); assert.equal(requests[0].documents.length, 3);
   for (let index = 0; index < 3; index++) { await buffer(index, originals[index]); await disk(index, originals[index]); }
   await review(); await dialog().getByLabel('Accept document guide.md', { exact: true }).uncheck(); await expect(dialog().getByRole('button', { name: 'Apply to 2 documents', exact: true })).toBeEnabled();

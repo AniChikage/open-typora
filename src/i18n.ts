@@ -1,8 +1,9 @@
+import { storedItem } from "./migrateStorage.ts";
 import { useSyncExternalStore } from 'react';
 import { translate } from '../shared/translate.mts';
 import type { Locale } from '../shared/translate.mts';
 export type { Locale };
-let language: Locale = (() => { try { return JSON.parse(localStorage.getItem('open-typora-preferences') || '{}').language === 'en' ? 'en' : 'zh-CN'; } catch { return 'zh-CN'; } })();
+let language: Locale = (() => { try { return JSON.parse(storedItem(localStorage, 'open-markdown-lane-preferences') || '{}').language === 'en' ? 'en' : 'zh-CN'; } catch { return 'zh-CN'; } })();
 const listeners = new Set<() => void>();
 export function t(source: string, ...values: (string | number)[]) { return translate(language, source, ...values); }
 export function locale() { return language; }

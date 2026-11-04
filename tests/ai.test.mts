@@ -69,7 +69,7 @@ function protector(available = true) {
     decrypt: (data: Buffer) => { const decipher = createDecipheriv("aes-256-gcm", key, data.subarray(0, 12)); decipher.setAuthTag(data.subarray(12, 28)); return Buffer.concat([decipher.update(data.subarray(28)), decipher.final()]).toString("utf8"); } };
 }
 test("host sends bounded real HTTP requests for compatible and Ollama formats; keeps keys out of renderer and disk", async () => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "open-typora-ai-unit-"));
+  const directory = await mkdtemp(path.join(os.tmpdir(), "open-markdown-lane-ai-unit-"));
   const calls: { url: string; auth: string | undefined; body: Record<string, unknown> }[] = [];
   let slowReceived = () => {}; let slowStarted = new Promise<void>(resolve => { slowReceived = resolve; });
   const server = createServer(async (request, response) => {

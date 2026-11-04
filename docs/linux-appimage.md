@@ -1,6 +1,6 @@
 # Running the Linux AppImage
 
-Use the x64 AppImage from the [0.20.2 release](https://github.com/AniChikage/open-typora/releases/tag/v0.20.2) and verify its SHA-256 checksum. Make it executable, then run it as your ordinary user. The DEB is the recommended Ubuntu installation, with desktop and file associations included.
+Use the x64 AppImage from the [0.20.2 release](https://github.com/AniChikage/open-markdown-lane/releases/tag/v0.20.2) and verify its SHA-256 checksum. Make it executable, then run it as your ordinary user. The DEB is the recommended Ubuntu installation, with desktop and file associations included.
 
 ```sh
 chmod +x Open-Typora-0.20.2-linux-x64.AppImage
@@ -26,17 +26,17 @@ Chromium also needs a working sandbox. Starting with 0.17.4, the launcher keeps 
 
 On Ubuntu 24.04 with restricted unprivileged user namespaces, an administrator may need to allow namespaces for the verified AppImage. The following example grants that permission only to the exact executable path in the profile; the system-wide restriction stays enabled. Only do this for an AppImage you trust, and update the path after moving or renaming it.
 
-Save this as `/etc/apparmor.d/open-typora-appimage`, replacing the example with your actual absolute AppImage path:
+Save this as `/etc/apparmor.d/open-markdown-lane-appimage`, replacing the example with your actual absolute AppImage path:
 
 ```text
 abi <abi/4.0>,
 include <tunables/global>
-profile open-typora-appimage "/absolute/path/Open-Typora-0.20.2-linux-x64.AppImage" flags=(unconfined) {
+profile open-markdown-lane-appimage "/absolute/path/Open-Typora-0.20.2-linux-x64.AppImage" flags=(unconfined) {
   userns,
 }
 ```
 
-Load it with `sudo apparmor_parser -r /etc/apparmor.d/open-typora-appimage`. To remove this permission, run `sudo apparmor_parser -R /etc/apparmor.d/open-typora-appimage` and remove that profile file. A managed machine may require its administrator's policy instead. The application does not install this rule or change system security settings automatically.
+Load it with `sudo apparmor_parser -r /etc/apparmor.d/open-markdown-lane-appimage`. To remove this permission, run `sudo apparmor_parser -R /etc/apparmor.d/open-markdown-lane-appimage` and remove that profile file. A managed machine may require its administrator's policy instead. The application does not install this rule or change system security settings automatically.
 
 ## Acceptance scope
 

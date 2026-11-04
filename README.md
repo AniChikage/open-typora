@@ -1,24 +1,24 @@
 <p align="center">
-  <img src="design/icon.svg" alt="Open Typora" width="88" height="88">
+  <img src="design/icon.svg" alt="Open Markdown Lane" width="88" height="88">
 </p>
 
-<h1 align="center">Open Typora</h1>
+<h1 align="center">Open Markdown Lane</h1>
 
 <p align="center">Write in Markdown. Work directly on the page. Keep your files.</p>
 
 <p align="center">
   English · <a href="README.zh-CN.md">简体中文</a><br>
-  <a href="https://open-typora.comicyueyu.chatgpt.site">Try in your browser</a> · <a href="https://github.com/AniChikage/open-typora/releases/latest">Download</a> · <a href="#features">Features</a> · <a href="#documentation">Docs</a> · <a href="CONTRIBUTING.md">Contributing</a> · <a href="LICENSE">MIT License</a>
+  <a href="https://open-typora.comicyueyu.chatgpt.site">Try in your browser</a> · <a href="https://github.com/AniChikage/open-markdown-lane/releases/latest">Download</a> · <a href="#features">Features</a> · <a href="#documentation">Docs</a> · <a href="CONTRIBUTING.md">Contributing</a> · <a href="LICENSE">MIT License</a>
 </p>
 
 > [!IMPORTANT]
-> **Open Typora is an independent, unofficial project. It is not developed, endorsed, or supported by Typora, and is not an official free edition.**
+> **Open Markdown Lane is an independent, unofficial project. It is not developed, endorsed, or supported by Typora, and is not an official free edition.**
 >
 > If you can afford it, please **[buy Typora](https://store.typora.io/)** and support its official developers. Visit **[typora.io](https://typora.io/)** for the official product and support.
 
-![Open Typora — live Markdown editing in the native macOS app](docs/images/hero.png)
+![Open Markdown Lane — live Markdown editing in the native macOS app](docs/images/hero.png)
 
-Open Typora is an open-source Markdown editor inspired by Typora's inline editing experience. Write directly in the rendered document, switch to source when you need it, and save ordinary `.md` files in your own folders.
+Open Markdown Lane is an open-source Markdown editor inspired by Typora's inline editing experience. Write directly in the rendered document, switch to source when you need it, and save ordinary `.md` files in your own folders.
 
 **Status:** early development, version **0.22.0**. Release builds support **macOS 14+ on Apple Silicon**, **Windows 10/11 x64**, and **Linux x64**. The interface supports Simplified Chinese and English (Preferences → Language). This is an independent project, unaffiliated with Typora; full feature and behavior parity is still in progress.
 
@@ -44,9 +44,9 @@ Open Typora is an open-source Markdown editor inspired by Typora's inline editin
 
 See the [feature checklist](docs/feature-parity.md) for coverage and known differences.
 
-[Watch the editing demo](docs/images/editing-demo.gif) · [Project introduction and walkthrough (中文)](docs/introducing-open-typora.zh-CN.md)
+[Watch the editing demo](docs/images/editing-demo.gif) · [Project introduction and walkthrough (中文)](docs/introducing-open-markdown-lane.zh-CN.md)
 
-Trying the preview? [Report a problem](https://github.com/AniChikage/open-typora/issues/new?template=bug_report.yml) or [suggest a feature](https://github.com/AniChikage/open-typora/issues/new?template=feature_request.yml). Include your platform, app version, and a small reproducible example.
+Trying the preview? [Report a problem](https://github.com/AniChikage/open-markdown-lane/issues/new?template=bug_report.yml) or [suggest a feature](https://github.com/AniChikage/open-markdown-lane/issues/new?template=feature_request.yml). Include your platform, app version, and a small reproducible example.
 
 ## Getting started
 
@@ -58,13 +58,15 @@ The demo keeps documents in the current tab's memory; it does not upload or pers
 
 ### Downloads
 
+> **Project rename:** Open Typora is now **Open Markdown Lane** (`open-markdown-lane`). The 0.22.0 downloads below were published under the previous name and retain their original filenames. Renamed installers have not been released yet. [Upgrade compatibility](docs/renaming.md).
+
 | Platform | Installer | Alternative |
 | --- | --- | --- |
-| Windows 10/11 · x64 | **[Download Setup.exe](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/Open-Typora-0.22.0-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/Open-Typora-0.22.0-windows-x64.zip) |
-| macOS 14+ · Apple Silicon | **[Download DMG](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/Open-Typora-0.22.0-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/Open-Typora-0.22.0-arm64.zip) |
-| Linux · x64 | **[Download DEB](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/Open-Typora-0.22.0-linux-x64.deb)** | [AppImage](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/Open-Typora-0.22.0-linux-x64.AppImage) |
+| Windows 10/11 · x64 | **[Download Setup.exe](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.22.0/Open-Typora-0.22.0-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.22.0/Open-Typora-0.22.0-windows-x64.zip) |
+| macOS 14+ · Apple Silicon | **[Download DMG](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.22.0/Open-Typora-0.22.0-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.22.0/Open-Typora-0.22.0-arm64.zip) |
+| Linux · x64 | **[Download DEB](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.22.0/Open-Typora-0.22.0-linux-x64.deb)** | [AppImage](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.22.0/Open-Typora-0.22.0-linux-x64.AppImage) |
 
-[SHA-256 checksums](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/SHA256SUMS.txt) · [All releases](https://github.com/AniChikage/open-typora/releases)
+[SHA-256 checksums](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.22.0/SHA256SUMS.txt) · [All releases](https://github.com/AniChikage/open-markdown-lane/releases)
 
 ### Install on Linux
 
@@ -90,7 +92,7 @@ The Windows build is currently **not code-signed**. Windows may display an unkno
 
 ### Install on macOS
 
-1. Download **[Open-Typora-0.22.0-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/Open-Typora-0.22.0-arm64.dmg)** from [Releases](https://github.com/AniChikage/open-typora/releases/latest).
+1. Download **[Open-Typora-0.22.0-arm64.dmg](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.22.0/Open-Typora-0.22.0-arm64.dmg)** from [Releases](https://github.com/AniChikage/open-markdown-lane/releases/latest).
 2. Open the DMG and drag **Open Typora** into **Applications**.
 3. Launch Open Typora from Applications.
 
@@ -103,19 +105,19 @@ The application is locally signed and **not Apple-notarized**. macOS may ask you
 All platforms need **Node.js 26** and npm. A Typora installation is not required. On macOS, also install the **Xcode Command Line Tools** (`xcode-select --install`).
 
 ```sh
-git clone https://github.com/AniChikage/open-typora.git
-cd open-typora
+git clone https://github.com/AniChikage/open-markdown-lane.git
+cd open-markdown-lane
 npm ci
 npm run package:mac
 ```
 
-Open `release/native/Open Typora.app`, or install it in `~/Applications`:
+Open `release/native/Open Markdown Lane.app`, or install it in `~/Applications`:
 
 ```sh
 node scripts/install.mts
 ```
 
-Quit a running Open Typora before replacing it. The installer preserves application data and removes the previous application after verifying the replacement. The build also produces a ZIP in `release/native/`; `npm run package:release` builds the DMG and checksum file too.
+Quit a running Open Markdown Lane before replacing it. The installer preserves application data and removes the previous application after verifying the replacement. The build also produces a ZIP in `release/native/`; `npm run package:release` builds the DMG and checksum file too.
 
 On Windows x64, also install Visual Studio 2022 Build Tools with the Desktop development with C++ workload and PowerShell 7 (`pwsh`). The build compiles the native preview handler using a pinned WebView2 SDK. Use the same clone and install steps, then build the installer:
 
@@ -211,7 +213,7 @@ More editor and desktop suites, test isolation, and build details are in [CONTRI
 
 ## Contributing
 
-Bug reports, focused fixes, documentation, and reproducible compatibility examples are welcome. Start with [the contribution guide](CONTRIBUTING.md), then open an [issue](https://github.com/AniChikage/open-typora/issues) or a pull request.
+Bug reports, focused fixes, documentation, and reproducible compatibility examples are welcome. Start with [the contribution guide](CONTRIBUTING.md), then open an [issue](https://github.com/AniChikage/open-markdown-lane/issues) or a pull request.
 
 ## License
 

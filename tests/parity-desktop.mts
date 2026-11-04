@@ -4,18 +4,18 @@ import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-const data = await mkdtemp(path.join(os.tmpdir(), "open-typora-parity-"));
-const qa = process.env.OPEN_TYPORA_QA_DIR || path.join(data, "evidence");
+const data = await mkdtemp(path.join(os.tmpdir(), "open-markdown-lane-parity-"));
+const qa = process.env.OPEN_MARKDOWN_LANE_QA_DIR || path.join(data, "evidence");
 await mkdir(qa, {recursive:true});
 const file = path.join(data,"Editing parity 中文.md");
 const original = '# Editing parity\n\n- alpha\n- beta\n- gamma\n\n> - quoted one\n> - quoted two\n\n| A | B |\n| --- | --- |\n| cellA | cellB |\n| cellC | cellD |\n\n```javascript\nlet first = 1;\nlet second = 2;\n```\n\n```sequence\nAlice->Bob: Hello Bob\nNote right of Bob: Bob thinks\nBob-->Alice: I am good thanks\n```\n\n```flow\nst=>start: Start\nop=>operation: Work\ncond=>condition: Ready?\ne=>end: End\nst->op->cond\ncond(yes)->e\ncond(no)->op\n```\n';
 await writeFile(file,original);
-const env: Record<string, string> = {...process.env,OPEN_TYPORA_DATA_DIR:path.join(data,"session")};
-delete env.ELECTRON_RUN_AS_NODE; delete env.OPEN_TYPORA_DEV_URL;
+const env: Record<string, string> = {...process.env,OPEN_MARKDOWN_LANE_DATA_DIR:path.join(data,"session")};
+delete env.ELECTRON_RUN_AS_NODE; delete env.OPEN_MARKDOWN_LANE_DEV_URL;
 let application!: import("playwright").ElectronApplication, page!: import("playwright").Page;
 const errors: string[] = [], checks: string[] = [];
 try {
-  application = await electron.launch({...(process.env.OPEN_TYPORA_EXECUTABLE ? {executablePath:process.env.OPEN_TYPORA_EXECUTABLE,args:[]} : {args:[process.cwd()]}),env,timeout:30000});
+  application = await electron.launch({...(process.env.OPEN_MARKDOWN_LANE_EXECUTABLE ? {executablePath:process.env.OPEN_MARKDOWN_LANE_EXECUTABLE,args:[]} : {args:[process.cwd()]}),env,timeout:30000});
   page = await application.firstWindow(); page.on("pageerror",error => errors.push(error.message));
   await expect(page.getByRole('button',{name:'欢迎.md',exact:true})).toBeVisible({timeout:20000});
   await application.evaluate(({dialog},file: string) => {dialog.showOpenDialog = async () => ({canceled:false,filePaths:[file]});},file);

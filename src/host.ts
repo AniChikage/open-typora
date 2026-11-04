@@ -1,9 +1,10 @@
+import { storedItem } from "./migrateStorage.ts";
 import type { BridgeResponse } from "../shared/contracts.js";
 import type { DocumentRecord, Host, Recovery, SessionSnapshot } from "./types";
 import samples from "../shared/samples.json";
 import { browserBackground, chooseBrowserBackground } from "./browserBackground";
 const browserRecords = new Map<string, DocumentRecord>();
-const key = "open-typora-session-v1";
+const key = "open-markdown-lane-session-v1";
 function draft(name: string, content: string): DocumentRecord {
   return {
     id: crypto.randomUUID(),
@@ -54,7 +55,7 @@ const browser: Host = {
   async restore() {
     let session: Recovery | null = null;
     try {
-      session = JSON.parse(localStorage.getItem(key) || "null");
+      session = JSON.parse(storedItem(localStorage, key) || "null");
     } catch {}
     session ??= {
       documents: samples.map((sample) => draft(sample.name, sample.content)),

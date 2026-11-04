@@ -3,10 +3,10 @@ import { mkdtemp, rm, cp } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 const directory = await mkdtemp(
-  path.join(os.tmpdir(), "open-typora-native-test-"),
+  path.join(os.tmpdir(), "open-markdown-lane-native-test-"),
 );
 try {
-  const executable = path.join(directory, "OpenTypora");
+  const executable = path.join(directory, "OpenMarkdownLane");
   await cp("build/runtime/shared/plugin-loader.mjs", path.join(directory, "plugin-loader.js"));
   execFileSync(
     "/usr/bin/xcrun",

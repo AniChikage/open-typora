@@ -10,7 +10,7 @@ import { backgroundStyle } from "../src/background.ts";
 import formats from "./background-formats.json" with {type:"json"};
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aNNsAAAAASUVORK5CYII=","base64");
 test("background copies survive source removal, failed replacements preserve the last image, clear retains documents",async () => {
-  const folder = await mkdtemp(path.join(os.tmpdir(),"open-typora-background-"));
+  const folder = await mkdtemp(path.join(os.tmpdir(),"open-markdown-lane-background-"));
   try {
     const source = path.join(folder,"source.png"), document = path.join(folder,"note.md");
     await writeFile(source,png); await writeFile(document,"# Keep my words\r\n");

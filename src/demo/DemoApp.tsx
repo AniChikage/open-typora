@@ -14,7 +14,7 @@ import icon from "../../design/icon.svg";
 
 const preferences = { ...defaultPreferences, imageAutoUpload: false, remoteImages: false };
 setMarkdownOptions(preferences);
-const repository = "https://github.com/AniChikage/open-typora";
+const repository = "https://github.com/AniChikage/open-markdown-lane";
 function documentFor(name: string, content: string): DocumentRecord {
   return { id: crypto.randomUUID(), name, content, savedContent: content, path: null, diskHash: null, lineEnding: "\n" };
 }
@@ -130,7 +130,7 @@ export default function DemoApp() {
       setInsertKind(null); editor.current?.focus();
     }} />}
     <header className="demo-header">
-      <a className="demo-brand" href={repository} target="_blank" rel="noreferrer"><img src={icon} alt="" width="36" height="36" /><span>Open Typora</span></a>
+      <a className="demo-brand" href={repository} target="_blank" rel="noreferrer"><img src={icon} alt="" width="36" height="36" /><span>Open Markdown Lane</span></a>
       <span className="demo-label">WEB DEMO</span>
       <nav aria-label="Project"><a href={repository} target="_blank" rel="noreferrer">GitHub <ArrowUpRight size={14} /></a><a className="desktop-link" href={`${repository}/releases/latest`} target="_blank" rel="noreferrer">Get the desktop app <ArrowUpRight size={14} /></a></nav>
     </header>

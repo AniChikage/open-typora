@@ -36,9 +36,9 @@ test('constraints detect number, date, unit and occurrence changes including Chi
   assert.equal(constraintViolations('30万元', '35万元', { ...defaultConstraints, numbers: false }).length, 0);
 });
 test('constraints preserve relative images, reference destinations, raw HTML and code, with explicit term locks', () => {
-  const text = '[说明](docs/a.md) ![图](./图.png)\n\n[ref]: other.md\n\n<img src="./raw.png">\n\n```ts\nconst 名称 = "value";\n```\n\nUse `x + y` with Open Typora.';
+  const text = '[说明](docs/a.md) ![图](./图.png)\n\n[ref]: other.md\n\n<img src="./raw.png">\n\n```ts\nconst 名称 = "value";\n```\n\nUse `x + y` with Open Markdown Lane.';
   for (const [before, after, kind] of [['docs/a.md','https://other.test','links'], ['./图.png','./new.png','links'], ['other.md','../private.md','links'], ['./raw.png','./other.png','links'], ['value','changed','code'], ['x + y','x - y','code']] as const) assert.ok(constraintViolations(text, text.replace(before, after), defaultConstraints).some(item => item.kind === kind));
-  assert.ok(constraintViolations(text, text.replace('Open Typora','new name'), { ...defaultConstraints, terms: ['Open Typora'] }).some(item => item.kind === 'terms'));
+  assert.ok(constraintViolations(text, text.replace('Open Markdown Lane','new name'), { ...defaultConstraints, terms: ['Open Markdown Lane'] }).some(item => item.kind === 'terms'));
   assert.equal(constraintViolations(text, text.replace('说明','文档'), defaultConstraints).length, 0);
 });
 

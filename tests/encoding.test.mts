@@ -6,7 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { DocumentStore, encodeText, decodeText, encodings } from "../build/runtime/electron/store.mjs";
 test("legacy and Unicode byte roundtrips preserve BOM and CRLF", async () => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "open-typora-encoding-"));
+  const directory = await mkdtemp(path.join(os.tmpdir(), "open-markdown-lane-encoding-"));
   try {
     const store = new DocumentStore(directory);
     for (const encoding of encodings) for (const bom of [false, true].filter(b => !b || encoding.startsWith("utf-"))) {
@@ -19,7 +19,7 @@ test("legacy and Unicode byte roundtrips preserve BOM and CRLF", async () => {
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 test("lossy conversion fails before writing; external conflict blocks recoding", async () => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "open-typora-recode-"));
+  const directory = await mkdtemp(path.join(os.tmpdir(), "open-markdown-lane-recode-"));
   try { const file = path.join(directory, "note.md"); await writeFile(file, "original"); const store = new DocumentStore(directory), record = await store.open(file);
     await assert.rejects(store.save(record.id, "中文😀", undefined, false, { encoding: "windows-1252" }), { code: "ENCODING_LOSS" }); assert.equal(await readFile(file, "utf8"), "original"); assert.equal(store.require(record.id).encoding, "utf-8");
     await store.save(record.id, "中文😀\r\n", undefined, false, { encoding: "utf-16be", bom: true });
@@ -31,7 +31,7 @@ test("lossy conversion fails before writing; external conflict blocks recoding",
 });
 
 test("untitled image survives first save and is readable from its persisted reference", async () => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "open-typora-draft-image-"));
+  const directory = await mkdtemp(path.join(os.tmpdir(), "open-markdown-lane-draft-image-"));
   try { const store = new DocumentStore(directory), record = store.registerDraft({ id: "../opaque-id", content: "", name: "图片.md" });
     const bytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aNNsAAAAASUVORK5CYII=', 'base64');
     const reference = await store.importImage(record.id, bytes, '中文.png');

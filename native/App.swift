@@ -133,7 +133,7 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       configuration.websiteDataStore = .nonPersistent()
     #endif
     let content = WKUserContentController()
-    content.add(self, name: "opentypora")
+    content.add(self, name: "markdownLane")
     let script = try! String(
       contentsOf: Bundle.main.resourceURL!.appendingPathComponent("bridge.js"), encoding: .utf8)
     content.addUserScript(
@@ -150,8 +150,8 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
       contentRect: webView.frame,
       styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
       backing: .buffered, defer: false)
-    window.title = "Open Typora"
-    window.tabbingIdentifier = "OpenTypora"
+    window.title = "Open Markdown Lane"
+    window.tabbingIdentifier = "OpenMarkdownLane"
     window.titleVisibility = .hidden
     window.titlebarAppearsTransparent = true
     window.isMovable = true
@@ -161,7 +161,7 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
     window.contentView = webView
     window.delegate = self
     titleObservation = webView.observe(\.title, options: [.new]) { [weak self] view, _ in
-      self?.window.title = view.title ?? "Open Typora"
+      self?.window.title = view.title ?? "Open Markdown Lane"
     }
     if !hidden {
       buildMenu()
@@ -187,7 +187,7 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
     guard let bytes = try? JSONSerialization.data(withJSONObject: message),
       let text = String(data: bytes, encoding: .utf8)
     else { return }
-    webView?.evaluateJavaScript("window.__openTypora?.command(\(text))", completionHandler: nil)
+    webView?.evaluateJavaScript("window.__openMarkdownLane?.command(\(text))", completionHandler: nil)
   }
   func userContentController(
     _ userContentController: WKUserContentController, didReceive message: WKScriptMessage
@@ -321,7 +321,7 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
           }
           for host in participants {
             locked.append(host)
-            let answer = try await host.webView.callAsyncJavaScript("return await window.__openTypora.fileOperation('prepare', change)", arguments: ["change": ["removedPath": operation["action"] == "trash" ? operation["path"] ?? "" : ""]], in: nil, contentWorld: .page)
+            let answer = try await host.webView.callAsyncJavaScript("return await window.__openMarkdownLane.fileOperation('prepare', change)", arguments: ["change": ["removedPath": operation["action"] == "trash" ? operation["path"] ?? "" : ""]], in: nil, contentWorld: .page)
             guard answer as? Bool == true else { throw NativeFailure("文件操作已取消。") }
           }
           let change = try owner.workspace.execute(operation, store: store)
@@ -334,12 +334,12 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
           for host in participants {
             host.store.applyPathChange(change)
             try host.store.persist(SessionRecord(documents: Array(host.store.records.values), activeId: host.store.activeId))
-            _ = try await host.webView.callAsyncJavaScript("return await window.__openTypora.fileOperation('commit', change)", arguments: ["change": change], in: nil, contentWorld: .page)
+            _ = try await host.webView.callAsyncJavaScript("return await window.__openMarkdownLane.fileOperation('commit', change)", arguments: ["change": change], in: nil, contentWorld: .page)
           }
           outcome = ["ok": true, "value": change]
         } catch { outcome = ["ok": false, "error": error.localizedDescription] }
         for host in locked {
-          _ = try? await host.webView.callAsyncJavaScript("return await window.__openTypora.fileOperation('release', {})", arguments: [:], in: nil, contentWorld: .page)
+          _ = try? await host.webView.callAsyncJavaScript("return await window.__openMarkdownLane.fileOperation('release', {})", arguments: [:], in: nil, contentWorld: .page)
         }
         owner.fileOperationRunning = false
         reply(id, outcome)
@@ -419,7 +419,7 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
     guard let data = try? JSONSerialization.data(withJSONObject: ["id": id, "result": result]),
       let text = String(data: data, encoding: .utf8)
     else { return }
-    webView.evaluateJavaScript("window.__openTypora.receive(\(text))", completionHandler: nil)
+    webView.evaluateJavaScript("window.__openMarkdownLane.receive(\(text))", completionHandler: nil)
   }
   func arg<T>(_ args: [Any], _ index: Int, _ type: T.Type) throws -> T {
     guard args.indices.contains(index), let value = args[index] as? T else {
@@ -808,12 +808,12 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
         if raw.contains("Ctrl-") { item.keyEquivalentModifierMask.insert(.control) }
         menu.addItem(item)
     }
-    let appMenu = group("Open Typora")
-    add(EditorCommand(label: "关于 Open Typora", action: "about", key: nil, context: nil, selector: nil), to: appMenu)
+    let appMenu = group("Open Markdown Lane")
+    add(EditorCommand(label: "关于 Open Markdown Lane", action: "about", key: nil, context: nil, selector: nil), to: appMenu)
     add(EditorCommand(label: "偏好设置…", action: "preferences", key: "Mod-,", context: nil, selector: nil), to: appMenu)
     appMenu.addItem(.separator())
-    appMenu.addItem(NSMenuItem(title: l("隐藏 Open Typora"), action: #selector(NSApplication.hide(_:)), keyEquivalent: "h"))
-    add(EditorCommand(label: "退出 Open Typora", action: "quit", key: "Mod-Q", context: nil, selector: nil), to: appMenu)
+    appMenu.addItem(NSMenuItem(title: l("隐藏 Open Markdown Lane"), action: #selector(NSApplication.hide(_:)), keyEquivalent: "h"))
+    add(EditorCommand(label: "退出 Open Markdown Lane", action: "quit", key: "Mod-Q", context: nil, selector: nil), to: appMenu)
     for definition in owner.commandGroups where definition.title != "表格" {
       let menu = group(definition.title)
       for command in definition.items where command.action != "preferences" {
@@ -837,8 +837,19 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
     NSApp.windowsMenu = menu
   }
 }
+// Upgrade compatibility: prefer existing data without moving files while another
+// process may still hold them. A fresh installation uses the new product name.
+func laneEnvironment(_ name: String) -> String? {
+  ProcessInfo.processInfo.environment["OPEN_MARKDOWN_LANE_" + name]
+    ?? ProcessInfo.processInfo.environment["OPEN_TYPORA_" + name]
+}
+func laneDataDirectory(_ root: URL, preview: Bool) -> URL {
+  let legacy = root.appendingPathComponent(preview ? "Open Typora Preview" : "Open Typora")
+  return FileManager.default.fileExists(atPath: legacy.path) ? legacy
+    : root.appendingPathComponent(preview ? "Open Markdown Lane Preview" : "Open Markdown Lane")
+}
 final class NativeApplication: NSObject, NSApplicationDelegate, NSMenuItemValidation {
-  lazy var ai = NativeAIService(ProcessInfo.processInfo.environment["OPEN_TYPORA_AI_SETTINGS_DIR"].map { URL(fileURLWithPath: $0) } ?? directory)
+  lazy var ai = NativeAIService(laneEnvironment("AI_SETTINGS_DIR").map { URL(fileURLWithPath: $0) } ?? directory)
   lazy var workspace = Workspace(directory)
   lazy var editBatches = EditBatchStore(directory)
   var uiLocale = "zh-CN"
@@ -853,11 +864,9 @@ final class NativeApplication: NSObject, NSApplicationDelegate, NSMenuItemValida
   var launched = false
   var files = [URL]()
   lazy var directory: URL =
-    ProcessInfo.processInfo.environment["OPEN_TYPORA_DATA_DIR"].map { URL(fileURLWithPath: $0) }
-    ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-    .appendingPathComponent(
-      Bundle.main.bundleIdentifier?.hasSuffix(".preview") == true
-        ? "Open Typora Preview" : "Open Typora")
+    laneEnvironment("DATA_DIR").map { URL(fileURLWithPath: $0) }
+    ?? laneDataDirectory(FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0],
+      preview: Bundle.main.bundleIdentifier?.hasSuffix(".preview") == true)
   var current: NativeWindowHost? {
     hosts.first(where: { $0.window === NSApp.keyWindow }) ?? hosts.first(where: {
       $0.window === NSApp.mainWindow
@@ -986,7 +995,7 @@ final class NativeApplication: NSObject, NSApplicationDelegate, NSMenuItemValida
     }
     host.titleObservation?.invalidate()
     host.webView.configuration.userContentController.removeScriptMessageHandler(
-      forName: "opentypora")
+      forName: "markdownLane")
     host.webView.stopLoading()
     host.window.close()
     hosts.removeAll(where: { $0 === host })
@@ -1028,7 +1037,7 @@ final class NativeApplication: NSObject, NSApplicationDelegate, NSMenuItemValida
   }
 }
 #if !WEBTEST
-  @main struct OpenTyporaMain {
+  @main struct OpenMarkdownLaneMain {
     static func main() {
       #if STORETEST
       if CommandLine.arguments.contains("--store-test") {

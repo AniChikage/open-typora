@@ -19,9 +19,9 @@ await build({
     extraResources: [{from:"build/windows-preview",to:"markdown-preview",filter:["MarkdownPreview.dll","Microsoft-WebView2-LICENSE.txt","dist/**/*"]}],
     electronVersion: pkg.devDependencies.electron,
     fileAssociations: pkg.build.fileAssociations,
-    win: { icon: "build/icon.ico", artifactName: "Open-Typora-${version}-windows-${arch}.${ext}" },
+    win: { icon: "build/icon.ico", artifactName: "Open-Markdown-Lane-${version}-windows-${arch}.${ext}" },
     nsis: {
-      artifactName: "Open-Typora-${version}-windows-${arch}-Setup.${ext}",
+      artifactName: "Open-Markdown-Lane-${version}-windows-${arch}-Setup.${ext}",
       include: path.resolve("windows-preview/installer.nsh"),
       oneClick: false, perMachine: false, allowToChangeInstallationDirectory: true,
       createDesktopShortcut: true, runAfterFinish: false,
@@ -29,7 +29,7 @@ await build({
     },
   },
 });
-const names = [`Open-Typora-${pkg.version}-windows-x64-Setup.exe`, `Open-Typora-${pkg.version}-windows-x64.zip`];
+const names = [`Open-Markdown-Lane-${pkg.version}-windows-x64-Setup.exe`, `Open-Markdown-Lane-${pkg.version}-windows-x64.zip`];
 const sums = [];
 for (const name of names) {
   const bytes = await readFile(path.join("release/windows", name));
@@ -38,6 +38,6 @@ for (const name of names) {
 }
 await writeFile("release/windows/SHA256SUMS-windows-x64.txt", sums.join("\n") + "\n");
 for (const name of await readdir("release/windows")) {
-  if (/^Open-Typora-\d[\w.-]*\.(exe|zip|blockmap)$/.test(name) && !names.includes(name) && !name.startsWith(`Open-Typora-${pkg.version}-`)) await rm(path.join("release/windows", name));
+  if (/^Open-Markdown-Lane-\d[\w.-]*\.(exe|zip|blockmap)$/.test(name) && !names.includes(name) && !name.startsWith(`Open-Markdown-Lane-${pkg.version}-`)) await rm(path.join("release/windows", name));
 }
 console.log(sums.join("\n"));

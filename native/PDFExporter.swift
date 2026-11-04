@@ -56,7 +56,7 @@ final class PDFExporter: NSObject, WKNavigationDelegate {
       await document.fonts.ready;
       await Promise.all([...document.images].map(image => image.complete ? Promise.resolve() : new Promise(resolve => { image.onload = image.onerror = resolve; setTimeout(resolve, 5000); })));
       \(paginationScript)
-      return openTyporaPagination(root, pageHeight);
+      return openMarkdownLanePagination(root, pageHeight);
       """
     let pageHeight = view.frame.height - ((options["header"] as? String ?? "").isEmpty ? 0 : 16) - ((options["footer"] as? String ?? "").isEmpty ? 0 : 16)
     view.callAsyncJavaScript(measurement, arguments: ["pageHeight": pageHeight], in: nil, in: .page) { result in
@@ -104,7 +104,7 @@ final class PDFExporter: NSObject, WKNavigationDelegate {
     let header = options["header"] as? String ?? "", footer = options["footer"] as? String ?? ""
     let headerSpace = header.isEmpty ? 0.0 : 16.0
     let output = NSMutableData()
-    guard let consumer = CGDataConsumer(data: output), let context = CGContext(consumer: consumer, mediaBox: nil, [kCGPDFContextTitle as String: options["title"] as? String ?? "", kCGPDFContextCreator as String: "Open Typora"] as CFDictionary) else { throw NativeFailure("无法创建 PDF。") }
+    guard let consumer = CGDataConsumer(data: output), let context = CGContext(consumer: consumer, mediaBox: nil, [kCGPDFContextTitle as String: options["title"] as? String ?? "", kCGPDFContextCreator as String: "Open Markdown Lane"] as CFDictionary) else { throw NativeFailure("无法创建 PDF。") }
     for (index, data) in pages.enumerated() {
       guard let provider = CGDataProvider(data: data as CFData), let document = CGPDFDocument(provider), let page = document.page(at: 1) else { throw NativeFailure("WebKit 未生成有效 PDF 页面。") }
       let source = page.getBoxRect(.mediaBox), scale = (width - margin * 2) / source.width

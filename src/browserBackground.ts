@@ -2,6 +2,7 @@ import { backgroundMime, checkedBackground } from "../shared/background.mjs";
 import type { BackgroundAsset } from "./background";
 async function database() {
   return new Promise<IDBDatabase>((resolve,reject) => {
+    // Stable database name preserves uploaded backgrounds across the rename.
     const request = indexedDB.open("open-typora-appearance-v1",1);
     request.onupgradeneeded = () => request.result.createObjectStore("assets");
     request.onsuccess = () => resolve(request.result);

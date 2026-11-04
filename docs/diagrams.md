@@ -1,6 +1,6 @@
 # Diagram compatibility
 
-Open Typora renders `mermaid` fences offline. Version 0.8 also accepts a common subset of the legacy `sequence` and `flow` syntax described in [Typora's public documentation](https://support.typora.io/Draw-Diagrams-With-Markdown/).
+Open Markdown Lane renders `mermaid` fences offline. Version 0.8 also accepts a common subset of the legacy `sequence` and `flow` syntax described in [Typora's public documentation](https://support.typora.io/Draw-Diagrams-With-Markdown/).
 
 Legacy syntax is translated only for rendering. Your Markdown file, source view, undo history and code fence language retain the original text. The layout uses Mermaid and will differ from js-sequence / flowchart.js.
 

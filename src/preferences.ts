@@ -1,3 +1,4 @@
+import { storedItem } from "./migrateStorage.ts";
 import { backgroundDefaults } from "./background.ts";
 export interface Preferences {
   language: "zh-CN" | "en";
@@ -15,7 +16,7 @@ export interface Preferences {
 export const defaultPreferences: Preferences = { language: "zh-CN", ...backgroundDefaults, imageUploader: "http://127.0.0.1:36677/upload", imageAutoUpload: false, remoteImages: true, imageFolder: ".assets", imagePrefix: false, imageEscape: true, pdfHeadingLevel: 0, pdfKeepTogether: true, pdfRepeatTableHeaders: true, pdfWidows: 2, pdfPaper: "a4", pdfMargin: 36, pdfHeader: "", pdfFooter: "", readingSpeed: 200, fontSize: 16, tabSize: 2, spellcheck: true, autoPair: true, highlight: true, subscript: true, superscript: true, emoji: true, inlineMath: true };
 export function loadPreferences(): Preferences {
   try {
-    const saved = JSON.parse(localStorage.getItem("open-typora-preferences") || "{}");
+    const saved = JSON.parse(storedItem(localStorage, "open-markdown-lane-preferences") || "{}");
     const next = { ...defaultPreferences };
     if (saved.language === "en") next.language = "en";
     if (Number.isFinite(saved.backgroundOpacity)) next.backgroundOpacity = Math.max(0,Math.min(100,saved.backgroundOpacity));

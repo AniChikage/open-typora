@@ -4,14 +4,14 @@ import {mkdtemp, mkdir, writeFile, readFile} from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 
-const directory=await mkdtemp(path.join(os.tmpdir(),'open-typora-community-'));
+const directory=await mkdtemp(path.join(os.tmpdir(),'open-markdown-lane-community-'));
 const profile=path.join(directory,'profile'); await mkdir(profile);
-const qa=process.env.OPEN_TYPORA_QA_DIR||path.join(directory,'evidence'); await mkdir(qa,{recursive:true});
+const qa=process.env.OPEN_MARKDOWN_LANE_QA_DIR||path.join(directory,'evidence'); await mkdir(qa,{recursive:true});
 const image='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aNNsAAAAASUVORK5CYII=';
 const markdown='# Community plugins\n\nFirst paragraph **bold 中文** and *emphasis*.\n\nSecond paragraph stays intact.\n\n- first item\n- second item\n\n- [ ] preserve task\n\n![pixel]('+image+')\n\n| A | B |\n| --- | --- |\n| cell 中文 | stable |\n\n```text\ncode 中文\n```\n';
 const documents=await Promise.all(['A.md','B.md'].map(async(name: string,i)=>{const file=path.join(directory,name);await writeFile(file,markdown);return {id:'community-'+i,name,path:file,content:markdown,savedContent:markdown,lineEnding:'\n',encoding:'utf-8',bom:false};}));
 await writeFile(path.join(profile,'session.json'),JSON.stringify({version:1,documents,activeId:documents[0].id}));
-const env: Record<string, string>={...process.env,OPEN_TYPORA_DATA_DIR:profile}; delete env.ELECTRON_RUN_AS_NODE;delete env.OPEN_TYPORA_DEV_URL;
+const env: Record<string, string>={...process.env,OPEN_MARKDOWN_LANE_DATA_DIR:profile}; delete env.ELECTRON_RUN_AS_NODE;delete env.OPEN_MARKDOWN_LANE_DEV_URL;
 const names=['列表折叠','只读模式','无图阅读','段落聚焦','常显语法标记','反色夜间模式'];
 let app!: import("playwright").ElectronApplication, page!: import("playwright").Page;const errors: string[]=[],checks: string[]=[];
 const pane=()=>page.locator('.document-editor[data-active="true"]');
@@ -23,10 +23,10 @@ async function closeManager(){await (await manager()).getByRole('button',{name:'
 async function enable(name: string,value=true){await manager();const box=card(name).getByRole('checkbox',{name:'启用'+name,exact:true});await expect(box).toBeEnabled();await box.setChecked(value);await expect(card(name).locator('.plugin-toggle')).toContainText(value?'已启用':'未启用');await expect(card(name)).not.toContainText('加载失败');}
 async function unchanged(){for(const document of documents)assert.equal(await readFile(document.path,'utf8'),markdown);}
 async function stop(){if(app){await app.evaluate(({BrowserWindow,app})=>{for(const window of BrowserWindow.getAllWindows())window.webContents.session.flushStorageData();app.exit(0);}).catch(()=>{});await app.close().catch(()=>{});app=null!;}}
-async function launch(){app=await electron.launch({...(process.env.OPEN_TYPORA_EXECUTABLE?{executablePath:process.env.OPEN_TYPORA_EXECUTABLE,args:[]}:{args:[process.cwd()]}),env,timeout:60000});page=await app.firstWindow();page.on('pageerror',e=>errors.push(e.message));await page.setViewportSize({width:1300,height:900});await page.emulateMedia({colorScheme:'light'});await expect(page.getByRole('tab',{name:'A.md',exact:true})).toBeVisible({timeout:20000});}
+async function launch(){app=await electron.launch({...(process.env.OPEN_MARKDOWN_LANE_EXECUTABLE?{executablePath:process.env.OPEN_MARKDOWN_LANE_EXECUTABLE,args:[]}:{args:[process.cwd()]}),env,timeout:60000});page=await app.firstWindow();page.on('pageerror',e=>errors.push(e.message));await page.setViewportSize({width:1300,height:900});await page.emulateMedia({colorScheme:'light'});await expect(page.getByRole('tab',{name:'A.md',exact:true})).toBeVisible({timeout:20000});}
 async function fold(){const list=root().locator(':scope > ul').first();await expect(root()).toHaveAttribute('id','write');const box=await list.boundingBox();assert.ok(box);console.log('FOLD-TARGET',await pane().getAttribute('data-document-id'));await page.mouse.click(box.x-11,box.y+4);await expect(list).toHaveClass(/plugin-collapsed-list/);await expect(list.locator(':scope > li').nth(1)).toBeHidden();}
 try{
- await launch();assert.match(await page.title(),/A\.md — Open Typora/);await expect(root().getByRole('heading',{name:'Community plugins',exact:true})).toBeVisible();
+ await launch();assert.match(await page.title(),/A\.md — Open Markdown Lane/);await expect(root().getByRole('heading',{name:'Community plugins',exact:true})).toBeVisible();
  await enable('列表折叠');await closeManager();await fold();
  await page.getByRole('tab',{name:'B.md',exact:true}).click();await expect(pane()).toHaveAttribute('data-document-id','community-1');await fold();
  await command('split-right');await expect(page.locator('.document-editor:not([hidden])')).toHaveCount(2);

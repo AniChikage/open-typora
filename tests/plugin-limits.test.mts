@@ -8,7 +8,7 @@ import {installPlugin,plugins} from '../build/runtime/electron/plugins.mjs';
 import {pluginResource,validatePlugin} from '../build/runtime/electron/resources.mjs';
 
 test('issue #7: multi-file modules above the old resource cap install, load and preserve original source',async()=>{
-  const root=await mkdtemp(path.join(os.tmpdir(),'open-typora-issue7-'));
+  const root=await mkdtemp(path.join(os.tmpdir(),'open-markdown-lane-issue7-'));
   try {
     const profile=path.join(root,'profile'),folder=path.join(root,'source');await mkdir(profile);await mkdir(folder);
     const original='module.exports.plugin=class extends BasePlugin {};\n/*'+'x'.repeat(700000)+'*/';
@@ -33,7 +33,7 @@ test('plugin limits count UTF-8 bytes, allow exactly 16 MiB, and reject source/p
   assert.throws(()=>pluginPackage('index.js',{'index.js':exact,'a.js':exact,'b.js':'x'}),/32 MiB/);
   // CSS quoting expands sixfold. Validate the actual wrapped size, not only input bytes.
   assert.throws(()=>pluginPackage('index.js',{'index.js':'module.exports.plugin=class {};','large.css':'\u0001'.repeat(11*1024*1024)}),/64 MiB/);
-  const root=await mkdtemp(path.join(os.tmpdir(),'open-typora-plugin-source-limit-'));
+  const root=await mkdtemp(path.join(os.tmpdir(),'open-markdown-lane-plugin-source-limit-'));
   try{
     const profile=path.join(root,'profile');await mkdir(profile);const file=path.join(root,'large.js');await writeFile(file,exact+'x');
     await assert.rejects(installPlugin(file,profile),/16 MiB/);assert.deepEqual(await plugins(profile),[]);
@@ -43,7 +43,7 @@ test('plugin limits count UTF-8 bytes, allow exactly 16 MiB, and reject source/p
   }finally{await rm(root,{recursive:true,force:true});}
 });
 test('installed plugin preflight keeps resource bounds, regular-file and canonical-path checks with actionable errors',async()=>{
-  const root=await mkdtemp(path.join(os.tmpdir(),'open-typora-plugin-resource-limit-'));
+  const root=await mkdtemp(path.join(os.tmpdir(),'open-markdown-lane-plugin-resource-limit-'));
   try{
     const profile=path.join(root,'profile'),pluginsDir=path.join(profile,'plugins');await mkdir(pluginsDir,{recursive:true});
     const id='local-'+'a'.repeat(64),file=path.join(pluginsDir,id+'.mjs');await writeFile(file,'');await truncate(file,pluginLimits.resource);

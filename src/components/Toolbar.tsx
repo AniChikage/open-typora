@@ -63,7 +63,7 @@ export function Toolbar(props: Props) {
     <>
       <header className="toolbar">
         <span className="document-title" title={props.name}>
-          {props.name || "Open Typora"}
+          {props.name || "Open Markdown Lane"}
           {props.edited && <span className="title-edited">{t("— 已编辑")}</span>}
         </span>
       </header>
@@ -158,7 +158,7 @@ export function Toolbar(props: Props) {
                 }}
               >
                 <span className="menu-check" />
-                <span>{t("关于 Open Typora")}</span>
+                <span>{t("关于 Open Markdown Lane")}</span>
                 <kbd>{version}</kbd>
               </button>
             </div>

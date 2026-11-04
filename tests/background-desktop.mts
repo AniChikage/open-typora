@@ -4,8 +4,8 @@ import path from "node:path";
 import os from "node:os";
 import assert from "node:assert/strict";
 import formats from "./background-formats.json" with {type:"json"};
-const directory = await mkdtemp(path.join(os.tmpdir(),"open-typora-background-desktop-"));
-const env: Record<string, string>={...process.env,OPEN_TYPORA_DATA_DIR:directory,OPEN_TYPORA_TEST_HIDDEN:"1"};delete env.ELECTRON_RUN_AS_NODE;delete env.OPEN_TYPORA_DEV_URL;
+const directory = await mkdtemp(path.join(os.tmpdir(),"open-markdown-lane-background-desktop-"));
+const env: Record<string, string>={...process.env,OPEN_MARKDOWN_LANE_DATA_DIR:directory,OPEN_MARKDOWN_LANE_TEST_HIDDEN:"1"};delete env.ELECTRON_RUN_AS_NODE;delete env.OPEN_MARKDOWN_LANE_DEV_URL;
 let application;
 try {
   application=await electron.launch({args:[process.cwd()],env,timeout:30000});let page=await application.firstWindow();
@@ -35,5 +35,5 @@ try {
   console.log('PASS: actual Electron HTML export excludes the personal background');
   await page.getByRole('button',{name:'更多操作',exact:true}).click();await page.getByRole('menuitem',{name:'偏好设置…',exact:true}).click();
   await page.getByRole('button',{name:'清除背景',exact:true}).click();await expect(page.locator('.editor-background')).toHaveCount(0);
-  const qa=process.env.OPEN_TYPORA_QA_DIR;if(qa){await mkdir(qa,{recursive:true});await page.screenshot({path:path.join(qa,'electron-background.png')});}
+  const qa=process.env.OPEN_MARKDOWN_LANE_QA_DIR;if(qa){await mkdir(qa,{recursive:true});await page.screenshot({path:path.join(qa,'electron-background.png')});}
 } finally {await application?.close();}

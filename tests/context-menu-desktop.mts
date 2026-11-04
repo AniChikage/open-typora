@@ -4,8 +4,8 @@ import {mkdtemp,mkdir,writeFile,readFile,realpath,stat} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import path from 'node:path';
 import os from 'node:os';
-const directory=await realpath(await mkdtemp(path.join(os.tmpdir(),'open-typora-menus-'))),profile=path.join(directory,'profile');
-const qa=process.env.OPEN_TYPORA_QA_DIR||path.join(directory,'evidence');await mkdir(profile);await mkdir(qa,{recursive:true});
+const directory=await realpath(await mkdtemp(path.join(os.tmpdir(),'open-markdown-lane-menus-'))),profile=path.join(directory,'profile');
+const qa=process.env.OPEN_MARKDOWN_LANE_QA_DIR||path.join(directory,'evidence');await mkdir(profile);await mkdir(qa,{recursive:true});
 const alpha='# Alpha\n\nFirst paragraph: alpha 中国.\n\nSecond paragraph: beta.\n';
 const table='# Table\n\n| Key | Value |\n| --- | --- |\n| row-one | A |\n| row-two | B |\n\nAfter table.\n';
 const big='| Key | Value |\n|---|---|\n'+Array.from({length:12000},(_,i)=>`| row-${i} | stable 中文 value ${i} ${'x'.repeat(30)} |`).join('\n')+'\n\n# End\n';
@@ -14,7 +14,7 @@ const names=['Alpha 中国.md','Table.md','Big table.md','Other.md'];
 const records: (import("../shared/contracts.js").DocumentRecord & {path: string})[]=[];
 for(let i=0;i<names.length;i++){const file=path.join(directory,names[i]);await writeFile(file,texts[i]);records.push({id:'menus-'+i,path:file,name:names[i],content:texts[i],savedContent:texts[i],diskHash:createHash('sha256').update(texts[i]).digest('hex'),lineEnding:'\n',encoding:'utf-8',bom:false});}
 await writeFile(path.join(profile,'session.json'),JSON.stringify({version:1,documents:records,activeId:records[0].id}));
-const env: Record<string, string>={...process.env,OPEN_TYPORA_DATA_DIR:profile};delete env.ELECTRON_RUN_AS_NODE;delete env.OPEN_TYPORA_DEV_URL;
+const env: Record<string, string>={...process.env,OPEN_MARKDOWN_LANE_DATA_DIR:profile};delete env.ELECTRON_RUN_AS_NODE;delete env.OPEN_MARKDOWN_LANE_DEV_URL;
 const mod=process.platform==='darwin'?'Meta':'Control';
 let app!: import("playwright").ElectronApplication, page!: import("playwright").Page;const errors: string[]=[],checks: string[]=[];
 const pane=(id: string)=>page.locator(`.document-editor[data-document-id="${id}"]`);
@@ -37,14 +37,14 @@ async function selectText(id: string,text: string){await pane(id).locator('.rich
 },text);}
 async function selectedMenu(){const rect=await page.evaluate(()=>{const r=getSelection()!.getRangeAt(0).getBoundingClientRect();return {x:r.left+Math.min(3,r.width/2),y:r.top+r.height/2};});await page.mouse.click(rect.x,rect.y,{button:'right'});await expect(menu('正文编辑菜单')).toBeVisible();return menu('正文编辑菜单');}
 try{
- app=await electron.launch({...(process.env.OPEN_TYPORA_EXECUTABLE?{executablePath:process.env.OPEN_TYPORA_EXECUTABLE,args:[]}:{args:[process.cwd()]}),env,timeout:60000});
+ app=await electron.launch({...(process.env.OPEN_MARKDOWN_LANE_EXECUTABLE?{executablePath:process.env.OPEN_MARKDOWN_LANE_EXECUTABLE,args:[]}:{args:[process.cwd()]}),env,timeout:60000});
  page=await app.firstWindow();page.on('pageerror',error=>errors.push(error.message));await page.setViewportSize({width:1300,height:900});
  if(process.platform==='darwin')await app.evaluate(({app,BrowserWindow})=>{const win=BrowserWindow.getAllWindows()[0];win.show();app.focus({steal:true});win.focus();});
  await expect(tab(names[0])).toHaveAttribute('aria-selected','true',{timeout:20000});await expect(page.getByRole('tab')).toHaveCount(4);
- assert.match(await page.title(),/Alpha 中国\.md — Open Typora/);await expect(pane('menus-0').locator('.rich-document')).toContainText('First paragraph:');
+ assert.match(await page.title(),/Alpha 中国\.md — Open Markdown Lane/);await expect(pane('menus-0').locator('.rich-document')).toContainText('First paragraph:');
  const initialMenu=await tabMenu(names[0]),initialAuto=initialMenu.getByRole('menuitemcheckbox',{name:'自动保存已有文件',exact:true});
  if(await initialAuto.getAttribute('aria-checked')==='true')await initialAuto.click();else await page.keyboard.press('Escape');
- await expect.poll(()=>page.evaluate(()=>localStorage.getItem('open-typora-autosave'))).toBe('false');
+ await expect.poll(()=>page.evaluate(()=>localStorage.getItem('open-markdown-lane-autosave'))).toBe('false');
  await app.evaluate(async({clipboard,shell})=>{globalThis.__menuClipboard=await clipboard.read();globalThis.__menuReveals=[];shell.showItemInFolder=(file: string)=>globalThis.__menuReveals.push(['reveal',file]);shell.openPath=async (file: string)=>{globalThis.__menuReveals.push(['open',file]);return '';};});
  for(const [label,expected] of [['复制文件名（含扩展名）',names[1]],['复制文件名（不含扩展名）','Table'],['复制完整路径',records[1].path],['复制带引号完整路径','"'+records[1].path+'"'],['复制所在文件夹路径',directory]]){
   await chooseTab(names[1],label);await expect.poll(()=>app.evaluate(async({clipboard},expected)=>await clipboard.readText()===expected,expected)).toBe(true);await expect(tab(names[0])).toHaveAttribute('aria-selected','true');
@@ -113,7 +113,7 @@ try{
  await chooseTab(names[1],'重命名文件…');const rename=page.getByRole('dialog',{name:'重命名',exact:true});await rename.getByRole('textbox',{name:'文件名称',exact:true}).fill('Renamed table.md');await rename.getByRole('button',{name:'确定',exact:true}).click();await expect(tab('Renamed table.md')).toBeVisible();await expect(tab(names[0])).toHaveAttribute('aria-selected','true');const renamed=path.join(directory,'Renamed table.md');assert.equal(await readFile(renamed,'utf8'),table);await assert.rejects(stat(records[1].path),{code:'ENOENT'});names[1]='Renamed table.md';records[1].path=renamed;
  await tabMenu(names[0]);const auto=menu('标签页菜单').getByRole('menuitemcheckbox',{name:'自动保存已有文件',exact:true});
  await expect(auto).toHaveAttribute('aria-checked','false');await page.keyboard.press('Escape');
- await expect.poll(()=>page.evaluate(()=>localStorage.getItem('open-typora-autosave'))).toBe('false');
+ await expect.poll(()=>page.evaluate(()=>localStorage.getItem('open-markdown-lane-autosave'))).toBe('false');
  await selectText('menus-0','alpha');await page.keyboard.insertText('DIRTY-ALPHA');
  await expect(pane('menus-0').locator('.rich-document')).toContainText('DIRTY-ALPHA');await expect(tab(names[0]).locator('..').locator('.tab-dirty')).toHaveCount(1);
  await tab(names[1]).click();await expect(tablePane).toHaveAttribute('data-active','true');await tablePane.getByRole('cell',{name:'B',exact:true}).click();
@@ -134,7 +134,7 @@ try{
  assert.deepEqual(errors,[]);await expect(page.locator('vite-error-overlay')).toHaveCount(0);
  await writeFile(path.join(qa,'context-menu-results.json'),JSON.stringify({platform:process.platform,browser:'Browser plugin not available; existing Electron/Playwright workflow',profile,checks,errors},null,2));console.log(checks.map(check=>'PASS: '+check).join('\n'));
 }catch(error){
- const state=page?await page.evaluate(()=>({autosave:localStorage.getItem('open-typora-autosave'),tabs:[...document.querySelectorAll<HTMLElement>('.document-tab')].map(tab=>({name:tab.querySelector<HTMLElement>('[role="tab"]')!?.textContent,dirty:!!tab.querySelector<HTMLElement>('.tab-dirty')!})),selection:getSelection()!?.toString(),focused:document.activeElement!?.outerHTML.slice(0,240)})).catch(()=>null):null;
+ const state=page?await page.evaluate(()=>({autosave:localStorage.getItem('open-markdown-lane-autosave'),tabs:[...document.querySelectorAll<HTMLElement>('.document-tab')].map(tab=>({name:tab.querySelector<HTMLElement>('[role="tab"]')!?.textContent,dirty:!!tab.querySelector<HTMLElement>('.tab-dirty')!})),selection:getSelection()!?.toString(),focused:document.activeElement!?.outerHTML.slice(0,240)})).catch(()=>null):null;
  console.log('MENU-FAILURE-STATE',JSON.stringify(state));
  if(app)console.log('MENU-CONFIRM-CALLS',JSON.stringify(await app.evaluate(()=>globalThis.__menuConfirmCalls).catch(()=>null)));
  await page?.screenshot({path:path.join(qa,'context-menu-failure.png')}).catch(()=>{});throw error;

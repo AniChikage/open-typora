@@ -7,7 +7,7 @@ import {pathToFileURL} from 'node:url';
 import {exportResource} from '../build/runtime/electron/resources.mjs';
 import {DocumentStore} from '../build/runtime/electron/store.mjs';
 test('export resource bridge reads bundled styles and owned images, rejecting arbitrary files and active content',async t=>{
-  const root = await mkdtemp(path.join(os.tmpdir(),'open-typora-export-'));t.after(()=>rm(root,{recursive:true,force:true}));
+  const root = await mkdtemp(path.join(os.tmpdir(),'open-markdown-lane-export-'));t.after(()=>rm(root,{recursive:true,force:true}));
   const bundle=path.join(root,'dist'); await mkdir(bundle);
   await writeFile(path.join(bundle,'style.css'),'body{color:black}');await writeFile(path.join(bundle,'script.js'),'alert(1)');
   const outside=path.join(root,'outside.css'); await writeFile(outside,'private');

@@ -1,5 +1,5 @@
 // Shared with the native WebKit exporter. This file has no application bridge.
-function openTyporaPagination(root: Element | null, pageHeight: number) {
+function openMarkdownLanePagination(root: Element | null, pageHeight: number) {
   if (!root || !(pageHeight > 0)) throw new Error('Invalid print area');
   const range = document.createRange(); range.selectNodeContents(root);
   const height = Math.ceil(Math.max(1, range.getBoundingClientRect().bottom));

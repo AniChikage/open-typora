@@ -17,7 +17,7 @@ export async function prepareElectronApplication(platform: "linux" | "windows") 
   await writeFile(path.join(application, "package.json"), JSON.stringify({
     name: pkg.name, version: pkg.version, description: pkg.description,
     main: "electron/main.mjs", type: "module", license: pkg.license, author: pkg.author,
-    ...(platform === "linux" ? { desktopName: "open-typora.desktop" } : {}),
+    ...(platform === "linux" ? { desktopName: "open-markdown-lane.desktop" } : {}),
     homepage: pkg.homepage, dependencies: { "iconv-lite": pkg.dependencies["iconv-lite"] },
   }, null, 2));
   return application;

@@ -15,7 +15,7 @@ const {codeBody}=await import('../src/editor/richRender.ts');
 const {parseBlocks}=await import('../src/editor/markdown.ts');
 
 test('32 MiB Markdown opens, saves, recovers and encodes beyond the previous cap',async()=>{
- const directory=await mkdtemp(path.join(os.tmpdir(),'open-typora-unbounded-')),file=path.join(directory,'large.md');
+ const directory=await mkdtemp(path.join(os.tmpdir(),'open-markdown-lane-unbounded-')),file=path.join(directory,'large.md');
  const content='# Large\n'+'x'.repeat(32*1024*1024)+'\n';await writeFile(file,content);
  const store=new DocumentStore(path.join(directory,'profile')),record=await store.open(file);
  assert.equal(record.content,content);await store.save(record.id,content+'保存');

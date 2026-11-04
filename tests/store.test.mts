@@ -17,7 +17,7 @@ import os from "node:os";
 import path from "node:path";
 import { DocumentStore, atomicWrite } from "../build/runtime/electron/store.mjs";
 async function setup(text = "# 原文\n\n中文内容\n") {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "open-typora-test-"));
+  const directory = await mkdtemp(path.join(os.tmpdir(), "open-markdown-lane-test-"));
   const file = path.join(directory, "note.md");
   await writeFile(file, text);
   const store = new DocumentStore(path.join(directory, ".recovery"));
@@ -121,7 +121,7 @@ test("folder inventory ignores symlinks and only grants Markdown files", async (
 });
 test("image reads reject directory traversal and external symlinks", async () => {
   const { store, directory, record } = await setup();
-  const outside = await mkdtemp(path.join(os.tmpdir(), "open-typora-outside-"));
+  const outside = await mkdtemp(path.join(os.tmpdir(), "open-markdown-lane-outside-"));
   await writeFile(path.join(outside, "image.png"), "outside");
   await symlink(outside, path.join(directory, "linked"), process.platform === "win32" ? "junction" : "dir");
   await assert.rejects(store.asset(record.id, "linked/image.png"), /之外/);
@@ -149,7 +149,7 @@ test("corrupt recovery is backed up before a new session is written", async () =
 });
 
 test("failed folder scans preserve the previous root and file tokens", async t => {
-  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), "open-typora-scan-")));
+  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), "open-markdown-lane-scan-")));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const file = path.join(directory, "note.md"); await writeFile(file, "# retained");
   const store = new DocumentStore(path.join(directory, "data")), inventory = await store.scan(directory);
@@ -162,7 +162,7 @@ test("failed folder scans preserve the previous root and file tokens", async t =
   assert.equal((await store.scan()).folder, directory, "a rejected scan does not poison the scan queue");
 });
 test("concurrent folder switches and refreshes commit in request order", async t => {
-  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), "open-typora-scan-order-")));
+  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), "open-markdown-lane-scan-order-")));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const a = path.join(directory, "a"), b = path.join(directory, "b");
   await mkdir(a); await mkdir(b); await writeFile(path.join(a, "a.md"), "A"); await writeFile(path.join(b, "b.md"), "B");
@@ -173,7 +173,7 @@ test("concurrent folder switches and refreshes commit in request order", async t
   assert.equal((await store.openToken(refreshed.files[0].token)).content, "B");
 });
 test("unreadable subfolders retain readable siblings and recover on refresh", { skip: process.platform === "win32" || process.getuid?.() === 0 }, async t => {
-  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), "open-typora-scan-permissions-")));
+  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), "open-markdown-lane-scan-permissions-")));
   const locked = path.join(directory, "a-locked"), readable = path.join(directory, "b-readable");
   t.after(async () => { await chmod(locked, 0o700); await rm(directory, { recursive: true, force: true }); });
   await mkdir(locked); await mkdir(readable);
@@ -190,7 +190,7 @@ test("unreadable subfolders retain readable siblings and recover on refresh", { 
   assert.equal(refreshed.skipped, 0); assert.ok(refreshed.files.some(file => file.name === "private.md"));
 });
 test("ignored files beyond the inventory limit do not falsely report truncation", async t => {
-  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), "open-typora-scan-limit-")));
+  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), "open-markdown-lane-scan-limit-")));
   t.after(() => rm(directory, { recursive: true, force: true }));
   for (let start = 0; start < 1000; start += 100)
     await Promise.all(Array.from({length: 100}, (_, i) => writeFile(path.join(directory, `note-${start + i}.md`), "")));
@@ -220,7 +220,7 @@ test("reopening an untitled tab restores its clean content without reading a nul
 
 
 test("recovery accepts an interrupted save only when disk exactly matches the recovered dirty text", async () => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "open-typora-save-checkpoint-"));
+  const directory = await mkdtemp(path.join(os.tmpdir(), "open-markdown-lane-save-checkpoint-"));
   try {
     const file = path.join(directory, "note.md"); await writeFile(file, "old");
     const store = new DocumentStore(path.join(directory, "data")), record = await store.open(file);
@@ -235,7 +235,7 @@ test("recovery accepts an interrupted save only when disk exactly matches the re
 
 
 test("scanned file tokens reject replacement symlinks before opening a new document", { skip: process.platform === 'win32' ? 'Symlink privilege is not assumed on Windows' : false }, async () => {
-  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), 'open-typora-token-open-')));
+  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), 'open-markdown-lane-token-open-')));
   try {
     const folder = path.join(directory, 'notes'), file = path.join(folder, 'note.md'), privateFile = path.join(directory, 'private.md');
     await mkdir(folder); await writeFile(file, 'public'); await writeFile(privateFile, 'private');

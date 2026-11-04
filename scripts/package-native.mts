@@ -6,8 +6,8 @@ import pkg from "../package.json" with { type: "json" };
 const preview = process.argv.includes("--preview");
 const app = path.resolve(
     preview
-      ? "release/preview/Open Typora Preview.app"
-      : "release/native/Open Typora.app",
+      ? "release/preview/Open Markdown Lane Preview.app"
+      : "release/native/Open Markdown Lane.app",
   ),
   contents = path.join(app, "Contents"),
   resources = path.join(contents, "Resources");
@@ -32,7 +32,7 @@ execFileSync(
     "native/App.swift",
     "native/PDFExporter.swift",
     "-o",
-    path.join(contents, "MacOS/OpenTypora"),
+    path.join(contents, "MacOS/OpenMarkdownLane"),
     "-framework",
     "AppKit",
     "-framework",
@@ -63,12 +63,12 @@ await writeFile(
 );
 await licenseNotices(path.join(resources, "ThirdPartyLicenses"));
 await cp("third-party/typora-plugins", path.join(resources, "ThirdPartyLicenses/typora-plugins"), { recursive: true });
-const plist = `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleName</key><string>Open Typora</string><key>CFBundleDisplayName</key><string>Open Typora</string><key>CFBundleIdentifier</key><string>org.opentypora.desktop</string><key>CFBundleExecutable</key><string>OpenTypora</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>${pkg.version}</string><key>CFBundleVersion</key><string>${pkg.version}</string><key>CFBundleIconFile</key><string>icon.icns</string><key>LSMinimumSystemVersion</key><string>14.0</string><key>CFBundleDevelopmentRegion</key><string>zh_CN</string><key>CFBundleLocalizations</key><array><string>zh_CN</string><string>en</string></array><key>NSHighResolutionCapable</key><true/><key>CFBundleDocumentTypes</key><array><dict><key>CFBundleTypeName</key><string>Markdown document</string><key>CFBundleTypeRole</key><string>Editor</string><key>CFBundleTypeExtensions</key><array><string>md</string><string>markdown</string><string>mdown</string></array></dict></array></dict></plist>`;
+const plist = `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleName</key><string>Open Markdown Lane</string><key>CFBundleDisplayName</key><string>Open Markdown Lane</string><key>CFBundleIdentifier</key><string>org.opentypora.desktop</string><key>CFBundleExecutable</key><string>OpenMarkdownLane</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>${pkg.version}</string><key>CFBundleVersion</key><string>${pkg.version}</string><key>CFBundleIconFile</key><string>icon.icns</string><key>LSMinimumSystemVersion</key><string>14.0</string><key>CFBundleDevelopmentRegion</key><string>zh_CN</string><key>CFBundleLocalizations</key><array><string>zh_CN</string><string>en</string></array><key>NSHighResolutionCapable</key><true/><key>CFBundleDocumentTypes</key><array><dict><key>CFBundleTypeName</key><string>Markdown document</string><key>CFBundleTypeRole</key><string>Editor</string><key>CFBundleTypeExtensions</key><array><string>md</string><string>markdown</string><string>mdown</string></array></dict></array></dict></plist>`;
 await writeFile(
   path.join(contents, "Info.plist"),
   preview
     ? plist
-        .replaceAll("Open Typora", "Open Typora Preview")
+        .replaceAll("Open Markdown Lane", "Open Markdown Lane Preview")
         .replace("org.opentypora.desktop", "org.opentypora.desktop.preview")
     : plist,
 );
@@ -84,14 +84,14 @@ console.log(`Native AppKit/WebKit bundle: ${app}`);
 
 if (!preview) {
   const archive = path.resolve(
-    `release/native/Open-Typora-${pkg.version}-${process.arch}.zip`,
+    `release/native/Open-Markdown-Lane-${pkg.version}-${process.arch}.zip`,
   );
   execFileSync("/usr/bin/ditto", ["-c", "-k", "--keepParent", app, archive], {
     stdio: "inherit",
   });
   // Keep only this release's archive after packaging has succeeded.
   for (const name of await readdir(path.dirname(archive))) {
-    if (/^Open-Typora-[\d.]+-(?:arm64|x64)\.zip$/.test(name)
+    if (/^Open-Markdown-Lane-[\d.]+-(?:arm64|x64)\.zip$/.test(name)
       && name !== path.basename(archive))
       await rm(path.join(path.dirname(archive), name));
   }

@@ -80,7 +80,7 @@ try {
   if (!originalResponse.ok) throw new Error(originalResponse.error);
   const original = originalResponse.value!.documents[0].content;
   for (const [query, replacement] of [["普(通)", "$<word>"], ["普(?<word>通)", "字$<word>"], ["普(?<word>通)", "$<missing>-$<word>"]]) {
-    window.__openTypora.command({ action: "find" }); await wait(() => document.querySelector(".rich-search"));
+    window.__openMarkdownLane.command({ action: "find" }); await wait(() => document.querySelector(".rich-search"));
     const field = (label: string, value: string) => {
       const element = document.querySelector<HTMLInputElement>('.rich-search [aria-label="' + label + '"]')!;
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(element, value); element.dispatchEvent(new Event("input", { bubbles: true }));
@@ -92,12 +92,12 @@ try {
     document.querySelector<HTMLButtonElement>('.rich-search [aria-label="关闭查找"]')!.click();
     const expected = original.replace(new RegExp(query, "gmiu"), replacement);
     await sourceMode(true); check(readSource() === expected, "native named/literal regex replacement keeps exact Markdown");
-    await sourceMode(false); window.__openTypora.command({ action: "undo" }); await sourceMode(true); check(readSource() === original, "native regex replacement undoes once to exact source");
-    await sourceMode(false); window.__openTypora.command({ action: "redo" }); await sourceMode(true); check(readSource() === expected, "native regex replacement redoes once to exact source");
-    await sourceMode(false); window.__openTypora.command({ action: "undo" }); await sourceMode(true); check(readSource() === original, "native regex fixture restored for subsequent checks"); await sourceMode(false);
+    await sourceMode(false); window.__openMarkdownLane.command({ action: "undo" }); await sourceMode(true); check(readSource() === original, "native regex replacement undoes once to exact source");
+    await sourceMode(false); window.__openMarkdownLane.command({ action: "redo" }); await sourceMode(true); check(readSource() === expected, "native regex replacement redoes once to exact source");
+    await sourceMode(false); window.__openMarkdownLane.command({ action: "undo" }); await sourceMode(true); check(readSource() === original, "native regex fixture restored for subsequent checks"); await sourceMode(false);
   }
 
-  const openPreferences = async () => { window.__openTypora.command({action:"preferences"}); await wait(() => document.querySelector<HTMLElement>('[aria-label="关闭偏好设置"]')!); };
+  const openPreferences = async () => { window.__openMarkdownLane.command({action:"preferences"}); await wait(() => document.querySelector<HTMLElement>('[aria-label="关闭偏好设置"]')!); };
   const preferenceButton = (text: string) => [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(button => button.textContent === text)!;
   await openPreferences(); preferenceButton('选择图片…').click();
   await wait(() => document.querySelector<HTMLElement>('.editor-background')!);
@@ -121,7 +121,7 @@ try {
     !root().querySelector<HTMLElement>(".math-error,[data-mjx-error]")!,
     "offline MathJax SVG renders document macros and extended fonts",
   );
-  const openPlugins = async () => { window.__openTypora.command({action:"plugins"}); await wait(() => document.querySelector<HTMLElement>('[role="dialog"][aria-label="插件管理"]')!); };
+  const openPlugins = async () => { window.__openMarkdownLane.command({action:"plugins"}); await wait(() => document.querySelector<HTMLElement>('[role="dialog"][aria-label="插件管理"]')!); };
   const pluginCard = (name: string) => [...document.querySelectorAll<HTMLElement>('.plugin-card')].find(card => card.querySelector<HTMLElement>('h3')!?.textContent === name)!;
   const closePlugins = () => document.querySelector<HTMLElement>('[aria-label="关闭插件管理"]')!.click();
   pointText("粗体", 1);
@@ -133,7 +133,7 @@ try {
   pluginCard('Native-plugin-fixture').querySelector<HTMLButtonElement>('.plugin-actions button')!.click();
   closePlugins(); await wait(() => root().textContent.includes('粗插件体'));
   check(true, 'installed original plugin calls the document adapter and creates a real undoable edit');
-  window.__openTypora.command({action:'undo'}); check(!root().textContent.includes('插件'), 'plugin edits undo without changing surrounding Markdown');
+  window.__openMarkdownLane.command({action:'undo'}); check(!root().textContent.includes('插件'), 'plugin edits undo without changing surrounding Markdown');
   await openPlugins(); pluginCard('Native-plugin-fixture').querySelector<HTMLInputElement>('input[type="checkbox"]')!.click(); await wait(() => !document.querySelector<HTMLStyleElement>('style[data-plugin^="local-"]')!);
   check(true, 'disabling an installed plugin removes its styles');
   await wait(()=>pluginCard('Package fixture'));
@@ -142,7 +142,7 @@ try {
   check(window.packageProbe.cached && window.packageProbe.marker==='/*__ENTRY__*/ /*__MODULES__*/','native 4+ MiB folder modules resolve JS JSON CSS and cache shared dependencies under the existing CSP');
   pluginCard('Package fixture').querySelector<HTMLButtonElement>('.plugin-actions button')!.click();closePlugins();
   await wait(()=>root().textContent.includes('插件中文😀42'));
-  window.__openTypora.command({action:'undo'});check(!root().textContent.includes('插件中文'),'native package command produces a single undoable Unicode edit');
+  window.__openMarkdownLane.command({action:'undo'});check(!root().textContent.includes('插件中文'),'native package command produces a single undoable Unicode edit');
   await openPlugins();pluginCard('Package fixture').querySelector<HTMLInputElement>('input[type="checkbox"]')!.click();
   await wait(()=>!document.querySelector<HTMLStyleElement>('style[data-plugin^="local-"]')!);
   const stoppedTicks=window.packageProbe.ticks;await new Promise(resolve=>setTimeout(resolve,100));
@@ -200,7 +200,7 @@ try {
     await new Promise(resolve=>setTimeout(resolve,20));
     await sourceMode(true);
     check(readSource()===original.replace(needle,needle.slice(0,offset)+'你好'+needle.slice(offset)), 'WebKit delayed Chinese commit preserves '+needle+' and its Markdown container');
-    await sourceMode(false); window.__openTypora.command({action:'undo'});
+    await sourceMode(false); window.__openMarkdownLane.command({action:'undo'});
     await sourceMode(true); check(readSource()===original,'WebKit Chinese commit undoes once for '+needle); await sourceMode(false);
   }
   pointText("。", 1);
@@ -215,26 +215,26 @@ try {
   await sourceMode(true);
   check(readSource() === original.replace("。", "。\n\n你好"), "synthetic composition at an empty element persists exact Chinese in native WebKit");
   await sourceMode(false);
-  window.__openTypora.command({ action: "undo" });
+  window.__openMarkdownLane.command({ action: "undo" });
   check(!root().textContent.includes("你好"), "empty-paragraph composition undoes as one transaction");
-  window.__openTypora.command({ action: "redo" });
+  window.__openMarkdownLane.command({ action: "redo" });
   check(root().textContent.includes("你好"), "empty-paragraph composition redoes as one transaction");
-  window.__openTypora.command({ action: "undo" });
-  window.__openTypora.command({ action: "undo" });
+  window.__openMarkdownLane.command({ action: "undo" });
+  window.__openMarkdownLane.command({ action: "undo" });
   await sourceMode(true);
   check(readSource() === original, "composition regression restores the original fixture exactly");
   await sourceMode(false);
   const repeatedSource='# 重复输入\n\n同\n\n同\n', repeatedRecord={id:'repeat-ime',path:null,name:'Repeated-IME.md',content:repeatedSource,savedContent:repeatedSource,diskHash:null,lineEnding:'\n'};
   const repeatedRegistration=await desktop.registerDraft(repeatedRecord);if(!repeatedRegistration.ok)throw Error(repeatedRegistration.error);
-  window.__openTypora.command({action:'opened',document:repeatedRecord});await wait(()=>document.querySelector<HTMLElement>('.document-title')!?.textContent==='Repeated-IME.md'&&[...(root()?.querySelectorAll(':scope > p')||[])].filter(element=>element.textContent==='同').length===2);
+  window.__openMarkdownLane.command({action:'opened',document:repeatedRecord});await wait(()=>document.querySelector<HTMLElement>('.document-title')!?.textContent==='Repeated-IME.md'&&[...(root()?.querySelectorAll(':scope > p')||[])].filter(element=>element.textContent==='同').length===2);
   for(const candidate of ['同','同同','中文😀']) {
     const [first,second]=root().querySelectorAll<HTMLElement>(':scope > p');root().focus();getSelection()!.setBaseAndExtent((first.firstChild as Text),0,(second.firstChild as Text),1);
     first.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true}));first.textContent=candidate;second.remove();getSelection()!.collapse((first.firstChild as Text),candidate.length);
     first.dispatchEvent(new CompositionEvent('compositionend',{bubbles:true,data:candidate}));
     await sourceMode(true);check(readSource()==='# 重复输入\n\n'+candidate+'\n','native repeated-text composition replaces the selected paragraph boundaries: '+candidate);
-    await sourceMode(false);window.__openTypora.command({action:'undo'});await sourceMode(true);check(readSource()===repeatedSource,'native repeated-text composition undoes once: '+candidate);await sourceMode(false);
+    await sourceMode(false);window.__openMarkdownLane.command({action:'undo'});await sourceMode(true);check(readSource()===repeatedSource,'native repeated-text composition undoes once: '+candidate);await sourceMode(false);
   }
-  window.__openTypora.command({action:'opened',document:originalResponse.value!.documents[0]});await wait(()=>document.querySelector<HTMLElement>('.document-title')!?.textContent==='WebKit-fixture.md');
+  window.__openMarkdownLane.command({action:'opened',document:originalResponse.value!.documents[0]});await wait(()=>document.querySelector<HTMLElement>('.document-title')!?.textContent==='WebKit-fixture.md');
   pointText("粗体", 1);
   document.dispatchEvent(new Event("selectionchange"));
   check(
@@ -250,17 +250,17 @@ try {
     readSource() === original.replace("粗体", "粗测体"),
     "rich DOM edit produces exact Markdown in separate source view",
   );
-  window.__openTypora.command({ action: "undo" });
+  window.__openMarkdownLane.command({ action: "undo" });
   await new Promise((resolve) => setTimeout(resolve, 100));
   check(
     readSource() === original.replace("粗体", "粗测体"),
     "fresh source view cannot undo an earlier rich edit",
   );
   await sourceMode(false);
-  window.__openTypora.command({ action: "undo" });
+  window.__openMarkdownLane.command({ action: "undo" });
   await wait(() => root().querySelector<HTMLElement>("strong")!.textContent === "粗体");
   check(true, "returning to rich mode restores its own undo history");
-  window.__openTypora.command({ action: "redo" });
+  window.__openMarkdownLane.command({ action: "redo" });
   await wait(() => root().querySelector<HTMLElement>("strong")!.textContent === "粗测体");
   check(true, "rich redo restores the edit after a source-view round trip");
   pointText("粗测体", 2);
@@ -331,7 +331,7 @@ try {
   if (!undoneFile.ok) throw new Error(undoneFile.error);
   await wait(() => document.querySelector<HTMLElement>('.document-title')!?.textContent.includes('WebKit-fixture.md'));
   check(readSource() === source, "native file operation preparation, path synchronization and undo preserve exact editor bytes");
-  window.__openTypora.command({ action: "pdf" });
+  window.__openMarkdownLane.command({ action: "pdf" });
   await wait(() =>
     document.querySelector<HTMLElement>(".toast")!?.textContent.includes("PDF 已导出"),
   );
@@ -346,7 +346,7 @@ try {
   const marginPdf = await desktop.exportPdf('<!doctype html><html><head><style>html,body{margin:0;padding:0}.print-document{display:flow-root}p{margin:0 0 800px;font:16px/24px sans-serif}</style></head><body><article class="print-document"><p>Trailing margin regression</p></article></body></html>');
   if (!marginPdf.ok) throw new Error(marginPdf.error);
   check(true, "native PDF ignores an unpainted trailing block margin");
-  window.__openTypora.command({ action: "html" });
+  window.__openMarkdownLane.command({ action: "html" });
   await wait(() => document.querySelector<HTMLElement>(".toast")!?.textContent.includes("HTML 已导出"));
   check(true, "native HTML export embeds local fonts and images without live app links");
   window.webkit.messageHandlers.opentypora.postMessage({id:"phase",name:"progress",args:["phase: encoding dialog"]});
@@ -369,15 +369,15 @@ try {
   const complexRecord = { id: 'complex-fixture', path: null, name: '复杂中文文档.md', content: complexSource, savedContent: '', diskHash: null, lineEnding: '\n' };
   window.webkit.messageHandlers.opentypora.postMessage({id:"phase",name:"progress",args:["phase: complex register"]});
   const complexRegistered = await desktop.registerDraft(complexRecord); if (!complexRegistered.ok) throw new Error(complexRegistered.error);
-  window.__openTypora.command({ action: 'opened', document: complexRecord });
+  window.__openMarkdownLane.command({ action: 'opened', document: complexRecord });
   await wait(() => document.querySelector<HTMLElement>('.document-title')!?.textContent.startsWith(complexRecord.name));
   window.webkit.messageHandlers.opentypora.postMessage({id:"phase",name:"progress",args:["phase: complex diagram"]});
   await wait(() => root()?.querySelectorAll('.mermaid-block svg').length === 3);
   check(true, 'complex Chinese fixture renders nested lists, tables, images, footnotes, math and Mermaid');
-  window.__openTypora.command({ action: 'pdf' }); await wait(() => document.querySelector<HTMLElement>('.toast')!?.textContent.includes('PDF 已导出'));
+  window.__openMarkdownLane.command({ action: 'pdf' }); await wait(() => document.querySelector<HTMLElement>('.toast')!?.textContent.includes('PDF 已导出'));
   check(true, 'complex native PDF export includes rendered Chinese tables, math, images, diagrams and footnotes');
   for (const format of ['docx', 'odt', 'rtf', 'epub', 'latex', 'rst', 'mediawiki', 'textile', 'opml', 'revealjs']) {
-    window.__openTypora.command({ action: format });
+    window.__openMarkdownLane.command({ action: format });
     await wait(() => { const message = document.querySelector<HTMLElement>('.toast')!?.textContent || ''; if (/失败|无法|无效|不能|超时|需要 Pandoc/.test(message)) throw new Error(format + ': ' + message); return message.includes(format.toUpperCase() + ' 已导出'); });
     check(true, 'real Pandoc ' + format + ' export completes from the rendered complex document');
   }
@@ -391,23 +391,23 @@ try {
   }
   const importedRecord = { ...complexRecord, id: 'converted-import', name: '导入的复杂文档.md', content: convertedImports.docx };
   const importRegistration = await desktop.registerDraft(importedRecord); if (!importRegistration.ok) throw new Error(importRegistration.error);
-  window.__openTypora.command({ action: 'opened', document: importedRecord });
+  window.__openMarkdownLane.command({ action: 'opened', document: importedRecord });
   await wait(() => document.querySelector<HTMLElement>('.document-title')!?.textContent.startsWith(importedRecord.name) && root()?.querySelectorAll('table tr').length === 3 && [...root().querySelectorAll<HTMLImageElement>('img')].some(image => image.naturalWidth > 0));
   check(true, 'reimported DOCX is editable and its persistent extracted media loads in native WebKit');
-  window.__openTypora.command({ action: 'opened', document: saved.value! });
+  window.__openMarkdownLane.command({ action: 'opened', document: saved.value! });
   await wait(() => document.querySelector<HTMLElement>('.document-title')!?.textContent === saved.value!.name);
   const reopenDraft = {id:'reopen-draft',path:null,name:'Reopen-draft.md',content:'',savedContent:'',diskHash:null,lineEnding:'\n'};
   const registeredDraft = await desktop.registerDraft(reopenDraft); if (!registeredDraft.ok) throw new Error(registeredDraft.error);
-  window.__openTypora.command({action:'opened',document:reopenDraft}); await wait(() => document.querySelector<HTMLElement>('.document-title')!?.textContent === 'Reopen-draft.md');
-  window.__openTypora.command({action:'close'}); await wait(() => document.querySelector<HTMLElement>('.document-title')!?.textContent === 'WebKit-fixture.md');
-  window.__openTypora.command({action:'reopen'}); await wait(() => document.querySelector<HTMLElement>('.document-title')!?.textContent === 'Reopen-draft.md');
+  window.__openMarkdownLane.command({action:'opened',document:reopenDraft}); await wait(() => document.querySelector<HTMLElement>('.document-title')!?.textContent === 'Reopen-draft.md');
+  window.__openMarkdownLane.command({action:'close'}); await wait(() => document.querySelector<HTMLElement>('.document-title')!?.textContent === 'WebKit-fixture.md');
+  window.__openMarkdownLane.command({action:'reopen'}); await wait(() => document.querySelector<HTMLElement>('.document-title')!?.textContent === 'Reopen-draft.md');
   check(true, "native reopen falls back to the same-window closed-document history when no closed window exists");
-  window.__openTypora.command({action:'close'}); await wait(() => document.querySelector<HTMLElement>('.document-title')!?.textContent === 'WebKit-fixture.md');
+  window.__openMarkdownLane.command({action:'close'}); await wait(() => document.querySelector<HTMLElement>('.document-title')!?.textContent === 'WebKit-fixture.md');
   await sourceMode(false);
   const paritySource = '# Native editing parity\n\n> - alpha\n> - beta\n\n| A | B |\n| --- | --- |\n| cellA | cellB |\n\n```sequence\nAlice->Bob: Native hello\nBob-->Alice: Native reply\n```\n\n```flow\nst=>start: Start\ne=>end: End\nst->e\n```\n';
   const parityRecord = {id:'native-parity',path:null,name:'Native-parity.md',content:paritySource,savedContent:paritySource,diskHash:null,lineEnding:'\n'};
   const parityRegistered = await desktop.registerDraft(parityRecord); if(!parityRegistered.ok) throw new Error(parityRegistered.error);
-  window.__openTypora.command({action:'opened',document:parityRecord});
+  window.__openMarkdownLane.command({action:'opened',document:parityRecord});
   await wait(() => document.querySelector<HTMLElement>('.document-title')!?.textContent === parityRecord.name && root()?.querySelectorAll('.mermaid-block svg').length === 2);
   check(root().querySelector<HTMLElement>('[data-diagram-language="sequence"] svg')!.textContent.includes('Native hello'), 'native WebKit renders legacy sequence and flow through offline Mermaid');
   pointText('alpha',0); const first = getSelection()!.anchorNode;
@@ -415,50 +415,50 @@ try {
   getSelection()!.setBaseAndExtent(first!,0,last!,4); document.dispatchEvent(new Event('selectionchange'));
   root().dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',code:'Tab',bubbles:true,cancelable:true}));
   await sourceMode(true); check(readSource() === paritySource.replace('> - alpha\n> - beta','>   - alpha\n>   - beta'), 'native multi-line quoted-list Tab preserves both list items');
-  await sourceMode(false); window.__openTypora.command({action:'undo'});
+  await sourceMode(false); window.__openMarkdownLane.command({action:'undo'});
   pointText('cellA',2);
   root().dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',code:'Enter',metaKey:true,bubbles:true,cancelable:true}));
   check(root().querySelectorAll<HTMLElement>('tbody tr').length === 2,'native Cmd-Enter inserts a table row');
-  window.__openTypora.command({action:'undo'}); pointText('cellA',2); input('insertLineBreak');
+  window.__openMarkdownLane.command({action:'undo'}); pointText('cellA',2); input('insertLineBreak');
   check(root().querySelectorAll<HTMLElement>('td br').length === 1,'native cell break renders as a real line break');
   input('insertText','新行'); await sourceMode(true); check(readSource() === paritySource.replace('cellA','ce<br>新行llA'),'native typing continues after the cell break');
-  await sourceMode(false); window.__openTypora.command({action:'undo'});
+  await sourceMode(false); window.__openMarkdownLane.command({action:'undo'});
   await sourceMode(true); check(readSource() === paritySource.replace('cellA','ce<br>llA'),'native Shift-Enter preserves the table with an inline cell break');
-  await sourceMode(false); window.__openTypora.command({action:'undo'});
+  await sourceMode(false); window.__openMarkdownLane.command({action:'undo'});
   await sourceMode(true); check(readSource() === paritySource,'native table undo and source round trip restore exact Markdown'); await sourceMode(false);
-  pointText('cellA',2); window.__openTypora.command({action:'select-scope'});
+  pointText('cellA',2); window.__openMarkdownLane.command({action:'select-scope'});
   check(getSelection()!.toString() === 'cellA','native scope selection selects the entire table cell');
-  window.__openTypora.command({action:'jump-selection'});
+  window.__openMarkdownLane.command({action:'jump-selection'});
   check(getSelection()!.toString() === 'cellA','native jump to selection preserves its range');
-  window.__openTypora.command({action:'select-line'});
+  window.__openMarkdownLane.command({action:'select-line'});
   check(getSelection()!.toString().includes('cellA') && getSelection()!.toString().includes('cellB') && !getSelection()!.toString().includes('cellC'),'native line selection stays in one table row');
-  pointText('cellA',2); window.__openTypora.command({action:'select-word'});
-  window.__openTypora.command({action:'delete-word'});
+  pointText('cellA',2); window.__openMarkdownLane.command({action:'select-word'});
+  window.__openMarkdownLane.command({action:'delete-word'});
   await sourceMode(true); check(readSource() === paritySource.replace('cellA',''),'native word deletion preserves table structure');
-  await sourceMode(false); window.__openTypora.command({action:'undo'}); await sourceMode(true);
+  await sourceMode(false); window.__openMarkdownLane.command({action:'undo'}); await sourceMode(true);
   check(readSource() === paritySource,'native rich undo restores word deletion before entering source');
-  window.__openTypora.command({action:'select-word'}); window.__openTypora.command({action:'delete-word'});
+  window.__openMarkdownLane.command({action:'select-word'}); window.__openMarkdownLane.command({action:'delete-word'});
   check(readSource() === paritySource.replace('cellA',''),'native source word deletion uses source selection');
-  window.__openTypora.command({action:'undo'}); check(readSource() === paritySource,'native source word deletion undo restores exact Markdown');
+  window.__openMarkdownLane.command({action:'undo'}); check(readSource() === paritySource,'native source word deletion undo restores exact Markdown');
   await sourceMode(false);
 
   const headerSource='# Native table header\n\n| Name | 中文 |';
   const headerRecord={id:'native-header-table',path:null,name:'Native-table-header.md',content:headerSource,savedContent:headerSource,diskHash:null,lineEnding:'\n'};
   const headerRegistered=await desktop.registerDraft(headerRecord);if(!headerRegistered.ok)throw Error(headerRegistered.error);
-  window.__openTypora.command({action:'opened',document:headerRecord});await wait(()=>document.querySelector<HTMLElement>('.document-title')!?.textContent===headerRecord.name && root()?.textContent.includes('| Name | 中文 |'));
+  window.__openMarkdownLane.command({action:'opened',document:headerRecord});await wait(()=>document.querySelector<HTMLElement>('.document-title')!?.textContent===headerRecord.name && root()?.textContent.includes('| Name | 中文 |'));
   pointText('| Name | 中文 |','| Name | 中文 |'.length);input('insertParagraph');
   check(root().querySelectorAll<HTMLElement>('th').length===2 && root().querySelectorAll<HTMLElement>('td').length===2 && !!getSelection()!.anchorNode!.parentElement!.closest<HTMLElement>('td')!,'native header Enter creates a table and focuses its first body cell');
   input('insertText','你好|中国');await sourceMode(true);
   const emptyHeaderTable=headerSource+'\n| --- | --- |\n|  |  |';
   check(readSource()===emptyHeaderTable.replace('|  |  |','| 你好\\|中国 |  |'),'native table pipe typing keeps Chinese content in one cell and survives source switching');
-  await sourceMode(false);window.__openTypora.command({action:'undo'});await sourceMode(true);
+  await sourceMode(false);window.__openMarkdownLane.command({action:'undo'});await sourceMode(true);
   check(readSource()===emptyHeaderTable,'native table content undo is separate from table creation');
-  await sourceMode(false);window.__openTypora.command({action:'undo'});await sourceMode(true);
+  await sourceMode(false);window.__openMarkdownLane.command({action:'undo'});await sourceMode(true);
   check(readSource()===headerSource,'native table creation undoes in one transaction');await sourceMode(false);
-  window.__openTypora.command({action:'opened',document:saved.value!});
+  window.__openMarkdownLane.command({action:'opened',document:saved.value!});
   await wait(() => document.querySelector<HTMLElement>('.document-title')!?.textContent === saved.value!.name);
   const spreadsheetDraft={id:crypto.randomUUID(),path:null,name:'Spreadsheet-QA.md',content:'',savedContent:'',diskHash:null,lineEnding:'\n'};
-  await desktop.registerDraft(spreadsheetDraft);window.__openTypora.command({action:'opened',document:spreadsheetDraft});
+  await desktop.registerDraft(spreadsheetDraft);window.__openMarkdownLane.command({action:'opened',document:spreadsheetDraft});
   await wait(()=>document.querySelector<HTMLElement>('.document-title')?.textContent===spreadsheetDraft.name);
   const spreadsheetData=new DataTransfer();
   spreadsheetData.setData('text/plain','项目\t数量\n苹果\t2\n香蕉\t');
@@ -470,30 +470,30 @@ try {
   check(!root().querySelector('img')&&root().querySelectorAll('tbody tr').length===2,'native spreadsheet HTML+PNG paste chooses an editable table and retains blank cells');
   const spreadsheetMarkdown='| 项目 | 数量 |\n| --- | --- |\n| 苹果 | 2 |\n| 香蕉 |  |';
   await sourceMode(true);check(readSource()===spreadsheetMarkdown,'native spreadsheet paste serializes to exact GFM with the copied first row as its header');
-  await sourceMode(false);window.__openTypora.command({action:'undo'});await sourceMode(true);await wait(()=>readSource()==='');
+  await sourceMode(false);window.__openMarkdownLane.command({action:'undo'});await sourceMode(true);await wait(()=>readSource()==='');
   check(true,'native rich spreadsheet paste undoes once after returning from source inspection');
   const spreadsheetSource=document.querySelector<HTMLElement>('.document-editor[data-active="true"] .source-surface .cm-content')!;
   spreadsheetSource.focus();await desktop.testSpreadsheetClipboard();
   await desktop.clipboardAction('paste');
   await wait(()=>readSource()===spreadsheetMarkdown);check(true,'native trusted source paste prefers table formats over the PNG alternative');
-  window.__openTypora.command({action:'undo'});await wait(()=>readSource()==='');window.__openTypora.command({action:'redo'});await wait(()=>readSource()===spreadsheetMarkdown);
+  window.__openMarkdownLane.command({action:'undo'});await wait(()=>readSource()==='');window.__openMarkdownLane.command({action:'redo'});await wait(()=>readSource()===spreadsheetMarkdown);
   check(true,'native rich/source spreadsheet paste remains one undo and redo transaction');
-  window.__openTypora.command({action:'undo'});await wait(()=>readSource()==='');await sourceMode(false);window.__openTypora.command({action:'close'});
+  window.__openMarkdownLane.command({action:'undo'});await wait(()=>readSource()==='');await sourceMode(false);window.__openMarkdownLane.command({action:'close'});
   await wait(()=>!document.querySelector(`[role="tab"][aria-label="${spreadsheetDraft.name}"]`));
-  window.__openTypora.command({action:'opened',document:saved.value!});await wait(()=>document.querySelector<HTMLElement>('.document-title')?.textContent===saved.value!.name);
+  window.__openMarkdownLane.command({action:'opened',document:saved.value!});await wait(()=>document.querySelector<HTMLElement>('.document-title')?.textContent===saved.value!.name);
   const workspaceDraft={id:crypto.randomUUID(),path:null,name:'Workspace-QA.md',content:'',savedContent:'',diskHash:null,lineEnding:'\n'};
-  await desktop.registerDraft(workspaceDraft);window.__openTypora.command({action:'opened',document:workspaceDraft});
+  await desktop.registerDraft(workspaceDraft);window.__openMarkdownLane.command({action:'opened',document:workspaceDraft});
   await wait(()=>document.querySelector<HTMLElement>('.document-title')!?.textContent===workspaceDraft.name);
-  window.__openTypora.command({action:'split-right'});await wait(()=>document.querySelectorAll<HTMLElement>('.document-editor:not([hidden])').length===2);
+  window.__openMarkdownLane.command({action:'split-right'});await wait(()=>document.querySelectorAll<HTMLElement>('.document-editor:not([hidden])').length===2);
   check(!!document.querySelector<HTMLElement>('[role="tablist"]')! && document.querySelector<HTMLElement>('[role="separator"]')!.getAttribute('aria-orientation')==='vertical','native tabs and two document panes render together');
-  window.__openTypora.command({action:'other-pane'});await wait(()=>document.querySelector<HTMLElement>('.document-editor[data-active="true"]')!?.dataset.documentId!==workspaceDraft.id);
-  window.__openTypora.command({action:'source'});await wait(()=>!!document.querySelector<HTMLElement>('.document-editor[data-active="true"] .source-surface:not([hidden])')!);
+  window.__openMarkdownLane.command({action:'other-pane'});await wait(()=>document.querySelector<HTMLElement>('.document-editor[data-active="true"]')!?.dataset.documentId!==workspaceDraft.id);
+  window.__openMarkdownLane.command({action:'source'});await wait(()=>!!document.querySelector<HTMLElement>('.document-editor[data-active="true"] .source-surface:not([hidden])')!);
   check(!!document.querySelector<HTMLElement>('.document-editor[data-active="false"]:not([hidden]) .rich-scroller:not([hidden])')!,'native split panes retain independent source and rich modes');
-  window.__openTypora.command({action:'source'});await wait(()=>!!document.querySelector<HTMLElement>('.document-editor[data-active="true"] .rich-scroller:not([hidden])')!);
-  window.__openTypora.command({action:'split-down'});await wait(()=>document.querySelector<HTMLElement>('[role="separator"]')!?.getAttribute('aria-orientation')==='horizontal');
+  window.__openMarkdownLane.command({action:'source'});await wait(()=>!!document.querySelector<HTMLElement>('.document-editor[data-active="true"] .rich-scroller:not([hidden])')!);
+  window.__openMarkdownLane.command({action:'split-down'});await wait(()=>document.querySelector<HTMLElement>('[role="separator"]')!?.getAttribute('aria-orientation')==='horizontal');
   document.querySelector<HTMLButtonElement>('.workspace-document.primary .pane-heading button[title="关闭此窗格，保留文档"]')!.click();await wait(()=>document.querySelectorAll<HTMLElement>('.document-editor:not([hidden])').length===1);
   document.querySelector<HTMLElement>('[aria-label="关闭标签 Workspace-QA.md"]')!.click();await wait(()=>!document.querySelector<HTMLElement>('[aria-label="关闭标签 Workspace-QA.md"]')!);
-  window.__openTypora.command({action:'opened',document:saved.value!});await wait(()=>document.querySelector<HTMLElement>('.document-title')!?.textContent===saved.value!.name);
+  window.__openMarkdownLane.command({action:'opened',document:saved.value!});await wait(()=>document.querySelector<HTMLElement>('.document-title')!?.textContent===saved.value!.name);
   check(document.querySelectorAll<HTMLElement>('.document-editor:not([hidden])').length===1,'closing a native pane retains documents and returns to the original editor');
   const controlledHtml = '<!doctype html><html><head><style>html,body{margin:0;padding:0}.print-document{display:flow-root;font:14px/24px sans-serif}</style></head><body><article class="print-document"><h1>Native first page</h1><div style="break-after:page;break-inside:avoid"><p>Keep-before</p></div><h2>Native second page</h2><p>Keep-after</p></article></body></html>';
   const controlled = await desktop.exportPdf(controlledHtml,{testName:'controlled',paper:'letter',margin:36});if(!controlled.ok)throw new Error(controlled.error);
@@ -503,9 +503,9 @@ try {
   const largeSource = '# Large native heading\n\n'+('Native 中文 large document paragraph. 0123456789\n\n').repeat(120000);
   const largeRecord = {id:'native-large-qa',name:'Native-Large.md',path:null,content:largeSource,savedContent:'',diskHash:null,lineEnding:'\n',encoding:'utf-8',bom:false};
   const registeredLarge=await desktop.registerDraft(largeRecord);if(!registeredLarge.ok)throw new Error(registeredLarge.error);
-  window.__openTypora.command({action:'opened',document:largeRecord});await wait(()=>document.querySelector<HTMLElement>('.document-editor[data-document-id="native-large-qa"] .rich-scroller:not([hidden]) .rich-document[data-virtualized="true"]')!);
+  window.__openMarkdownLane.command({action:'opened',document:largeRecord});await wait(()=>document.querySelector<HTMLElement>('.document-editor[data-document-id="native-large-qa"] .rich-scroller:not([hidden]) .rich-document[data-virtualized="true"]')!);
   check(document.querySelectorAll<HTMLElement>('.document-editor[data-document-id="native-large-qa"] [data-cid]').length<200,'native multi-megabyte rich editor remains viewport-virtualized');
-  window.__openTypora.command({action:'outline'});await wait(()=>[...document.querySelectorAll<HTMLButtonElement>('.outline button')].some(button=>button.textContent==='Large native heading'));
+  window.__openMarkdownLane.command({action:'outline'});await wait(()=>[...document.querySelectorAll<HTMLButtonElement>('.outline button')].some(button=>button.textContent==='Large native heading'));
   check(true,'large native outline analysis completes through the bundled worker');
   async function recoveredText(id: string, expected: string, previous: string, label: string) {
     const started=Date.now(),deadline=started+12000;let pending=false;
@@ -521,7 +521,7 @@ try {
   const giantCodeSource = '# Native giant code\n\n```javascript\n'+('const value = "native"; // 0123456789abcdef\n').repeat(820000)+'NATIVE-CODE-END\n```\n';
   const giantCodeRecord={id:'native-giant-code-qa',name:'Native-Giant-Code.md',path:null,content:giantCodeSource,savedContent:'',diskHash:null,lineEnding:'\n',encoding:'utf-8',bom:false};
   const registeredGiant=await desktop.registerDraft(giantCodeRecord);if(!registeredGiant.ok)throw new Error(registeredGiant.error);
-  window.__openTypora.command({action:'opened',document:giantCodeRecord});await wait(()=>root()?.querySelector('.large-code .code-preview .cm-content'));
+  window.__openMarkdownLane.command({action:'opened',document:giantCodeRecord});await wait(()=>root()?.querySelector('.large-code .code-preview .cm-content'));
   check(giantCodeSource.length>32*1024*1024 && root().querySelectorAll<HTMLElement>('.large-code .cm-line').length<200,'32+ MiB native code renders a bounded read-only CodeMirror viewport');
   root().querySelector<HTMLElement>('.large-code .code-preview .cm-content')!.click();await wait(()=>root()?.querySelector('.large-code.fence-editing .cm-content[contenteditable="true"]'));
   check(root().querySelectorAll<HTMLElement>('.large-code .cm-line').length<200,'native giant code activates its editable viewport without mounting the full block');
@@ -531,25 +531,25 @@ try {
   const editedGiant=giantCodeSource.replace('const value','const\nconst extra = `value`;\n value');
   let giantState=await recoveredText(giantCodeRecord.id,editedGiant,giantCodeSource,'native giant code edit');
   check(giantState.value!.documents.find(record=>record.id===giantCodeRecord.id)!?.content===giantCodeSource.replace('const value','const\nconst extra = `value`;\n value'),'native giant code newline and punctuation persist with every surrounding byte intact');
-  window.__openTypora.command({action:'undo'});await wait(()=>!root()?.textContent.includes('const extra = `value`;'));
+  window.__openMarkdownLane.command({action:'undo'});await wait(()=>!root()?.textContent.includes('const extra = `value`;'));
   giantState=await recoveredText(giantCodeRecord.id,giantCodeSource,editedGiant,'native giant code undo');
   check(giantState.value!.documents.find(record=>record.id===giantCodeRecord.id)!?.content===giantCodeSource,'native giant code newline edit undoes to exact original recovery bytes');
   const giantTableSource='| Key | Value |\n|---|---|\n'+Array.from({length:20000},(_,i)=>'| Row-'+i+' | '+(i===19999?'NATIVE-TABLE-END':'Native table value')+' |').join('\n')+'\n';
   const giantTableRecord={id:'native-giant-table-qa',name:'Native-Giant-Table.md',path:null,content:giantTableSource,savedContent:'',diskHash:null,lineEnding:'\n',encoding:'utf-8',bom:false};
   const registeredTable=await desktop.registerDraft(giantTableRecord);if(!registeredTable.ok)throw new Error(registeredTable.error);
-  window.__openTypora.command({action:'opened',document:giantTableRecord});await wait(()=>root()?.querySelector('.md-large-table'));
+  window.__openMarkdownLane.command({action:'opened',document:giantTableRecord});await wait(()=>root()?.querySelector('.md-large-table'));
   const tableViewport=root().querySelector<HTMLElement>('.md-large-table')!;await wait(()=>tableViewport.clientHeight>0&&tableViewport.scrollHeight>10000);check(true,'native giant table viewport laid out: '+tableViewport.clientHeight+'/'+tableViewport.scrollHeight);tableViewport.scrollTop=tableViewport.scrollHeight;tableViewport.dispatchEvent(new Event('scroll'));await wait(()=>root()?.textContent.includes('NATIVE-TABLE-END'));check(true,'native giant table final row mounted: '+tableViewport.scrollTop+'/'+tableViewport.scrollHeight);
   pointText('NATIVE-TABLE-END','NATIVE-TABLE-END'.length);input('insertText','中国');await wait(()=>root()?.textContent.includes('NATIVE-TABLE-END中国'));check(true,'native giant table Chinese edit committed');
-  window.__openTypora.command({action:'undo'});await wait(()=>!root()?.textContent.includes('NATIVE-TABLE-END中国'));check(true,'native giant table edit undone');
+  window.__openMarkdownLane.command({action:'undo'});await wait(()=>!root()?.textContent.includes('NATIVE-TABLE-END中国'));check(true,'native giant table edit undone');
   pointText('NATIVE-TABLE-END','NATIVE-TABLE-END'.length);input('deleteContentBackward');await wait(()=>root()?.textContent.includes('NATIVE-TABLE-EN')&&!root()?.textContent.includes('NATIVE-TABLE-END'));
   const giantTableState=await recoveredText(giantTableRecord.id,giantTableSource.replace('NATIVE-TABLE-END','NATIVE-TABLE-EN'),giantTableSource,'native giant table edit');
   check(giantTableState.value!.documents.find(record=>record.id===giantTableRecord.id)!?.content===giantTableSource.replace('NATIVE-TABLE-END','NATIVE-TABLE-EN'),'native giant table Backspace persists only the exact changed character');
-  window.__openTypora.command({action:'undo'});await wait(()=>root()?.textContent.includes('NATIVE-TABLE-END'));
+  window.__openMarkdownLane.command({action:'undo'});await wait(()=>root()?.textContent.includes('NATIVE-TABLE-END'));
   pointText('NATIVE-TABLE-END','NATIVE-TABLE-END'.length);input('insertText','👨‍👩‍👧‍👦');
   for(const key of ['ArrowLeft','ArrowRight'])root().dispatchEvent(new KeyboardEvent('keydown',{key,bubbles:true,cancelable:true}));
   input('deleteContentBackward');await wait(()=>!root()?.textContent.includes('👨‍👩‍👧‍👦'));
-  window.__openTypora.command({action:'undo'});await wait(()=>root()?.textContent.includes('NATIVE-TABLE-END👨‍👩‍👧‍👦'));
-  window.__openTypora.command({action:'undo'});await wait(()=>!root()?.textContent.includes('👨‍👩‍👧‍👦'));
+  window.__openMarkdownLane.command({action:'undo'});await wait(()=>root()?.textContent.includes('NATIVE-TABLE-END👨‍👩‍👧‍👦'));
+  window.__openMarkdownLane.command({action:'undo'});await wait(()=>!root()?.textContent.includes('👨‍👩‍👧‍👦'));
   check(true,'native rapid navigation and Backspace retain independent emoji deletion and insertion undo groups');
   await new Promise(resolve=>setTimeout(resolve,1600));const navigationState=await desktop.testRecovery();if(!navigationState.ok)throw new Error(navigationState.error);
   check(navigationState.value!.documents.find(record=>record.id===giantTableRecord.id)!?.content===giantTableSource,'native rapid navigation undo restores exact full-table recovery bytes');
@@ -559,10 +559,10 @@ try {
   const tableAnchor=getSelection()!?.anchorNode,tableAnchorElement=tableAnchor?.nodeType===Node.ELEMENT_NODE?tableAnchor:tableAnchor?.parentElement;
   check((tableAnchorElement as HTMLElement | null)?.closest<HTMLElement>('tr[data-source-row]')!?.dataset.sourceRow==='20002','native Tab-created empty row retains its caret through virtual viewport refresh');
   input('insertText','NATIVE-ADDED');await wait(()=>root()?.textContent.includes('NATIVE-ADDED'));
-  window.__openTypora.command({action:'undo'});await wait(()=>!root()?.textContent.includes('NATIVE-ADDED'));
-  window.__openTypora.command({action:'undo'});await wait(()=>!root()?.querySelector('tr[data-source-row="20002"]'));
+  window.__openMarkdownLane.command({action:'undo'});await wait(()=>!root()?.textContent.includes('NATIVE-ADDED'));
+  window.__openMarkdownLane.command({action:'undo'});await wait(()=>!root()?.querySelector('tr[data-source-row="20002"]'));
   check(true,'native large-table appended cell edits and both structural undo steps preserve the table');
-  window.__openTypora.command({action:'opened',document:saved.value!});await wait(()=>document.querySelector<HTMLElement>('.document-title')!?.textContent===saved.value!.name && root()?.textContent.includes('粗测新体'));
+  window.__openMarkdownLane.command({action:'opened',document:saved.value!});await wait(()=>document.querySelector<HTMLElement>('.document-title')!?.textContent===saved.value!.name && root()?.textContent.includes('粗测新体'));
   const menuButton = (label: string) => [...document.querySelectorAll<HTMLButtonElement>('[role="menu"] button')].find(button => button.textContent.trim() === label)!;
   const openNativeContext = async (target: HTMLElement) => {
     const rect = target.getBoundingClientRect();
@@ -594,13 +594,13 @@ try {
   check(true, 'native context Copy uses AppKit and preserves the selected rich text');
   await desktop.writeClipboard('菜单粘贴');
   selectNativeWord(); await wait(() => menuButton('粘贴')); menuButton('粘贴').click(); await wait(() => root().textContent.includes('菜单粘贴'));
-  window.__openTypora.command({action:'undo'}); await wait(() => root().textContent.includes('粗测新体') && !root().textContent.includes('菜单粘贴'));
+  window.__openMarkdownLane.command({action:'undo'}); await wait(() => root().textContent.includes('粗测新体') && !root().textContent.includes('菜单粘贴'));
   await sourceMode(true); check(readSource() === contextBaseline, 'native context Paste uses AppKit and undoes to exact Markdown'); await sourceMode(false);
   const targetCell = root().querySelector<HTMLElement>('tbody tr:last-child td:last-child')!, beforeRows = root().querySelectorAll<HTMLElement>('tbody tr').length;
   targetCell.scrollIntoView({block:'center'}); await new Promise(resolve => setTimeout(resolve, 50));
   await openNativeContext(targetCell); menuButton('表格').click(); await wait(() => menuButton('下方插入行')); menuButton('下方插入行').click();
   await wait(() => root().querySelectorAll<HTMLElement>('tbody tr').length === beforeRows + 1);
-  window.__openTypora.command({action:'undo'}); await wait(() => root().querySelectorAll<HTMLElement>('tbody tr').length === beforeRows);
+  window.__openMarkdownLane.command({action:'undo'}); await wait(() => root().querySelectorAll<HTMLElement>('tbody tr').length === beforeRows);
   await sourceMode(true); check(readSource() === contextBaseline, 'native table right-click inserts at the clicked row and undoes to exact source'); await sourceMode(false);
   root().focus(); root().dispatchEvent(new KeyboardEvent('keydown', {key:'F10',shiftKey:true,bubbles:true,cancelable:true})); await wait(() => document.querySelector<HTMLElement>('[role="menu"]')!);
   document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape',bubbles:true,cancelable:true}));
@@ -608,7 +608,7 @@ try {
   check(root().contains(document.activeElement!), 'native Escape dismisses the context menu and restores editor focus');
   pointText("粗测新体", 2);
   input("insertText", "保留");
-  window.__openTypora.command({ action: "close-window" });
+  window.__openMarkdownLane.command({ action: "close-window" });
   await new Promise((resolve) => setTimeout(resolve, 200));
   check(
     root().querySelector<HTMLElement>("strong")!.textContent.includes("保留"),

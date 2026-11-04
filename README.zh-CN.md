@@ -1,24 +1,24 @@
 <p align="center">
-  <img src="design/icon.svg" alt="Open Typora" width="88" height="88">
+  <img src="design/icon.svg" alt="Open Markdown Lane" width="88" height="88">
 </p>
 
-<h1 align="center">Open Typora</h1>
+<h1 align="center">Open Markdown Lane</h1>
 
 <p align="center">直接在正文中写 Markdown，让文件始终属于你。</p>
 
 <p align="center">
   <a href="README.md">English</a> · 简体中文<br>
-  <a href="https://open-typora.comicyueyu.chatgpt.site">在线试玩</a> · <a href="https://github.com/AniChikage/open-typora/releases/latest">下载安装包</a> · <a href="#功能">功能</a> · <a href="#使用文档">使用文档</a> · <a href="CONTRIBUTING.md">参与贡献</a> · <a href="LICENSE">MIT 许可证</a>
+  <a href="https://open-typora.comicyueyu.chatgpt.site">在线试玩</a> · <a href="https://github.com/AniChikage/open-markdown-lane/releases/latest">下载安装包</a> · <a href="#功能">功能</a> · <a href="#使用文档">使用文档</a> · <a href="CONTRIBUTING.md">参与贡献</a> · <a href="LICENSE">MIT 许可证</a>
 </p>
 
 > [!IMPORTANT]
-> **Open Typora 是独立、非官方项目，与 Typora 官方无隶属关系，未经官方背书，也不是官方免费版。**
+> **Open Markdown Lane 是独立、非官方项目，与 Typora 官方无隶属关系，未经官方背书，也不是官方免费版。**
 >
 > **有能力的朋友，请优先[购买正版 Typora](https://store.typora.io/)，支持官方开发者。** 官方产品与支持请认准 **[typora.io](https://typora.io/)**。
 
-![Open Typora 产品展示：macOS 原生窗口中的 Markdown 编辑界面](docs/images/hero.png)
+![Open Markdown Lane 产品展示：macOS 原生窗口中的 Markdown 编辑界面](docs/images/hero.png)
 
-Open Typora 是一款开源 Markdown 编辑器，受 Typora 的行内编辑体验启发。直接修改排版后的正文，需要时切换源码，文档以普通 `.md` 文件保存在自己的文件夹中。
+Open Markdown Lane 是一款开源 Markdown 编辑器，受 Typora 的行内编辑体验启发。直接修改排版后的正文，需要时切换源码，文档以普通 `.md` 文件保存在自己的文件夹中。
 
 **项目状态：**当前为早期开发版本 **0.22.0**，发布目标为 **macOS 14+、Apple Silicon**、**Windows 10/11 x64** 和 **Linux x64**，支持简体中文和英文界面，可在偏好设置中切换。本项目独立实现，与 Typora 无隶属关系；功能和交互仍在持续完善。
 
@@ -44,9 +44,9 @@ Open Typora 是一款开源 Markdown 编辑器，受 Typora 的行内编辑体�
 
 具体覆盖范围与已知差异见[功能清单](docs/feature-parity.md)。
 
-[观看实际编辑演示](docs/images/editing-demo.gif) · [阅读项目介绍与操作过程](docs/introducing-open-typora.zh-CN.md)
+[观看实际编辑演示](docs/images/editing-demo.gif) · [阅读项目介绍与操作过程](docs/introducing-open-markdown-lane.zh-CN.md)
 
-试用中遇到问题，可以[报告问题](https://github.com/AniChikage/open-typora/issues/new?template=bug_report.yml)或[提出功能建议](https://github.com/AniChikage/open-typora/issues/new?template=feature_request.yml)。请附上系统、应用版本和最小复现示例。
+试用中遇到问题，可以[报告问题](https://github.com/AniChikage/open-markdown-lane/issues/new?template=bug_report.yml)或[提出功能建议](https://github.com/AniChikage/open-markdown-lane/issues/new?template=feature_request.yml)。请附上系统、应用版本和最小复现示例。
 
 ## 开始使用
 
@@ -58,13 +58,15 @@ Open Typora 是一款开源 Markdown 编辑器，受 Typora 的行内编辑体�
 
 ### 下载
 
+> **项目改名：** Open Typora 现更名为 **Open Markdown Lane**（`open-markdown-lane`）。下方 0.22.0 安装包是改名前发布的版本，保留原文件名；新名称安装包尚未正式发布。[升级兼容说明](docs/renaming.md)。
+
 | 平台 | 安装包 | 其他方式 |
 | --- | --- | --- |
-| Windows 10/11 · x64 | **[下载 Setup.exe](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/Open-Typora-0.22.0-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/Open-Typora-0.22.0-windows-x64.zip) |
-| macOS 14+ · Apple Silicon | **[下载 DMG](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/Open-Typora-0.22.0-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/Open-Typora-0.22.0-arm64.zip) |
-| Linux · x64 | **[下载 DEB](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/Open-Typora-0.22.0-linux-x64.deb)** | [AppImage](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/Open-Typora-0.22.0-linux-x64.AppImage) |
+| Windows 10/11 · x64 | **[下载 Setup.exe](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.22.0/Open-Typora-0.22.0-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.22.0/Open-Typora-0.22.0-windows-x64.zip) |
+| macOS 14+ · Apple Silicon | **[下载 DMG](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.22.0/Open-Typora-0.22.0-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.22.0/Open-Typora-0.22.0-arm64.zip) |
+| Linux · x64 | **[下载 DEB](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.22.0/Open-Typora-0.22.0-linux-x64.deb)** | [AppImage](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.22.0/Open-Typora-0.22.0-linux-x64.AppImage) |
 
-[SHA-256 校验文件](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/SHA256SUMS.txt) · [所有版本](https://github.com/AniChikage/open-typora/releases)
+[SHA-256 校验文件](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.22.0/SHA256SUMS.txt) · [所有版本](https://github.com/AniChikage/open-markdown-lane/releases)
 
 ### 安装 Linux 版
 
@@ -90,7 +92,7 @@ Windows 版目前**没有代码签名证书**，系统可能显示未知发布�
 
 ### 安装 macOS 版
 
-1. 从 [Releases](https://github.com/AniChikage/open-typora/releases/latest) 下载 **[Open-Typora-0.22.0-arm64.dmg](https://github.com/AniChikage/open-typora/releases/download/v0.22.0/Open-Typora-0.22.0-arm64.dmg)**。
+1. 从 [Releases](https://github.com/AniChikage/open-markdown-lane/releases/latest) 下载 **[Open-Typora-0.22.0-arm64.dmg](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.22.0/Open-Typora-0.22.0-arm64.dmg)**。
 2. 打开 DMG，把 **Open Typora** 拖入 **Applications（应用程序）**。
 3. 从应用程序中启动 Open Typora。
 
@@ -103,19 +105,19 @@ Windows 版目前**没有代码签名证书**，系统可能显示未知发布�
 所有平台均需 **Node.js 26** 和 npm。macOS 还需 **Xcode Command Line Tools**（`xcode-select --install`），无需安装 Typora。
 
 ```sh
-git clone https://github.com/AniChikage/open-typora.git
-cd open-typora
+git clone https://github.com/AniChikage/open-markdown-lane.git
+cd open-markdown-lane
 npm ci
 npm run package:mac
 ```
 
-打开 `release/native/Open Typora.app`，或安装到 `~/Applications`：
+打开 `release/native/Open Markdown Lane.app`，或安装到 `~/Applications`：
 
 ```sh
 node scripts/install.mts
 ```
 
-替换前请先退出正在运行的 Open Typora。安装器保留应用数据，验证新应用后删除旧应用；构建同时在 `release/native/` 生成 ZIP 包；`npm run package:release` 另外生成 DMG 和校验文件。
+替换前请先退出正在运行的 Open Markdown Lane。安装器保留应用数据，验证新应用后删除旧应用；构建同时在 `release/native/` 生成 ZIP 包；`npm run package:release` 另外生成 DMG 和校验文件。
 
 Windows x64 还需安装 **Visual Studio 2022 Build Tools**（选择 **使用 C++ 的桌面开发** 工作负载）和 **PowerShell 7**（`pwsh`）。构建会使用固定版本的 WebView2 SDK 编译原生预览处理器。完成同样的克隆和依赖安装后，执行：
 
@@ -211,7 +213,7 @@ npm run test:ai-webkit    # 原生 WebKit AI 审阅与历史测试
 
 ## 参与贡献
 
-欢迎提交可复现的问题、范围明确的修复、文档和兼容性样本。请先阅读[贡献指南](CONTRIBUTING.md)，再提交 [Issue](https://github.com/AniChikage/open-typora/issues) 或 Pull Request。
+欢迎提交可复现的问题、范围明确的修复、文档和兼容性样本。请先阅读[贡献指南](CONTRIBUTING.md)，再提交 [Issue](https://github.com/AniChikage/open-markdown-lane/issues) 或 Pull Request。
 
 ## 许可证
 

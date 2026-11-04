@@ -4,14 +4,14 @@ import { mkdtemp, writeFile, readFile, mkdir, realpath } from 'node:fs/promises'
 import path from 'node:path';
 import os from 'node:os';
 import { digest, encodeText, decodeText } from '../build/runtime/electron/store.mjs';
-const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), 'open-typora-encoding-ui-'))), file = path.join(directory, '编码验收.md');
+const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), 'open-markdown-lane-encoding-ui-'))), file = path.join(directory, '编码验收.md');
 const initial = '# 编码验收\r\n\r\n原始中文。\r\n\r\n输入区：\r\n';
 await writeFile(file, encodeText(initial, 'gbk'));
 await writeFile(path.join(directory, 'session.json'), JSON.stringify({ version: 1, activeId: 'fixture', folder: directory, documents: [{ id: 'fixture', path: file, name: '编码验收.md', content: initial, savedContent: initial, diskHash: digest(await readFile(file)), encoding: 'gbk', bom: false, lineEnding: '\r\n' }] }));
-const env: Record<string, string> = { ...process.env, OPEN_TYPORA_DATA_DIR: directory }; delete env.ELECTRON_RUN_AS_NODE; delete env.OPEN_TYPORA_DEV_URL;
+const env: Record<string, string> = { ...process.env, OPEN_MARKDOWN_LANE_DATA_DIR: directory }; delete env.ELECTRON_RUN_AS_NODE; delete env.OPEN_MARKDOWN_LANE_DEV_URL;
 const app = await electron.launch({ args: [process.cwd()], env }), page = await app.firstWindow(), errors: string[] = [], passed: string[] = [];
 page.on('pageerror', error => errors.push(error.message));
-const qa = process.env.OPEN_TYPORA_QA_DIR || '/tmp/open-typora-encoding-qa'; await mkdir(qa, { recursive: true });
+const qa = process.env.OPEN_MARKDOWN_LANE_QA_DIR || '/tmp/open-markdown-lane-encoding-qa'; await mkdir(qa, { recursive: true });
 const rich = page.locator('.document-editor:not([hidden]) .rich-document'), encodingButton = page.getByRole('button', { name: '更改文本编码' });
 const dialog = () => page.getByRole('dialog', { name: '文本编码', exact: true });
 const pass = (label: string) => { passed.push(label); console.log('PASS:', label); };

@@ -30,7 +30,7 @@ test("regex replacements preserve literal named references without named capture
   }
 });
 test("workspace rename/move/undo preserves a dirty BOM draft and refuses overwrite/traversal", async () => {
-  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), "open-typora-workspace-"))), file = path.join(directory, "original.md");
+  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), "open-markdown-lane-workspace-"))), file = path.join(directory, "original.md");
   await writeFile(file, "\uFEFF# original\r\n"); await mkdir(path.join(directory, "child"));
   const store = new DocumentStore(path.join(directory, "data")), workspace = new Workspace(store.dataDir);
   const doc = await store.open(file); await store.scan(directory); store.records.get(doc.id)!.content = "# unsaved\r\n";
@@ -41,7 +41,7 @@ test("workspace rename/move/undo preserves a dirty BOM draft and refuses overwri
   assert.equal(await readFile(duplicate.newPath!, "utf8"), "\uFEFF# unsaved\r\n");
   await assert.rejects(workspace.execute({ action: "rename", path: file, name: "copy.md" }, store), /已存在/);
   await assert.rejects(workspace.execute({ action: "new-file", path: directory, name: "../escape.md" }, store), /无效/);
-  const outside = await mkdtemp(path.join(os.tmpdir(), "open-typora-outside-")); await symlink(outside, path.join(directory, "link"), process.platform === "win32" ? "junction" : "dir");
+  const outside = await mkdtemp(path.join(os.tmpdir(), "open-markdown-lane-outside-")); await symlink(outside, path.join(directory, "link"), process.platform === "win32" ? "junction" : "dir");
   await assert.rejects(workspace.execute({ action: "new-file", path: path.join(directory, "link"), name: "escape.md" }, store), /符号链接/);
   change = await workspace.execute({ action: "move", path: file, target: path.join(directory, "child") }, store); workspace.apply(change, store);
   assert.equal(store.require(doc.id).path, path.join(directory, "child/original.md"));
@@ -50,7 +50,7 @@ test("workspace rename/move/undo preserves a dirty BOM draft and refuses overwri
   assert.ok(first.files.some(file => file.relative === "empty" && file.isDirectory === "true"));
 });
 test("recent pins persist and global search returns real line positions", async () => {
-  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), "open-typora-search-"))), file = path.join(directory, "search.md"); await writeFile(file, "Title\nNeedle 12\nneedle 34\n");
+  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), "open-markdown-lane-search-"))), file = path.join(directory, "search.md"); await writeFile(file, "Title\nNeedle 12\nneedle 34\n");
   const store = new DocumentStore(path.join(directory, "data")), workspace = new Workspace(store.dataDir);
   await workspace.remember(directory, true); await workspace.remember(file); await workspace.recentAction("pin", directory); await workspace.recentAction("clear");
   assert.deepEqual((await new Workspace(store.dataDir).recent()).map(item => item.path), [directory]);
@@ -59,7 +59,7 @@ test("recent pins persist and global search returns real line positions", async 
   assert.equal((await workspace.search(inventory.files, "Needle", { regex: false, caseSensitive: true })).matches.length, 1);
 });
 test("opening an already owned path cannot silently accept an external edit", async () => {
-  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), "open-typora-owned-"))), file = path.join(directory, "owned.md");
+  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), "open-markdown-lane-owned-"))), file = path.join(directory, "owned.md");
   await writeFile(file, "original"); const store = new DocumentStore(path.join(directory, "data")); const original = await store.open(file);
   store.records.get(original.id)!.content = "dirty draft"; await writeFile(file, "external edit");
   const openedAgain = await store.open(file); assert.equal(openedAgain.content, "dirty draft"); assert.equal(openedAgain.diskHash, original.diskHash);

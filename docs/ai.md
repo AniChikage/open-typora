@@ -2,7 +2,7 @@
 
 English · [简体中文](ai.zh-CN.md)
 
-AI editing is optional and available in the desktop app. You bring a model service; Open Typora does not include a paid subscription or a hosted model.
+AI editing is optional and available in the desktop app. You bring a model service; Open Markdown Lane does not include a paid subscription or a hosted model.
 
 ## Connect a model
 
@@ -17,7 +17,7 @@ Open **Edit → Model settings…**, or **Preferences → AI rewriting → Model
 
 The compatible interface uses non-streaming `POST /chat/completions`; a root URL gets `/v1/chat/completions`. Custom path prefixes and complete endpoint URLs are preserved. The Ollama interface uses non-streaming `POST /api/chat`. Select a model actually installed in the local server or available to your provider account. Local servers must be running separately; an optional local API key can be left empty if the server permits it.
 
-For OpenRouter, copy an exact model ID from its [current catalog](https://openrouter.ai/models), and use your own OpenRouter key. Availability, pricing and [request limits](https://openrouter.ai/docs/api/reference/limits) are controlled by the provider. Open Typora sends the configured model ID without substituting another model.
+For OpenRouter, copy an exact model ID from its [current catalog](https://openrouter.ai/models), and use your own OpenRouter key. Availability, pricing and [request limits](https://openrouter.ai/docs/api/reference/limits) are controlled by the provider. Open Markdown Lane sends the configured model ID without substituting another model.
 
 Other proprietary API formats are not supported unless the service offers an OpenAI-compatible chat endpoint. Reviewed edits to up to four selected documents are available in [multi-document editing](workspace.md#edit-multiple-documents). This release does not include tool calling, browsing or an autonomous whole-folder agent.
 
@@ -43,7 +43,7 @@ The checks compare token values and counts. They are conservative and do not und
 
 ## Credentials and data
 
-- Starting with 0.20.2, the macOS app stores remembered keys in plaintext in `~/Library/Application Support/Open Typora/ai-settings.json`, with file permissions `0600` (read/write for the current user only). Regular settings and rewrite requests read that file, without Keychain access. Do not commit or share the configuration file. Windows/Linux retain Electron's system-backed encryption; insecure Linux `basic_text` storage is refused.
+- Starting with 0.20.2, the macOS app stores remembered keys in plaintext in `~/Library/Application Support/Open Markdown Lane/ai-settings.json`, with file permissions `0600` (read/write for the current user only). Regular settings and rewrite requests read that file, without Keychain access. Do not commit or share the configuration file. Windows/Linux retain Electron's system-backed encryption; insecure Linux `basic_text` storage is refused.
 - Uncheck **Save key in local configuration** on macOS, or **Remember key in system secure storage** on Windows/Linux, to keep a key only until the app exits. Session keys are not written to disk. Local servers without authentication need no key.
 - For a macOS configuration from 0.20.1 or earlier, the app does not read Keychain automatically. Settings offers **Migrate legacy key to configuration**, or you can re-enter the key. This explicit migration may need one final system authorization; after migration, settings and rewrites no longer query Keychain. The old entry is not used again. Never put a key in chat or an issue.
 - Settings return only key-presence/storage flags to the interface. The password field is cleared after saving. Reopening settings does not reveal a saved key. Changing the service endpoint does not reuse its previous key.
@@ -63,7 +63,7 @@ Truncated responses and empty results cannot be applied. Authentication, endpoin
 | Symptom | What to check |
 | --- | --- |
 | Connection test fails | Match the interface and URL to your service, use its exact model ID, and check the key and provider quota. A valid configuration stays saved even when the test request fails. |
-| Local server cannot be reached | Start LM Studio or Ollama separately, load a model and verify the host and port. Open Typora does not install or start a local model server. |
+| Local server cannot be reached | Start LM Studio or Ollama separately, load a model and verify the host and port. Open Markdown Lane does not install or start a local model server. |
 | An old macOS key still needs migration | In model settings, choose **Migrate legacy key to configuration**, or re-enter the key once and save. Subsequent launches use the file. Do not include the key or configuration file in an issue. |
 | Apply is disabled | Finish any IME candidate input, leave read-only mode, and return to the unchanged original document and pane. If the text changed, select it again and generate a new proposal. |
 | Empty, truncated or oversized output | Narrow the selection or requested change and check the model's context/output limits. The rejected result has not changed your document. |

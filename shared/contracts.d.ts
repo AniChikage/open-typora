@@ -171,7 +171,7 @@ declare global {
   interface Window {
     desktop?: DesktopBridge;
     webkit: { messageHandlers: Record<string, { postMessage(message: unknown): void }> };
-    __openTypora: {
+    __openMarkdownLane: {
       receive(message: { id: string; result: BridgeResponse<unknown> }): void;
       command(command: Command): void;
       fileOperation(phase: string, change: PathChange): Promise<boolean>;

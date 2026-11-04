@@ -181,7 +181,7 @@ test("installed plugin preflight failures display the host reason before import 
   }finally{await run.destroy();}
 });
 test("local CommonJS installation preserves original source, is content addressed and rejects invalid input", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "open-typora-plugins-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "open-markdown-lane-plugins-"));
   try {
     const entry = path.join(root, "example.js"), directory = path.join(root, "profile"); await mkdir(directory); const original = await source("dark"); await writeFile(entry, original);
     const installed = await installPlugin(entry, directory); assert.equal((await installPlugin(entry, directory)).id, installed.id);
@@ -195,7 +195,7 @@ test("local CommonJS installation preserves original source, is content addresse
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 test("folder installation resolves nested CommonJS, JSON and CSS, caches modules, and owns helper timers",async()=>{
-  const root=await mkdtemp(path.join(os.tmpdir(),'open-typora-package-')), profile=path.join(root,'profile'), folder=path.join(root,'source');await mkdir(profile);
+  const root=await mkdtemp(path.join(os.tmpdir(),'open-markdown-lane-package-')), profile=path.join(root,'profile'), folder=path.join(root,'source');await mkdir(profile);
   await cp(new URL('./fixtures/plugin-package',import.meta.url),folder,{recursive:true});
   let text='original'; const states: Record<string, PluginState>={};
   const run=new PluginRuntime({getMarkdown:()=>text,getPath:()=>'/tmp/doc.md',getSelection:()=>'',insert:value=>text+=value,replace:value=>text=value,setReadOnly(){},notify(){},changed:(id: string,state)=>states[id]=state,saveConfig(){}});
@@ -221,7 +221,7 @@ test("folder module loading supports circular CommonJS and rejects external or e
   assert.throws(()=>execute(pluginPackage('index.js',{'index.js':"require('./missing');"})),/缺少模块/);
 });
 test("folder installation refuses symlinks, invalid entry paths and excessive bundles without partial records",async()=>{
-  const root=await mkdtemp(path.join(os.tmpdir(),'open-typora-package-limits-')),profile=path.join(root,'profile'),folder=path.join(root,'source');await mkdir(profile);await mkdir(folder);
+  const root=await mkdtemp(path.join(os.tmpdir(),'open-markdown-lane-package-limits-')),profile=path.join(root,'profile'),folder=path.join(root,'source');await mkdir(profile);await mkdir(folder);
   try {
     await writeFile(path.join(folder,'index.js'),'module.exports.plugin=class {};');
     await writeFile(path.join(folder,'package.json'),'{"main":"../outside.js"}');await assert.rejects(installPlugin(folder,profile),/文件夹内/);
@@ -231,7 +231,7 @@ test("folder installation refuses symlinks, invalid entry paths and excessive bu
   } finally {await rm(root,{recursive:true,force:true});}
 });
 test("Windows theme installation embeds local imports, fonts and images and refuses cycles and path escapes", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "open-typora-theme-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "open-markdown-lane-theme-"));
   try {
     const theme = path.join(root, "theme"), profile = path.join(root, "profile"); await mkdir(theme); await mkdir(profile);
     await writeFile(path.join(theme, "font.woff2"), "owned font"); await writeFile(path.join(theme, "image.png"), "owned image"); await writeFile(path.join(theme, "type.css"), '@font-face{font-family:Owned;src:url("font.woff2")}');
@@ -298,7 +298,7 @@ test("plugin DOM bindings follow the focused pane when both documents are visibl
 
 
 test("self-contained themes with embedded font data can be reimported above the old 1 MB limit", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "open-typora-theme-roundtrip-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "open-markdown-lane-theme-roundtrip-"));
   try {
     const css = '@font-face{font-family:Owned;src:url(data:font/woff2;base64,'+'A'.repeat(5*1024*1024)+')}';
     const file=path.join(root,'shared.css');await writeFile(file,css);await installTheme(file,path.join(root,'profile'));

@@ -2,12 +2,12 @@
 
 The Windows x64 installer includes a native COM preview handler for `.md`, `.markdown` and `.mdown`. It is optional and does not change the default Markdown editor.
 
-1. Install Open Typora and [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/).
+1. Install Open Markdown Lane and [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/).
 2. In Preferences, find **系统 Markdown 预览** and enable it.
 3. In Everything, show the Preview pane (View → Preview, usually Alt+P) and select a Markdown file. In File Explorer, turn on the Preview pane and enable preview handlers in Folder Options.
 4. If a host cached the old handler, close and reopen its window.
 
-Registration is per-user; no administrator permission is requested. Enabling saves the current handler for each extension. Disabling or uninstalling restores it when Open Typora still owns the mapping; another application's subsequent choice is left intact. Updates refresh the installed DLL path without enabling preview for users who have not opted in.
+Registration is per-user; no administrator permission is requested. Enabling saves the current handler for each extension. Disabling or uninstalling restores it when Open Markdown Lane still owns the mapping; another application's subsequent choice is left intact. Updates refresh the installed DLL path without enabling preview for users who have not opted in.
 
 ## Scope
 

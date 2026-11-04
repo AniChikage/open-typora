@@ -8,7 +8,7 @@ import { atomicWrite } from "./store.mjs";
 const exec = promisify(execFile);
 export async function pandocPath(): Promise<string> {
   const executable = process.platform === "win32" ? "pandoc.exe" : "pandoc";
-  const candidates = [process.env.OPEN_TYPORA_PANDOC,
+  const candidates = [process.env.OPEN_MARKDOWN_LANE_PANDOC || process.env.OPEN_TYPORA_PANDOC,
     ...(process.platform === "win32" ? [process.env.ProgramFiles, process.env.LOCALAPPDATA].filter(Boolean).map(root => path.join(root!, "Pandoc", executable)) : ["/opt/homebrew/bin/pandoc", "/usr/local/bin/pandoc"]),
     ...(process.env.PATH || "").split(path.delimiter).filter(Boolean).map(root => path.join(root!, executable)),
   ].filter(Boolean);
@@ -27,7 +27,7 @@ export async function convertExport(directory: string, format: string, source: s
 export async function libreOfficePath(): Promise<string> {
   const names = process.platform === "win32" ? ["soffice.com", "soffice.exe"] : ["soffice", "libreoffice"];
   const roots = process.platform === "win32" ? [process.env.ProgramFiles, process.env["ProgramFiles(x86)"]].filter(Boolean).map(root => path.join(root!,"LibreOffice","program")) : ["/Applications/LibreOffice.app/Contents/MacOS", "/usr/bin", "/opt/homebrew/bin"];
-  const candidates = [process.env.OPEN_TYPORA_LIBREOFFICE, ...roots.flatMap(root => names.map(name => path.join(root!,name))), ...(process.env.PATH || "").split(path.delimiter).filter(Boolean).flatMap(root => names.map(name => path.join(root!,name)))].filter(Boolean);
+  const candidates = [process.env.OPEN_MARKDOWN_LANE_LIBREOFFICE || process.env.OPEN_TYPORA_LIBREOFFICE, ...roots.flatMap(root => names.map(name => path.join(root!,name))), ...(process.env.PATH || "").split(path.delimiter).filter(Boolean).flatMap(root => names.map(name => path.join(root!,name)))].filter(Boolean);
   for (const file of candidates as string[]) try { await access(file); return file; } catch {}
   return "";
 }

@@ -5,7 +5,7 @@ func runStoreTests() throws {
   try runWindowChromeTests()
   let fm = FileManager.default
   let directory = fm.temporaryDirectory.appendingPathComponent(
-    "open-typora-native-tests-\(UUID().uuidString)").resolvingSymlinksInPath()
+    "open-markdown-lane-native-tests-\(UUID().uuidString)").resolvingSymlinksInPath()
   try fm.createDirectory(at: directory, withIntermediateDirectories: true)
   func expect(_ condition: @autoclosure () throws -> Bool, _ name: String) throws {
     if try !condition() { throw NativeFailure("FAIL: \(name)") }
@@ -346,5 +346,11 @@ func runStoreTests() throws {
   let pendingBatch = try batchStore.prepare(batchInput, store: store)
   try batchStore.finish(pendingBatch["id"] as! String, applied: false)
   try expect(try batchStore.list().count == 1, "native cancelled preparation removes only the unused recovery point")
+  let brandingRoot = directory.appendingPathComponent("branding")
+  try fm.createDirectory(at: brandingRoot, withIntermediateDirectories: true)
+  try expect(laneDataDirectory(brandingRoot, preview: false).lastPathComponent == "Open Markdown Lane", "native fresh installations use the new data directory")
+  try fm.createDirectory(at: brandingRoot.appendingPathComponent("Open Typora"), withIntermediateDirectories: true)
+  try expect(laneDataDirectory(brandingRoot, preview: false).lastPathComponent == "Open Typora", "native upgrades retain existing sessions and AI settings in place")
+  try expect(laneDataDirectory(brandingRoot, preview: true).lastPathComponent == "Open Markdown Lane Preview", "native preview data stays separate from the installed application")
   print("Native document store checks passed. Artifacts: \(directory.path)")
 }

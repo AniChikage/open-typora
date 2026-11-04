@@ -1,3 +1,4 @@
+import { storedItem } from "./migrateStorage.ts";
 import { useEffect, useRef, useState } from "react";
 import { host } from "./host";
 import { normalizeWorkspace, activateWorkspace, reorderDocuments } from "./workspace";
@@ -15,7 +16,7 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
     [message, setMessage] = useState(""),
     [saving, setSaving] = useState(false);
   const [autosave, setAutosave] = useState(
-    () => localStorage.getItem("open-typora-autosave") !== "false",
+    () => storedItem(localStorage, "open-markdown-lane-autosave") !== "false",
   );
   const [fileOperationBusy, setFileOperationBusy] = useState(false);
   const [recent, setRecent] = useState<RecentEntry[]>([]);
@@ -96,7 +97,7 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
     return () => clearTimeout(timer);
   }, [documents, activeId, workspace, ready]);
   useEffect(() => {
-    localStorage.setItem("open-typora-autosave", String(autosave));
+    localStorage.setItem("open-markdown-lane-autosave", String(autosave));
   }, [autosave]);
   async function save(
     saveAs = false,

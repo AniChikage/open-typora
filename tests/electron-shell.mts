@@ -10,19 +10,19 @@ import { installPlugin } from "../build/runtime/electron/plugins.mjs";
 import { builtInThemes } from "../src/themes.ts";
 import backgroundFormats from "./background-formats.json" with {type:"json"};
 
-const executablePath = process.env.OPEN_TYPORA_EXECUTABLE;
+const executablePath = process.env.OPEN_MARKDOWN_LANE_EXECUTABLE;
 assert.ok(["win32", "linux"].includes(process.platform));
 assert.ok(executablePath, "Test the installed executable, not the development host");
-const qa = process.env.OPEN_TYPORA_QA_DIR!;
+const qa = process.env.OPEN_MARKDOWN_LANE_QA_DIR!;
 await mkdir(qa, { recursive: true });
-const data = await mkdtemp(path.join(os.tmpdir(), "open-typora-shell-"));
+const data = await mkdtemp(path.join(os.tmpdir(), "open-markdown-lane-shell-"));
 const first = path.join(data, "English note.md"), second = path.join(data, "中文 notes.md");
 await writeFile(first, "# A quiet place for your words\n\nAn installed Windows application.\n");
 await writeFile(second, "# Windows 文件关联\n\n保留空格和中文文件名。\n");
-const env: Record<string, string> = { ...process.env, OPEN_TYPORA_DATA_DIR: path.join(data, "session") };
+const env: Record<string, string> = { ...process.env, OPEN_MARKDOWN_LANE_DATA_DIR: path.join(data, "session") };
 const pluginFile = path.join(data, "Win-plugin-fixture.js");
 await writeFile(pluginFile, "class WindowsFixture extends BasePlugin { style() { return '#write { --plugin-fixture: loaded; }' }; call() { this.utils.insertText('插件验收') } }; module.exports = {plugin: WindowsFixture};");
-await installPlugin(pluginFile, env.OPEN_TYPORA_DATA_DIR);
+await installPlugin(pluginFile, env.OPEN_MARKDOWN_LANE_DATA_DIR);
 delete env.ELECTRON_RUN_AS_NODE;
 let application, currentPage;
 try {
@@ -100,7 +100,7 @@ try {
   await expect(page.locator('.editor-background')).toHaveCSS('filter','blur(0px)');
   await page.screenshot({path:path.join(qa,'windows-background.png')});
   await page.getByRole('button',{name:'清除背景',exact:true}).click(); await expect(page.locator('.editor-background')).toHaveCount(0);
-  assert.equal(JSON.parse(await readFile(path.join(env.OPEN_TYPORA_DATA_DIR,'background.json'),'utf8')),null);
+  assert.equal(JSON.parse(await readFile(path.join(env.OPEN_MARKDOWN_LANE_DATA_DIR,'background.json'),'utf8')),null);
   await page.getByRole('button',{name:'管理插件…',exact:true}).click();
   const plugin = page.locator('.plugin-card').filter({has:page.getByRole('heading',{name:'Win-plugin-fixture',exact:true})});
   await plugin.getByRole('checkbox').check();

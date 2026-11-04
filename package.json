@@ -1,5 +1,5 @@
 {
-  "name": "open-typora",
+  "name": "open-markdown-lane",
   "version": "0.22.0",
   "description": "A local Markdown writing space with live rendering and lossless source editing.",
   "private": true,
@@ -52,7 +52,8 @@
     "test:ai-native": "npm run build:runtime && node scripts/test-ai-native.mts",
     "test:ai-webkit": "npm run build && node scripts/test-webkit.mts --ai",
     "test:batch": "node tests/batch-desktop.mts",
-    "test:knowledge": "node tests/knowledge-desktop.mts"
+    "test:knowledge": "node tests/knowledge-desktop.mts",
+    "test:branding": "node tests/branding-desktop.mts"
   },
   "dependencies": {
     "@codemirror/autocomplete": "6.20.3",
@@ -101,7 +102,7 @@
   },
   "build": {
     "appId": "org.opentypora.desktop",
-    "productName": "Open Typora",
+    "productName": "Open Markdown Lane",
     "directories": {
       "output": "release"
     },
@@ -141,11 +142,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/AniChikage/open-typora.git"
+    "url": "https://github.com/AniChikage/open-markdown-lane.git"
   },
-  "homepage": "https://github.com/AniChikage/open-typora#readme",
+  "homepage": "https://github.com/AniChikage/open-markdown-lane#readme",
   "bugs": {
-    "url": "https://github.com/AniChikage/open-typora/issues"
+    "url": "https://github.com/AniChikage/open-markdown-lane/issues"
   },
   "engines": {
     "node": ">=26"
