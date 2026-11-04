@@ -5,7 +5,7 @@ export const samples = [
 
 A little room to think. A place for your next idea.
 
-This is **Open Typora**, an open-source Markdown editor. Click anywhere in this document and start writing. You're editing the page itself.
+This is **Open Markdown Lane**, an open-source Markdown editor. Click anywhere in this document and start writing. You're editing the page itself.
 
 ## Make it yours
 
@@ -40,7 +40,7 @@ Your writing stays in this tab. Download a copy before you leave; refreshing cle
 
 先写下来，再慢慢整理。
 
-这是 Open Typora 的网页试玩。点击正文就能编辑，也可以切到 **Source** 查看 Markdown。它与桌面版使用同一套编辑内核。
+这是 Open Markdown Lane 的网页试玩。点击正文就能编辑，也可以切到 **Source** 查看 Markdown。它与桌面版使用同一套编辑内核。
 
 ## 今天要做的事
 

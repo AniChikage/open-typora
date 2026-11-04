@@ -1,8 +1,9 @@
+import { storedItem } from "./migrateStorage.ts";
 export interface ThemeCustomization {
   fontFamily: string; codeFontFamily: string; lineHeight: number; contentWidth: number;
   paragraphSpacing: number; accent: string; paper: string; ink: string; css: string; printCss: string;
 }
-export const themeCustomizationKey = 'open-typora-theme-customizations-v1';
+export const themeCustomizationKey = 'open-markdown-lane-theme-customizations-v1';
 export const customizationDefaults: ThemeCustomization = { fontFamily: '', codeFontFamily: '', lineHeight: 1.6, contentWidth: 860, paragraphSpacing: 12.8, accent: '', paper: '', ink: '', css: '', printCss: '' };
 export function normalizeCustomization(value: unknown): ThemeCustomization {
   const raw = value && typeof value === 'object' ? value as Record<string, unknown> : {}, next = { ...customizationDefaults };
@@ -13,7 +14,7 @@ export function normalizeCustomization(value: unknown): ThemeCustomization {
   return next;
 }
 export function loadCustomizations(): Record<string, ThemeCustomization> {
-  try { return Object.fromEntries(Object.entries(JSON.parse(localStorage.getItem(themeCustomizationKey) || '{}')).slice(0, 100).map(([key, value]) => [key, normalizeCustomization(value)])); }
+  try { return Object.fromEntries(Object.entries(JSON.parse(storedItem(localStorage, themeCustomizationKey) || '{}')).slice(0, 100).map(([key, value]) => [key, normalizeCustomization(value)])); }
   catch { return {}; }
 }
 export function customizationCss(value: ThemeCustomization) {

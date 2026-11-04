@@ -58,7 +58,7 @@ export async function imageAction({store,id,sources,action,options={},destinatio
   if (action === "upload") {
     const endpoint = options.imageUploader || "http://127.0.0.1:36677/upload";
     if (!/^https?:\/\//i.test(endpoint)) throw new Error("PicGo Server 地址无效。");
-    const temporary = await mkdtemp(path.join(os.tmpdir(),"open-typora-upload-"));
+    const temporary = await mkdtemp(path.join(os.tmpdir(),"open-markdown-lane-upload-"));
     try {
       for (const [index,item] of items.entries()) {
         let file = item.local;

@@ -6,7 +6,7 @@ import os from 'node:os';
 import { DocumentStore, digest } from '../build/runtime/electron/store.mjs';
 import { VersionStore } from '../build/runtime/electron/versions.mjs';
 async function fixture() {
-  const directory=await realpath(await mkdtemp(path.join(os.tmpdir(),'open-typora-versions-'))), file=path.join(directory,'中文.md');
+  const directory=await realpath(await mkdtemp(path.join(os.tmpdir(),'open-markdown-lane-versions-'))), file=path.join(directory,'中文.md');
   const text='# 版本\r\n\r\n你好，中国 👨‍👩‍👧‍👦  \r\n'; await writeFile(file,text); const store=new DocumentStore(path.join(directory,'data')); const record=await store.open(file); return {directory,file,text,store,record};
 }
 test('saved history survives a new host instance and reads exact Unicode/CRLF without touching disk', async()=>{

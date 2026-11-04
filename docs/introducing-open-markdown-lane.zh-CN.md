@@ -1,14 +1,14 @@
-# Open Typora 开源 Markdown 编辑器与实际编辑演示
+# Open Markdown Lane 开源 Markdown 编辑器与实际编辑演示
 
 > 本文记录 0.5.2 的发布和操作演示，保留当时的功能范围。当前版本为 0.20.2，已提供 Linux 安装包和 AI 编辑等后续功能；最新下载、配置与限制请看[中文 README](../README.zh-CN.md)。
 
-我把 Open Typora 开源了。现在有 macOS 和 Windows 安装包，可以直接下载试用。
+我把 Open Markdown Lane 开源了。现在有 macOS 和 Windows 安装包，可以直接下载试用。
 
 我想要的东西很明确：打开一份 `.md` 文件，直接在正文里写。标题、列表、表格正常排版，需要看源码时再切过去。写完保存，文件还在自己的文件夹里，换个编辑器也能继续打开。
 
 项目受 Typora 的编辑体验启发，采用 MIT 许可证，与 Typora 官方没有关联。本文对应 **0.5.2 早期预览版**，界面暂时只有简体中文。
 
-![Open Typora 英文产品展示](images/hero.png)
+![Open Markdown Lane 英文产品展示](images/hero.png)
 
 ## 编辑交互要实际用起来
 
@@ -16,7 +16,7 @@
 
 所以这次也补了一段实际编辑演示。下面展示的是安装版 macOS 应用中的操作，用公开的示例文件走了一遍正文修改、任务勾选、表格加行、源码切换、保存和 PDF 导出。
 
-![Open Typora 实际编辑操作动图](images/editing-demo.gif)
+![Open Markdown Lane 实际编辑操作动图](images/editing-demo.gif)
 
 动图由实际窗口截图按步骤整理，播放时长不代表操作耗时。文中的英文来自示例文档，应用菜单和提示目前仍为中文。
 
@@ -50,10 +50,10 @@ HTML 和 PDF 可以直接导出。DOCX、ODT、EPUB 等额外格式通过可选�
 
 请使用[当前版本的下载与安装说明](../README.zh-CN.md#下载)，提供 macOS、Windows 和 Linux 安装包。上方演示仍对应 0.5.2，不代表新版本的完整界面。
 
-[Release 页面](https://github.com/AniChikage/open-typora/releases/latest)同时提供 ZIP 和 SHA-256 校验文件。Windows 安装包目前没有代码签名证书，macOS 包还没有经过 Apple 公证，首次安装可能出现系统提示。安装说明见[中文 README](../README.zh-CN.md#开始使用)。
+[Release 页面](https://github.com/AniChikage/open-markdown-lane/releases/latest)同时提供 ZIP 和 SHA-256 校验文件。Windows 安装包目前没有代码签名证书，macOS 包还没有经过 Apple 公证，首次安装可能出现系统提示。安装说明见[中文 README](../README.zh-CN.md#开始使用)。
 
 如果你愿意试用，我更想知道具体卡在哪里：哪种输入法、哪份表格、哪一步保存或导出出了问题。附上系统、应用版本和最小复现示例，后面才好把问题真正修掉。
 
-[源码仓库](https://github.com/AniChikage/open-typora) · [报告问题](https://github.com/AniChikage/open-typora/issues/new?template=bug_report.yml) · [提出功能建议](https://github.com/AniChikage/open-typora/issues/new?template=feature_request.yml)
+[源码仓库](https://github.com/AniChikage/open-markdown-lane) · [报告问题](https://github.com/AniChikage/open-markdown-lane/issues/new?template=bug_report.yml) · [提出功能建议](https://github.com/AniChikage/open-markdown-lane/issues/new?template=feature_request.yml)
 
 本文使用 AI 辅助起草与整理。功能说明依据 0.5.2 项目文档，操作素材来自该版本 macOS 安装版的实际窗口。

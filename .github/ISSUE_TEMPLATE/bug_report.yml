@@ -5,12 +5,12 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for trying Open Typora. Please search existing issues first.
+        Thanks for trying Open Markdown Lane. Please search existing issues first.
         Share a small example with personal information removed. Reports are public.
   - type: input
     id: version
     attributes:
-      label: Open Typora version
+      label: Open Markdown Lane version
       placeholder: "e.g. 0.5.2"
     validations:
       required: true

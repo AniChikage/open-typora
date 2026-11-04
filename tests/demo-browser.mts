@@ -6,7 +6,7 @@ import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 
-const repo = process.cwd(), root = process.env.OPEN_TYPORA_QA_DIR || await mkdtemp(path.join(os.tmpdir(), 'open-typora-demo-qa-'));
+const repo = process.cwd(), root = process.env.OPEN_MARKDOWN_LANE_QA_DIR || await mkdtemp(path.join(os.tmpdir(), 'open-markdown-lane-demo-qa-'));
 await mkdir(root, { recursive: true });
 const dist = path.join(repo, 'dist-demo');
 const types: Record<string, string> = {
@@ -34,7 +34,7 @@ let acceptDialog = false;
 
 try {
   browser = await chromium.launch({
-    ...(process.env.OPEN_TYPORA_BROWSER_EXECUTABLE ? { executablePath: process.env.OPEN_TYPORA_BROWSER_EXECUTABLE } : {}),
+    ...(process.env.OPEN_MARKDOWN_LANE_BROWSER_EXECUTABLE ? { executablePath: process.env.OPEN_MARKDOWN_LANE_BROWSER_EXECUTABLE } : {}),
     headless: true
   });
   const context = await browser.newContext({ acceptDownloads: true });
@@ -53,7 +53,7 @@ try {
   await page.goto(base + '/');
   await page.setViewportSize({ width: 1280, height: 900 });
   await expect(page.getByRole('main', { name: 'Markdown writing workspace' })).toBeVisible();
-  assert.match(await page.title(), /Open Typora/);
+  assert.match(await page.title(), /Open Markdown Lane/);
   assert.equal(await page.evaluate(() => window.desktop), undefined);
   await expect(page.locator('input[type=password]')).toHaveCount(0);
   await expect(page.locator('vite-error-overlay')).toHaveCount(0);

@@ -6,7 +6,7 @@ import os from 'node:os';
 import { EditBatchStore } from '../build/runtime/electron/edit-batches.mjs';
 import { DocumentStore } from '../build/runtime/electron/store.mjs';
 async function fixture() {
-  const directory = await mkdtemp(path.join(os.tmpdir(), 'open-typora-batch-')), store = new DocumentStore(directory), batches = new EditBatchStore(directory);
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'open-markdown-lane-batch-')), store = new DocumentStore(directory), batches = new EditBatchStore(directory);
   store.registerDraft({ id: 'one', name: '正文.md', content: '你好，中国。', path: null });
   const input = { instruction: '润色', files: [{ documentId: 'one', before: '你好，中国。', after: '中国，你好。' }] };
   return { directory, store, batches, input };

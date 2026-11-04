@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 const directory = await mkdtemp(
-  path.join(os.tmpdir(), "open-typora-kernel-desktop-"),
+  path.join(os.tmpdir(), "open-markdown-lane-kernel-desktop-"),
 );
 const file = path.join(directory, "内核验收.md");
 const original =
@@ -30,8 +30,8 @@ await writeFile(
     ],
   }),
 );
-const env: Record<string, string> = { ...process.env, OPEN_TYPORA_DATA_DIR: directory };
-delete env.OPEN_TYPORA_DEV_URL;
+const env: Record<string, string> = { ...process.env, OPEN_MARKDOWN_LANE_DATA_DIR: directory };
+delete env.OPEN_MARKDOWN_LANE_DEV_URL;
 delete env.ELECTRON_RUN_AS_NODE;
 const application = await electron.launch({ args: [process.cwd()], env });
 const page = await application.firstWindow(),
@@ -136,7 +136,7 @@ try {
   await mode(true);
   assert.deepEqual(errors, []);
   passed.push("no renderer errors");
-  const qa = process.env.OPEN_TYPORA_QA_DIR || "/tmp/open-typora-kernel-qa";
+  const qa = process.env.OPEN_MARKDOWN_LANE_QA_DIR || "/tmp/open-markdown-lane-kernel-qa";
   await mkdir(qa, { recursive: true });
   await page.screenshot({ path: path.join(qa, "kernel-desktop.png") });
   await writeFile(

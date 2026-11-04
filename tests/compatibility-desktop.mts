@@ -11,8 +11,8 @@ import {pathToFileURL} from 'node:url';
 import {pandocPath,libreOfficePath} from '../build/runtime/electron/interchange.mjs';
 const exec = promisify(execFile), pandoc = await pandocPath(), office = await libreOfficePath();
 assert.ok(pandoc && office,'Install Pandoc and LibreOffice for actual conversion acceptance');
-const data = await mkdtemp(path.join(os.tmpdir(),'open-typora-compatibility-'));
-const qa = process.env.OPEN_TYPORA_QA_DIR || path.join(data,'evidence'); await mkdir(qa,{recursive:true});
+const data = await mkdtemp(path.join(os.tmpdir(),'open-markdown-lane-compatibility-'));
+const qa = process.env.OPEN_MARKDOWN_LANE_QA_DIR || path.join(data,'evidence'); await mkdir(qa,{recursive:true});
 const pixels = Buffer.from(Array.from({length:12*8*3},(_,index)=>(index*37)%256));
 const png = await sharp(pixels,{raw:{width:12,height:8,channels:3}}).png().toBuffer();
 await writeFile(path.join(data,'figure.png'),png);
@@ -20,12 +20,12 @@ const markdown = '# 兼容验收\n\n中文、English **bold**, $E=mc^2$ and note
 const md = path.join(data,'input.md'); await writeFile(md,markdown);
 for (const format of ['docx','odt','epub']) await exec(pandoc,[md,'--output='+path.join(data,'input.'+format),'--resource-path='+data]);
 for (const format of ['doc:MS Word 97','rtf:Rich Text Format']) await exec(office,['-env:UserInstallation='+pathToFileURL(path.join(data,'profile')).href,'--headless','--norestore','--convert-to',format,'--outdir',data,path.join(data,'input.docx')],{timeout:60000});
-const env: Record<string, string> = {...process.env,OPEN_TYPORA_DATA_DIR:path.join(data,'session')}; delete env.ELECTRON_RUN_AS_NODE; delete env.OPEN_TYPORA_DEV_URL;
+const env: Record<string, string> = {...process.env,OPEN_MARKDOWN_LANE_DATA_DIR:path.join(data,'session')}; delete env.ELECTRON_RUN_AS_NODE; delete env.OPEN_MARKDOWN_LANE_DEV_URL;
 const server = createServer((request,response)=>{response.writeHead(200,{'content-type':'image/png'});response.end(png);});
 await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
 let application!: import("playwright").ElectronApplication, page!: import("playwright").Page; const checks: string[]=[],errors: string[]=[];
 try {
-  application = await electron.launch({...(process.env.OPEN_TYPORA_EXECUTABLE ? {executablePath:process.env.OPEN_TYPORA_EXECUTABLE,args:[]} : {args:[process.cwd()]}),env,timeout:30000});
+  application = await electron.launch({...(process.env.OPEN_MARKDOWN_LANE_EXECUTABLE ? {executablePath:process.env.OPEN_MARKDOWN_LANE_EXECUTABLE,args:[]} : {args:[process.cwd()]}),env,timeout:30000});
   page = await application.firstWindow(); page.on('pageerror',error=>errors.push(error.message));
   await expect(page.getByRole('button',{name:'欢迎.md',exact:true})).toBeVisible({timeout:20000});
   await application.evaluate(({dialog})=>{dialog.showMessageBox=async()=>({response:2,checkboxChecked:false});});
@@ -70,7 +70,7 @@ try {
   checks.push('Installed host copies local/HTTP images, rewrites paths, moves originals to Trash and renders new destinations');
   await page.screenshot({path:path.join(qa,'compatibility.png')});
   await application.close(); application=null!;
-  application = await electron.launch({...(process.env.OPEN_TYPORA_EXECUTABLE ? {executablePath:process.env.OPEN_TYPORA_EXECUTABLE,args:[savedDoc]} : {args:[process.cwd(),savedDoc]}),env,timeout:30000});
+  application = await electron.launch({...(process.env.OPEN_MARKDOWN_LANE_EXECUTABLE ? {executablePath:process.env.OPEN_MARKDOWN_LANE_EXECUTABLE,args:[savedDoc]} : {args:[process.cwd(),savedDoc]}),env,timeout:30000});
   page = await application.firstWindow(); page.on('pageerror',error=>errors.push(error.message));
   const reopened = page.locator('.document-editor:not([hidden]) .rich-document');
   await application.evaluate(({dialog})=>{dialog.showMessageBox=async()=>({response:2,checkboxChecked:false});});

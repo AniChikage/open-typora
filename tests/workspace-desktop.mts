@@ -4,15 +4,15 @@ import { mkdtemp, mkdir, writeFile, readFile, realpath } from "node:fs/promises"
 import { createHash } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
-const data=await realpath(await mkdtemp(path.join(os.tmpdir(),'open-typora-workspace-'))), profile=path.join(data,'profile');
-const qa=process.env.OPEN_TYPORA_QA_DIR || path.join(data,'evidence');await mkdir(profile);await mkdir(qa,{recursive:true});
+const data=await realpath(await mkdtemp(path.join(os.tmpdir(),'open-markdown-lane-workspace-'))), profile=path.join(data,'profile');
+const qa=process.env.OPEN_MARKDOWN_LANE_QA_DIR || path.join(data,'evidence');await mkdir(profile);await mkdir(qa,{recursive:true});
 const texts=['# Long document\n\n'+Array.from({length:700},(_,i)=>`Paragraph ${i}. 中文 **Markdown** editing.`).join('\n\n')+'\n','# Second document\n\nSecond input: end\n','# Third document\n\nThird input: end\n'];
 const names=['Long.md','Second.md','Third.md'];
 const records: (import("../shared/contracts.js").DocumentRecord & {path: string})[]=[];for(let i=0;i<3;i++){const file=path.join(data,names[i]);await writeFile(file,texts[i]);records.push({id:'workspace-'+i,path:file,name:names[i],content:texts[i],savedContent:texts[i],diskHash:createHash('sha256').update(texts[i]).digest('hex'),lineEnding:'\n',encoding:'utf-8',bom:false});}
 await writeFile(path.join(profile,'session.json'),JSON.stringify({version:1,documents:records,activeId:records[0].id}));
-const env: Record<string, string>={...process.env,OPEN_TYPORA_DATA_DIR:profile};delete env.ELECTRON_RUN_AS_NODE;delete env.OPEN_TYPORA_DEV_URL;
+const env: Record<string, string>={...process.env,OPEN_MARKDOWN_LANE_DATA_DIR:profile};delete env.ELECTRON_RUN_AS_NODE;delete env.OPEN_MARKDOWN_LANE_DEV_URL;
 let app!: import("playwright").ElectronApplication, page!: import("playwright").Page;const errors: string[]=[],checks: string[]=[];const mod=process.platform==='darwin'?'Meta':'Control';
-async function launch(){app=await electron.launch({...(process.env.OPEN_TYPORA_EXECUTABLE?{executablePath:process.env.OPEN_TYPORA_EXECUTABLE,args:[]}:{args:[process.cwd()]}),env,timeout:30000});page=await app.firstWindow();page.on('pageerror',error=>errors.push(error.message));await page.setViewportSize({width:1380,height:900});await expect(page.getByRole('tab',{name:'Long.md',exact:true})).toBeVisible({timeout:20000});}
+async function launch(){app=await electron.launch({...(process.env.OPEN_MARKDOWN_LANE_EXECUTABLE?{executablePath:process.env.OPEN_MARKDOWN_LANE_EXECUTABLE,args:[]}:{args:[process.cwd()]}),env,timeout:30000});page=await app.firstWindow();page.on('pageerror',error=>errors.push(error.message));await page.setViewportSize({width:1380,height:900});await expect(page.getByRole('tab',{name:'Long.md',exact:true})).toBeVisible({timeout:20000});}
 const pane=(id: string)=>page.locator(`.document-editor[data-document-id="${id}"]`);
 const tab=(name: string)=>page.getByRole('tab',{name,exact:true});
 async function command(action: string){await app.evaluate(({BrowserWindow},action: string)=>BrowserWindow.getAllWindows()[0].webContents.send('app:command',{action}),action);}

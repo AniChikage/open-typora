@@ -27,9 +27,9 @@ P0：可能丢失/覆盖内容、错误目标或破坏保存恢复；P1：主要
 
 ## 可执行入口与本轮结果
 
-先运行 `npm ci`、`npm run build`。设置 `OPEN_TYPORA_QA_DIR` 为仓库外的独立绝对目录，逐套运行以免多个剪贴板/窗口测试互相干扰；不同套件使用不同输出子目录。导入导出需 Pandoc，旧 DOC/RTF 路径还需 LibreOffice；PDF 文本检查需可导入 pypdf 的 Python，可用 `OPEN_TYPORA_PDF_PYTHON` 指定。原生套件需 macOS/Xcode Command Line Tools。
+先运行 `npm ci`、`npm run build`。设置 `OPEN_MARKDOWN_LANE_QA_DIR` 为仓库外的独立绝对目录，逐套运行以免多个剪贴板/窗口测试互相干扰；不同套件使用不同输出子目录。导入导出需 Pandoc，旧 DOC/RTF 路径还需 LibreOffice；PDF 文本检查需可导入 pypdf 的 Python，可用 `OPEN_MARKDOWN_LANE_PDF_PYTHON` 指定。原生套件需 macOS/Xcode Command Line Tools。
 
-网页补测先运行 `npm run build:demo`，再运行 `npm run test:demo`。默认使用 Playwright 管理的 Chromium；已有 Chrome/Chromium 时可设置 `OPEN_TYPORA_BROWSER_EXECUTABLE`，使用全新的临时浏览器资料。套件不使用用户浏览器配置，不要求登录或模型密钥。
+网页补测先运行 `npm run build:demo`，再运行 `npm run test:demo`。默认使用 Playwright 管理的 Chromium；已有 Chrome/Chromium 时可设置 `OPEN_MARKDOWN_LANE_BROWSER_EXECUTABLE`，使用全新的临时浏览器资料。套件不使用用户浏览器配置，不要求登录或模型密钥。
 
 | 入口 ID | 命令 | 基线执行 | 修复分支复测 |
 | --- | --- | --- | --- |
@@ -63,7 +63,7 @@ P0：可能丢失/覆盖内容、错误目标或破坏保存恢复；P1：主要
 | `native-ai-ui` | `node scripts/test-webkit.mts --ai` | 通过 | 通过 |
 | `browser-demo` | `npm run build:demo` 后 `npm run test:demo` | 本轮新增，独立 Chrome 的 9 项检查通过 | 永久套件 9 项检查也通过 |
 
-基线完整执行了 28 套入口：27 套通过、原生完整套件首次失败。修复分支重新检查构建、230 项单元测试及查找替换界面；原生完整套件在隐藏条件中出现过恢复/粘贴时限波动；改为可见窗口后，带原时限和精确断言的正常完整、剪贴板与 AI 界面套件通过。隐藏执行可用 `OPEN_TYPORA_TEST_HIDDEN=1` 显式开启，仍按 OBS 保留失败，不作为发布验收默认模式。Windows/Linux 与真实 FUSE 的当前公开安装包证据对应 [0.22.0 正式流程](https://github.com/AniChikage/open-typora/actions/runs/41639901120)，不是本轮在本机重新安装这些系统。真实模型沿用同日 0.22.0 的两宿主三次生成补测；本轮 AI 自动化使用自有 HTTP 夹具。
+基线完整执行了 28 套入口：27 套通过、原生完整套件首次失败。修复分支重新检查构建、230 项单元测试及查找替换界面；原生完整套件在隐藏条件中出现过恢复/粘贴时限波动；改为可见窗口后，带原时限和精确断言的正常完整、剪贴板与 AI 界面套件通过。隐藏执行可用 `OPEN_MARKDOWN_LANE_TEST_HIDDEN=1` 显式开启，仍按 OBS 保留失败，不作为发布验收默认模式。Windows/Linux 与真实 FUSE 的当前公开安装包证据对应 [0.22.0 正式流程](https://github.com/AniChikage/open-markdown-lane/actions/runs/41639901120)，不是本轮在本机重新安装这些系统。真实模型沿用同日 0.22.0 的两宿主三次生成补测；本轮 AI 自动化使用自有 HTTP 夹具。
 
 ## 逐项用例
 
@@ -345,10 +345,10 @@ P0：可能丢失/覆盖内容、错误目标或破坏保存恢复；P1：主要
 
 | 问题 | 当前复核范围 | 仍需区分 |
 | --- | --- | --- |
-| [#1 Linux 安装包及后续反馈](https://github.com/AniChikage/open-typora/issues/1) | INS-03/04/05/06、EDT-05；无空格 Linux 安装路径、文件关联及 Ctrl 缩进 | 0.22.0 安装/FUSE 发布任务；完整 Kubuntu 26.04 人工记录为旧版，未冒充本轮 |
-| [#3 标签、正文、表格右键](https://github.com/AniChikage/open-typora/issues/3) | WSP-04/05/06/07、TBL-04/05/08；本轮菜单套件通过 | 全部实体鼠标、菜单键及桌面/DPI 组合未穷尽 |
-| [#5 Excel/WPS 粘贴](https://github.com/AniChikage/open-typora/issues/5) | CLP-01 至 CLP-06、TBL-06/08；本轮格式夹具及独立原生剪贴板通过 | 实体 Excel/WPS 复制来源与版本单列；OBS-002 仍待定位 |
-| [#7 大型插件加载](https://github.com/AniChikage/open-typora/issues/7) | PLG-01/02/03/05；1+ MiB 单文件、4+ MiB 包、64 MiB 超限诊断 | 没有获得提交者插件源码，不宣称其整个插件已验收 |
+| [#1 Linux 安装包及后续反馈](https://github.com/AniChikage/open-markdown-lane/issues/1) | INS-03/04/05/06、EDT-05；无空格 Linux 安装路径、文件关联及 Ctrl 缩进 | 0.22.0 安装/FUSE 发布任务；完整 Kubuntu 26.04 人工记录为旧版，未冒充本轮 |
+| [#3 标签、正文、表格右键](https://github.com/AniChikage/open-markdown-lane/issues/3) | WSP-04/05/06/07、TBL-04/05/08；本轮菜单套件通过 | 全部实体鼠标、菜单键及桌面/DPI 组合未穷尽 |
+| [#5 Excel/WPS 粘贴](https://github.com/AniChikage/open-markdown-lane/issues/5) | CLP-01 至 CLP-06、TBL-06/08；本轮格式夹具及独立原生剪贴板通过 | 实体 Excel/WPS 复制来源与版本单列；OBS-002 仍待定位 |
+| [#7 大型插件加载](https://github.com/AniChikage/open-markdown-lane/issues/7) | PLG-01/02/03/05；1+ MiB 单文件、4+ MiB 包、64 MiB 超限诊断 | 没有获得提交者插件源码，不宣称其整个插件已验收 |
 
 ## 菜单命令登记
 

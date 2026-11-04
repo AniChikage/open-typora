@@ -9,11 +9,11 @@ import os from 'node:os';
 import {pathToFileURL,fileURLToPath} from 'node:url';
 import {convertImport,pandocPath,libreOfficePath} from '../build/runtime/electron/interchange.mjs';
 const exec = promisify(execFile), pandoc = await pandocPath(), office = await libreOfficePath();
-if (process.env.OPEN_TYPORA_REQUIRE_CONVERTERS) { assert.ok(pandoc,'Pandoc must be installed for release acceptance'); assert.ok(office,'LibreOffice must be installed for release acceptance'); }
+if (process.env.OPEN_MARKDOWN_LANE_REQUIRE_CONVERTERS) { assert.ok(pandoc,'Pandoc must be installed for release acceptance'); assert.ok(office,'LibreOffice must be installed for release acceptance'); }
 const pixels = Buffer.from(Array.from({length:12*8*3},(_,index)=>(index*37)%256));
 const png = await sharp(pixels,{raw:{width:12,height:8,channels:3}}).png().toBuffer();
 async function fixture(t: import("node:test").TestContext) {
-  const root = await mkdtemp(path.join(os.tmpdir(),'open-typora-import-')); t.after(()=>rm(root,{recursive:true,force:true}));
+  const root = await mkdtemp(path.join(os.tmpdir(),'open-markdown-lane-import-')); t.after(()=>rm(root,{recursive:true,force:true}));
   await writeFile(path.join(root,'figure.png'),png);
   const source = '# 中文 heading\n\nBody **bold** with $E=mc^2$ and note[^n].\n\n| A | B |\n|---|---|\n| one | 中文 |\n\n![Figure](figure.png)\n\n```javascript\nlet answer = 42;\n```\n\n[^n]: Footnote text\n';
   const md = path.join(root,'复杂 input.md'); await writeFile(md,source);

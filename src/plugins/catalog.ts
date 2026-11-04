@@ -1,3 +1,4 @@
+import { storedItem } from "../migrateStorage.ts";
 import dark from "../../third-party/typora-plugins/dark.js?typora-plugin";
 import noImage from "../../third-party/typora-plugins/no_image.js?typora-plugin";
 import blur from "../../third-party/typora-plugins/blur.js?typora-plugin";
@@ -13,7 +14,7 @@ export const bundledPlugins: PluginDefinition[] = [
   { id: "static_markers", name: "常显语法标记", description: "保留粗体、斜体、代码等 Markdown 符号。", factory: markers, config: { STATIC_DEFAULT: true, STATIC_MARKERS: ["strong", "em", "del", "underline", "highlight", "superscript", "subscript", "code", "inlineMath", "image", "link", "footnote"], HOTKEY: "mod+alt+m" } },
   { id: "dark", name: "反色夜间模式", description: "系统为浅色外观时反色显示，也可选用内置深色主题。", factory: dark, config: { DARK_DEFAULT: true, HOTKEY: "mod+alt+d" } },
 ].map(plugin => ({ ...plugin, builtin: true }));
-export const pluginPreferenceKey = "open-typora-plugins-v1";
+export const pluginPreferenceKey = "open-markdown-lane-plugins-v1";
 export function loadPluginPreferences(): PluginPreferences {
-  try { const parsed = JSON.parse(localStorage.getItem(pluginPreferenceKey) || "{}"); return parsed && !Array.isArray(parsed) && typeof parsed === "object" ? parsed : {}; } catch { return {}; }
+  try { const parsed = JSON.parse(storedItem(localStorage, pluginPreferenceKey) || "{}"); return parsed && !Array.isArray(parsed) && typeof parsed === "object" ? parsed : {}; } catch { return {}; }
 }

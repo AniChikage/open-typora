@@ -486,7 +486,7 @@ test("copy and paste within the editor retain nested formatting and normal plain
   Object.defineProperty(copy, "clipboardData", { value: clipboard });
   f.root.dispatchEvent(copy);
   assert.equal(data.get("text/plain"), "粗体");
-  assert.equal(data.get("text/x-open-typora-markdown"), "***粗体***");
+  assert.equal(data.get("text/x-open-markdown-lane-markdown"), "***粗体***");
   assert.match(
     data.get("text/html"),
     /<em><strong>粗体<\/strong><\/em>|<strong><em>粗体<\/em><\/strong>/,

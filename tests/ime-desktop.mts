@@ -5,8 +5,8 @@ import path from "node:path";
 import os from "node:os";
 import { installPlugin } from "../build/runtime/electron/plugins.mjs";
 
-const data=await mkdtemp(path.join(os.tmpdir(),"open-typora-ime-"));
-const qa=process.env.OPEN_TYPORA_QA_DIR || path.join(data,"evidence"); await mkdir(qa,{recursive:true});
+const data=await mkdtemp(path.join(os.tmpdir(),"open-markdown-lane-ime-"));
+const qa=process.env.OPEN_MARKDOWN_LANE_QA_DIR || path.join(data,"evidence"); await mkdir(qa,{recursive:true});
 const file=path.join(data,"中文输入验收.md"), profile=path.join(data,"profile"); await mkdir(profile);
 const original='# IME acceptance\n\n输入区：end\n\n- 列表：end\n\n| A | B |\n| --- | --- |\n| 单元格：end | value |\n\n```text\n代码：end\n```\n';
 await writeFile(file,original);
@@ -23,10 +23,10 @@ await writeFile(pluginFile,`class Probe extends BasePlugin {
   }
 } module.exports={plugin:Probe};`);
 await installPlugin(pluginFile,profile);
-const env: Record<string, string>={...process.env,OPEN_TYPORA_DATA_DIR:profile}; delete env.ELECTRON_RUN_AS_NODE; delete env.OPEN_TYPORA_DEV_URL;
+const env: Record<string, string>={...process.env,OPEN_MARKDOWN_LANE_DATA_DIR:profile}; delete env.ELECTRON_RUN_AS_NODE; delete env.OPEN_MARKDOWN_LANE_DEV_URL;
 let app!: import("playwright").ElectronApplication, page!: import("playwright").Page; const checks: string[]=[],errors: string[]=[];
 try {
-  app=await electron.launch({...(process.env.OPEN_TYPORA_EXECUTABLE?{executablePath:process.env.OPEN_TYPORA_EXECUTABLE,args:[]}:{args:[process.cwd()]}),env,timeout:30000});
+  app=await electron.launch({...(process.env.OPEN_MARKDOWN_LANE_EXECUTABLE?{executablePath:process.env.OPEN_MARKDOWN_LANE_EXECUTABLE,args:[]}:{args:[process.cwd()]}),env,timeout:30000});
   page=await app.firstWindow(); page.setDefaultTimeout(10000); page.on('pageerror',e=>errors.push(e.message));
   console.log('IME: launched');
   await expect(page.getByRole('button',{name:'欢迎.md',exact:true})).toBeVisible({timeout:20000});

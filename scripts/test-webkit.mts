@@ -4,7 +4,7 @@ import path from "node:path";
 import os from "node:os";
 import { createServer } from "node:http";
 import assert from "node:assert/strict";
-const directory = await mkdtemp(path.join(os.tmpdir(), "open-typora-webkit-"));
+const directory = await mkdtemp(path.join(os.tmpdir(), "open-markdown-lane-webkit-"));
 const uploads = [];
 const clipboardOnly = process.argv.includes("--clipboard");
 const aiOnly = process.argv.includes("--ai");
@@ -77,9 +77,9 @@ try {
     const child = spawn(executable, {
       env: {
         ...process.env,
-        OPEN_TYPORA_DATA_DIR: path.join(directory, "data"),
-        OPEN_TYPORA_AI_SETTINGS_DIR: path.join(directory, "data"),
-        OPEN_TYPORA_TEST_UPLOADER: uploaderURL,
+        OPEN_MARKDOWN_LANE_DATA_DIR: path.join(directory, "data"),
+        OPEN_MARKDOWN_LANE_AI_SETTINGS_DIR: path.join(directory, "data"),
+        OPEN_MARKDOWN_LANE_TEST_UPLOADER: uploaderURL,
       },
       stdio: "inherit",
     });
@@ -91,13 +91,13 @@ try {
   if (aiOnly) { assert.equal(aiRequests.length,6); assert.deepEqual(aiRequests.slice(0,4),["你好","普通","粗体","A"]); assert.equal(aiRequests[4],"What is the release budget?"); const aiFile=path.join(directory,"data/ai-settings.json"); assert.equal(JSON.parse(await readFile(aiFile,"utf8")).apiKey,"owned-fixture-only"); assert.equal((await stat(aiFile)).mode & 0o777,0o600); console.log("PASS: native AI UI reaches actual URLSession fixture, sends only selected text and persists the owner-only file credential without exposing it through the bridge"); }
   if (!clipboardOnly && !aiOnly) assert.equal(uploads.length, 1, "native PicGo request reaches the owned HTTP fixture once");
   if (!clipboardOnly && !aiOnly) console.log("PASS: native PicGo integration sends owned PNG bytes and accepts the returned URL");
-  if (!clipboardOnly && !aiOnly && process.env.OPEN_TYPORA_QA_DIR) {
-    await mkdir(process.env.OPEN_TYPORA_QA_DIR, { recursive: true });
-    await cp(path.join(directory, "data/native-test-long.pdf"), path.join(process.env.OPEN_TYPORA_QA_DIR, "native-pagination.pdf"));
-    for (const name of await readdir(path.join(directory, "data"))) if ((name.startsWith("native-converted.") || ["native-complex.pdf", "native-controlled.pdf", "native-tableheaders.pdf"].includes(name))) await cp(path.join(directory, "data", name), path.join(process.env.OPEN_TYPORA_QA_DIR, name), { recursive: true });
+  if (!clipboardOnly && !aiOnly && process.env.OPEN_MARKDOWN_LANE_QA_DIR) {
+    await mkdir(process.env.OPEN_MARKDOWN_LANE_QA_DIR, { recursive: true });
+    await cp(path.join(directory, "data/native-test-long.pdf"), path.join(process.env.OPEN_MARKDOWN_LANE_QA_DIR, "native-pagination.pdf"));
+    for (const name of await readdir(path.join(directory, "data"))) if ((name.startsWith("native-converted.") || ["native-complex.pdf", "native-controlled.pdf", "native-tableheaders.pdf"].includes(name))) await cp(path.join(directory, "data", name), path.join(process.env.OPEN_MARKDOWN_LANE_QA_DIR, name), { recursive: true });
   }
 } finally {
   await new Promise(resolve => server.close(resolve));
-  if (process.env.OPEN_TYPORA_QA_DIR) { try { for (const name of await readdir(path.join(directory, "data"))) if ((name.startsWith("native-converted.") || ["native-complex.pdf", "native-controlled.pdf", "native-tableheaders.pdf"].includes(name))) await cp(path.join(directory, "data", name), path.join(process.env.OPEN_TYPORA_QA_DIR, name), { recursive: true }); } catch {} await mkdir(process.env.OPEN_TYPORA_QA_DIR, { recursive: true }); try { await cp(path.join(directory, "data/native-test-long.pdf"), path.join(process.env.OPEN_TYPORA_QA_DIR, "native-pagination.pdf")); } catch {} }
+  if (process.env.OPEN_MARKDOWN_LANE_QA_DIR) { try { for (const name of await readdir(path.join(directory, "data"))) if ((name.startsWith("native-converted.") || ["native-complex.pdf", "native-controlled.pdf", "native-tableheaders.pdf"].includes(name))) await cp(path.join(directory, "data", name), path.join(process.env.OPEN_MARKDOWN_LANE_QA_DIR, name), { recursive: true }); } catch {} await mkdir(process.env.OPEN_MARKDOWN_LANE_QA_DIR, { recursive: true }); try { await cp(path.join(directory, "data/native-test-long.pdf"), path.join(process.env.OPEN_MARKDOWN_LANE_QA_DIR, "native-pagination.pdf")); } catch {} }
   await rm(directory, { recursive: true, force: true });
 }

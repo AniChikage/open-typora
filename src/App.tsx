@@ -1,3 +1,4 @@
+import { storedItem } from "./migrateStorage.ts";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { BatchEditDialog } from './components/BatchEditDialog';
@@ -85,7 +86,7 @@ export default function App() {
   }
   const [selectedText, setSelectedText] = useState("");
   const [selection, setSelection] = useState("");
-  const [countUnit, setCountUnit] = useState<"characters" | "words">(() => localStorage.getItem("open-typora-count-unit") === "words" ? "words" : "characters");
+  const [countUnit, setCountUnit] = useState<"characters" | "words">(() => storedItem(localStorage, "open-markdown-lane-count-unit") === "words" ? "words" : "characters");
   const [exporting, setExporting] = useState(false);
   const exportingRef = useRef(false);
   const [modes, setModes] = useState<Record<string,boolean>>({});
@@ -95,7 +96,7 @@ export default function App() {
     [focus, setFocus] = useState(false);
   const [tab, setTab] = useState<"files" | "outline" | "tree">("files"),
     [theme, setTheme] = useState(
-      () => localStorage.getItem("open-typora-theme") || "light",
+      () => storedItem(localStorage, "open-markdown-lane-theme") || "light",
     );
   const [cursor, setCursor] = useState({ line: 1, column: 1 }),
     [about, setAbout] = useState(false);
@@ -292,12 +293,12 @@ export default function App() {
   const wholeStatistics = useMemo(() => largeDocument ? sourceAnalysis : countUnit === "words" || dialog === "statistics" ? documentStatistics(active?.content || "", undefined, preferences.readingSpeed) : null, [active?.content, preferences, countUnit, dialog, largeDocument, sourceAnalysis]);
   const statistics = useMemo(() => dialog === "statistics" && selection ? documentStatistics(selection, selection, preferences.readingSpeed) : wholeStatistics, [dialog, selection, wholeStatistics]);
   const selectionCharacters = useMemo(() => Array.from(selection.replace(/\s/g, "")).length, [selection]);
-  useEffect(() => { localStorage.setItem("open-typora-count-unit", countUnit); }, [countUnit]);
+  useEffect(() => { localStorage.setItem("open-markdown-lane-count-unit", countUnit); }, [countUnit]);
   useEffect(() => {
     setLanguage(preferences.language);
     document.documentElement.lang = preferences.language;
     void host.setLocale(preferences.language).catch(() => {});
-    localStorage.setItem("open-typora-preferences", JSON.stringify(preferences));
+    localStorage.setItem("open-markdown-lane-preferences", JSON.stringify(preferences));
     document.documentElement.style.setProperty("--editor-font-size", `${preferences.fontSize}px`);
   }, [preferences]);
   useEffect(() => { if (window.desktop?.viewState) void window.desktop.viewState(focus, typewriter, sidebar).catch(() => {}); }, [focus, typewriter, sidebar]);
@@ -347,20 +348,20 @@ export default function App() {
   }
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    localStorage.setItem("open-typora-theme", theme);
+    localStorage.setItem("open-markdown-lane-theme", theme);
   }, [theme]);
   useEffect(() => {
     const sync = (event: StorageEvent) => {
       if (event.key === pluginPreferenceKey) setPluginPreferences(loadPluginPreferences());
-      if (event.key === "open-typora-theme") setTheme(event.newValue || "light");
+      if (event.key === "open-markdown-lane-theme") setTheme(event.newValue || "light");
       if (event.key === themeCustomizationKey) setCustomizations(loadCustomizations());
-      if (event.key === "open-typora-preferences") { const next = loadPreferences(); setLanguage(next.language); setMarkdownOptions(next); setPreferences(next); }
+      if (event.key === "open-markdown-lane-preferences") { const next = loadPreferences(); setLanguage(next.language); setMarkdownOptions(next); setPreferences(next); }
       if (event.key === backgroundRevisionKey) void refreshBackground().catch(error => session.setMessage(error.message));
     };
     window.addEventListener("storage", sync); return () => window.removeEventListener("storage", sync);
   }, []);
   useEffect(() => {
-    document.title = active ? `${active.name} — Open Typora` : "Open Typora";
+    document.title = active ? `${active.name} — Open Markdown Lane` : "Open Markdown Lane";
   }, [active?.name]);
   commands.current = ({ action, document: opened, anchor, line, message }) => {
     if (action === "newWindow" && window.desktop?.windowAction) { void host.windowAction(action).catch((error: Error) => session.setMessage(error.message)); return; }
@@ -538,7 +539,7 @@ export default function App() {
           <div className="empty-document">{t("正在恢复文档…")}</div>
         ) : !active ? (
           <div className="empty-document">
-            <h1>Open Typora</h1>
+            <h1>Open Markdown Lane</h1>
             <p>{t("新建或打开 Markdown 文档。")}</p>
             <div>
               <button onClick={() => void session.create()}>
@@ -616,7 +617,7 @@ export default function App() {
             className="about-dialog"
             role="dialog"
             aria-modal="true"
-            aria-label={t("关于 Open Typora")}
+            aria-label={t("关于 Open Markdown Lane")}
             onClick={(event) => event.stopPropagation()}
           >
             <button
@@ -628,7 +629,7 @@ export default function App() {
               <X size={18} />
             </button>
             <img className="app-mark" src={appIcon} width={96} height={96} alt="" />
-            <h2>Open Typora</h2>
+            <h2>Open Markdown Lane</h2>
             <p>{t("让文字，回到文字。")}</p>
             <p className="about-details">
               {appVersion}{t("· 本地 Markdown 写作空间")}<br />{t("MIT 开源 · 独立实现")}</p>

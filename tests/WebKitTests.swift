@@ -25,7 +25,7 @@ final class WebKitTests: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         owner: owner, directory: directory,
         seed: SessionRecord(documents: [record], activeId: record.id))
       owner.hosts.append(host)
-      host.show(hidden: ProcessInfo.processInfo.environment["OPEN_TYPORA_TEST_HIDDEN"] == "1")
+      host.show(hidden: ProcessInfo.processInfo.environment["OPEN_MARKDOWN_LANE_TEST_HIDDEN"] == "1")
       host.webView.navigationDelegate = self
       DispatchQueue.main.asyncAfter(deadline: .now() + 240) {
         fputs("WebKit test timed out\n", stderr)
@@ -38,7 +38,7 @@ final class WebKitTests: NSObject, NSApplicationDelegate, WKNavigationDelegate {
       let script = try String(
         contentsOf: Bundle.main.resourceURL!.appendingPathComponent("web-tests.js"), encoding: .utf8
       )
-      webView.callAsyncJavaScript(script, arguments: ["uploaderURL": ProcessInfo.processInfo.environment["OPEN_TYPORA_TEST_UPLOADER"] ?? ""], in: nil, in: .page) { result in
+      webView.callAsyncJavaScript(script, arguments: ["uploaderURL": ProcessInfo.processInfo.environment["OPEN_MARKDOWN_LANE_TEST_UPLOADER"] ?? ""], in: nil, in: .page) { result in
         do {
           let value = try result.get()
           guard let output = value as? [String: Any], output["error"] == nil else {
@@ -105,7 +105,7 @@ final class WebKitTests: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     let app = NSApplication.shared
     let delegate = WebKitTests()
     app.delegate = delegate
-    app.setActivationPolicy(ProcessInfo.processInfo.environment["OPEN_TYPORA_TEST_HIDDEN"] == "1" ? .prohibited : .regular)
+    app.setActivationPolicy(ProcessInfo.processInfo.environment["OPEN_MARKDOWN_LANE_TEST_HIDDEN"] == "1" ? .prohibited : .regular)
     app.run()
     withExtendedLifetime(delegate) {}
   }

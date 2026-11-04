@@ -1,3 +1,4 @@
+import { applyLegacyEnvironment, applicationDataDirectory, encryptionApplicationName, productName } from "../shared/branding.mjs";
 import { translate } from "../shared/translate.mjs";
 import type { IpcRequests, Command, PathChange } from "../shared/contracts.js";
 import type { IpcMainInvokeEvent } from "electron";
@@ -19,6 +20,7 @@ import {
   safeStorage,
 } from "electron";
 import path from "node:path";
+import { mkdirSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { imageAction, imageName } from "./image-actions.mjs";
 import { libreOfficePath, pandocPath, convertExport, convertImport, themes, installTheme } from "./interchange.mjs";
@@ -33,10 +35,14 @@ import { pluginResource, validatePlugin, exportResource } from "./resources.mjs"
 import { readBackground, saveBackground, clearBackground } from "./background.mjs";
 const runtimeRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const root = app.isPackaged ? runtimeRoot : path.resolve(runtimeRoot, "../..");
-const development = process.env.OPEN_TYPORA_DEV_URL;
-if (process.env.OPEN_TYPORA_DATA_DIR)
-  app.setPath("userData", process.env.OPEN_TYPORA_DATA_DIR);
-app.setName("Open Typora");
+applyLegacyEnvironment(process.env);
+const development = process.env.OPEN_MARKDOWN_LANE_DEV_URL;
+const dataDirectory = applicationDataDirectory(app.getPath("appData"), process.env.OPEN_MARKDOWN_LANE_DATA_DIR);
+mkdirSync(dataDirectory, { recursive: true });
+app.setPath("userData", dataDirectory);
+// OSCrypt captures the legacy Linux keyring namespace during initialization.
+// Restore the display name after that initialization, before creating windows.
+app.setName(encryptionApplicationName(process.platform));
 protocol.registerSchemesAsPrivileged([
   { scheme: "opentypora", privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
   {
@@ -81,7 +87,7 @@ const send = (command: Command | string) =>
     "app:command",
     typeof command === "string" ? { action: command } : command,
   );
-const showError = (error: Error) => dialog.showErrorBox("Open Typora", error.message);
+const showError = (error: Error) => dialog.showErrorBox("Open Markdown Lane", error.message);
 const handshakes = new Map<string, (value: boolean) => void>();
 ipcMain.on("workspace:prepared", (event, id, value) => { if (event.sender !== window?.webContents) return; handshakes.get(id)?.(value); });
 function prepareOperation(phase: string, change: PathChange) { return new Promise<boolean>((resolve, reject) => { const id = randomUUID(), timeout = setTimeout(() => { handshakes.delete(id); reject(new Error("文件操作等待超时。")); }, 30000); handshakes.set(id, value => { clearTimeout(timeout); handshakes.delete(id); resolve(value); }); window!.webContents.send("workspace:operation", id, phase, change); }); }
@@ -135,7 +141,7 @@ const handlers: IpcHandlers = {
     if (result.canceled) return null; await atomicWrite(result.filePath, css); return result.filePath;
   },
   readResource: async (_, address) => exportResource(address,store,path.join(root,"dist")),
-  conversionSettings: async (_, choose) => { if (choose) { const result = await dialog.showOpenDialog(window!, { title: l("选择 Pandoc 可执行文件"), properties: ["openFile"] }); if (!result.canceled) process.env.OPEN_TYPORA_PANDOC = result.filePaths[0]; } return { word: process.platform === "darwin", libreOffice: await libreOfficePath(), pandoc: await pandocPath() }; },
+  conversionSettings: async (_, choose) => { if (choose) { const result = await dialog.showOpenDialog(window!, { title: l("选择 Pandoc 可执行文件"), properties: ["openFile"] }); if (!result.canceled) process.env.OPEN_MARKDOWN_LANE_PANDOC = result.filePaths[0]; } return { word: process.platform === "darwin", libreOffice: await libreOfficePath(), pandoc: await pandocPath() }; },
   importDocument: async () => { const result = await dialog.showOpenDialog(window!, { title: l("导入文档"), properties: ["openFile"], filters: [{ name: l("文档"), extensions: ["docx", "doc", "rtf", "odt", "epub", "tex", "rst", "html", "txt"] }] }); return result.canceled ? null : convertImport(result.filePaths[0], store.dataDir); },
   exportConverted: async (_, id, format, source, html) => { const record = store.require(id), ext = { latex: "tex", revealjs: "html", mediawiki: "wiki" }[format] || format; const result = await dialog.showSaveDialog(window!, { defaultPath: record.name.replace(/\.[^.]+$/, "." + ext) }); return result.canceled ? null : convertExport(store.dataDir, format, source, html, result.filePath); },
   imageAction: async (_, id, sources, action, options) => {
@@ -324,9 +330,10 @@ const handlers: IpcHandlers = {
 app
   .whenReady()
   .then(async () => {
+    app.setName(productName);
     if (process.platform !== "darwin" && !app.hasSingleInstanceLock()) return;
     store = new DocumentStore(app.getPath("userData"));
-    ai = new AIService(process.env.OPEN_TYPORA_AI_SETTINGS_DIR || store.dataDir, {
+    ai = new AIService(process.env.OPEN_MARKDOWN_LANE_AI_SETTINGS_DIR || store.dataDir, {
       available: () => safeStorage.isEncryptionAvailable() && (process.platform !== "linux" || safeStorage.getSelectedStorageBackend() !== "basic_text"),
       encrypt: text => safeStorage.encryptString(text), decrypt: bytes => safeStorage.decryptString(bytes),
     }, process.platform === "darwin" ? "file" : "system");
@@ -373,19 +380,19 @@ app
       });
     function createWindow() {
       window = new BrowserWindow({
-        show: process.env.OPEN_TYPORA_TEST_HIDDEN !== "1",
+        show: process.env.OPEN_MARKDOWN_LANE_TEST_HIDDEN !== "1",
         width: 1380,
         height: 960,
         minWidth: 660,
         minHeight: 500,
-        title: "Open Typora",
+        title: "Open Markdown Lane",
         ...(process.platform === "darwin" ? {
           titleBarStyle: "hiddenInset", trafficLightPosition: { x: 12, y: 9 },
         } : {}),
         ...(process.platform === "linux" ? { icon: path.join(root, "icon.png") } : {}),
         backgroundColor: "#FFFFFF",
         webPreferences: {
-          backgroundThrottling: process.env.OPEN_TYPORA_TEST_HIDDEN !== "1",
+          backgroundThrottling: process.env.OPEN_MARKDOWN_LANE_TEST_HIDDEN !== "1",
           preload: path.join(runtimeRoot, "electron/preload.cjs"),
           contextIsolation: true,
           nodeIntegration: false,
@@ -422,7 +429,7 @@ app
     const roles: Record<string, import("electron").MenuItemConstructorOptions["role"]> = { "cut:": "cut", "copy:": "copy", "paste:": "paste", "selectAll:": "selectAll" };
     const accelerator = (key?: string) => key?.replaceAll("Mod-", "CommandOrControl+").replaceAll("Ctrl-", "Control+").replaceAll("Alt-", "Alt+").replaceAll("Shift-", "Shift+");
     buildMenu = () => Menu.setApplicationMenu(Menu.buildFromTemplate([
-      { label: "Open Typora", submenu: [{ label: l("关于 Open Typora"), click: command("about") }, { label: l("偏好设置…"), accelerator: "CommandOrControl+,", click: command("preferences") }, ...(process.platform === "darwin" ? [{ type: "separator" as const }, { role: "hide" as const, label: l("隐藏 Open Typora") }, { role: "hideOthers" as const, label: l("隐藏其他应用") }] : []), { type: "separator" as const }, { label: l("退出 Open Typora"), accelerator: "CommandOrControl+Q", click: command("quit") }] },
+      { label: "Open Markdown Lane", submenu: [{ label: l("关于 Open Markdown Lane"), click: command("about") }, { label: l("偏好设置…"), accelerator: "CommandOrControl+,", click: command("preferences") }, ...(process.platform === "darwin" ? [{ type: "separator" as const }, { role: "hide" as const, label: l("隐藏 Open Markdown Lane") }, { role: "hideOthers" as const, label: l("隐藏其他应用") }] : []), { type: "separator" as const }, { label: l("退出 Open Markdown Lane"), accelerator: "CommandOrControl+Q", click: command("quit") }] },
       ...groups.map(group => ({ label: uiLocale === "en" && group.title === "文件" ? "File" : l(group.title), submenu: group.items.filter(item => item.action !== "preferences").map(item => ({ label: l(item.label), accelerator: accelerator(process.platform === "darwin" ? item.key : item.pcKey ?? item.key), ...(item.selector ? { role: roles[item.selector] } : { click: command(item.action) }) })) })),
       { role: "windowMenu", label: l("窗口") }
     ]));

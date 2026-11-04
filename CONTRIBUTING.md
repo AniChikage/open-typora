@@ -1,12 +1,12 @@
-# Contributing to Open Typora
+# Contributing to Open Markdown Lane
 
-Thanks for helping improve Open Typora. Small, focused contributions are easier to review and verify.
+Thanks for helping improve Open Markdown Lane. Small, focused contributions are easier to review and verify.
 
 ## Report a problem
 
-Search [existing issues](https://github.com/AniChikage/open-typora/issues) first. A useful report includes:
+Search [existing issues](https://github.com/AniChikage/open-markdown-lane/issues) first. A useful report includes:
 
-- Open Typora version, operating system version, and CPU architecture.
+- Open Markdown Lane version, operating system version, and CPU architecture.
 - Steps to reproduce, expected behavior, and actual behavior.
 - A minimal Markdown document and a screenshot when they help explain the problem.
 - For input problems: input method, rich/source mode, editing location, and the key sequence.
@@ -20,8 +20,8 @@ Remove personal information and credentials from examples. For a behavior compar
 Use Node.js 26 and npm. The macOS host needs macOS 14+ and Xcode Command Line Tools. Windows packaging needs Windows x64, Visual Studio 2022 Build Tools with Desktop development with C++, and PowerShell 7 (`pwsh`); Linux packaging uses Ubuntu 22.04 x64. Install Pandoc for the complete conversion and WebKit test suites. See the [source-build instructions](README.md#build-from-source).
 
 ```sh
-git clone https://github.com/AniChikage/open-typora.git
-cd open-typora
+git clone https://github.com/AniChikage/open-markdown-lane.git
+cd open-markdown-lane
 npm ci
 npm run dev:app
 ```
@@ -68,9 +68,9 @@ Additional suites:
 | `npm run test:ai` | Model settings, scoped requests, diff review, history, stale results, cancellation, IME guards, read-only and splits | Electron desktop; local HTTP fixtures, no API key |
 | `npm run test:ai-native` | URLSession transport, file permissions, restart/session credentials, legacy migration, protocol errors and limits | macOS; local HTTP fixtures, no API key |
 | `npm run test:ai-webkit` | Native bridge, review/apply and history in WKWebView | macOS; local HTTP fixtures, no API key |
-| `npm run test:demo` | Standalone web demo import limits, actual download, edit history, confirmation branches and compact layout | Run `npm run build:demo` first; Playwright Chromium, or `OPEN_TYPORA_BROWSER_EXECUTABLE` pointing to installed Chrome/Chromium |
+| `npm run test:demo` | Standalone web demo import limits, actual download, edit history, confirmation branches and compact layout | Run `npm run build:demo` first; Playwright Chromium, or `OPEN_MARKDOWN_LANE_BROWSER_EXECUTABLE` pointing to installed Chrome/Chromium |
 
-Automated desktop suites use isolated temporary application data. To keep screenshots and reports outside the checkout, set `OPEN_TYPORA_QA_DIR` to an absolute output directory. Synthetic composition tests do not replace manual input-method checks. Native UI suites use visible isolated windows by default so WebKit timers and the native responder chain participate normally. Set `OPEN_TYPORA_TEST_HIDDEN=1` only for explicit hidden-window diagnostics; record that condition separately from release acceptance.
+Automated desktop suites use isolated temporary application data. To keep screenshots and reports outside the checkout, set `OPEN_MARKDOWN_LANE_QA_DIR` to an absolute output directory. Synthetic composition tests do not replace manual input-method checks. Native UI suites use visible isolated windows by default so WebKit timers and the native responder chain participate normally. Set `OPEN_MARKDOWN_LANE_TEST_HIDDEN=1` only for explicit hidden-window diagnostics; record that condition separately from release acceptance.
 
 For AI changes, keep deterministic acceptance on the owned HTTP fixtures. Never require contributors to supply a paid key or send their documents to a provider. Check the request payload, unchanged source during generation, partial acceptance, one-step undo/redo, stale/cancelled responses, read-only guards, split targets and composition. Record any real-provider or physical-IME check separately, with its app version and environment; see the [AI guide](docs/ai.md) and [versioned verification](docs/verification.md).
 
@@ -80,7 +80,7 @@ For AI changes, keep deterministic acceptance on the owned HTTP fixtures. Never 
 npm run package:mac
 ```
 
-This creates `release/native/Open Typora.app` and a ZIP archive. Run `npm run package:release` to additionally create a drag-to-install DMG and `SHA256SUMS.txt`; the DMG wraps the same native application. To install it locally, quit the running application and run:
+This creates `release/native/Open Markdown Lane.app` and a ZIP archive. Run `npm run package:release` to additionally create a drag-to-install DMG and `SHA256SUMS.txt`; the DMG wraps the same native application. To install it locally, quit the running application and run:
 
 ```sh
 node scripts/install.mts
@@ -90,7 +90,7 @@ Use `npm run package:preview` for a separate preview application and data direct
 
 On Windows x64, run `npm run package:win` to create the NSIS EXE installer, ZIP, and checksums in `release/windows/`. The same original M icon is generated as a multi-resolution ICO. The Windows package contains only the two runtime file-bridge dependencies; frontend libraries are already bundled.
 
-After packaging on Windows, `npm run test:windows` installs the EXE into an isolated temporary folder, runs the desktop suite against the installed executable, checks Unicode document arguments, single-instance opening and file-association registration, and uninstalls the application. It preserves recovery data. Evidence goes to `OPEN_TYPORA_QA_DIR` in the runner temporary directory. This is automated acceptance on a Windows Server runner, not a manual Windows 10/11 IME check.
+After packaging on Windows, `npm run test:windows` installs the EXE into an isolated temporary folder, runs the desktop suite against the installed executable, checks Unicode document arguments, single-instance opening and file-association registration, and uninstalls the application. It preserves recovery data. Evidence goes to `OPEN_MARKDOWN_LANE_QA_DIR` in the runner temporary directory. This is automated acceptance on a Windows Server runner, not a manual Windows 10/11 IME check.
 
 ## Project layout
 

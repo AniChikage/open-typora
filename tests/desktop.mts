@@ -4,18 +4,18 @@ import { mkdtemp, readFile, writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 const root = process.cwd(),
-  qa = process.env.OPEN_TYPORA_QA_DIR || "/tmp/open-typora-qa";
+  qa = process.env.OPEN_MARKDOWN_LANE_QA_DIR || "/tmp/open-markdown-lane-qa";
 await mkdir(qa, { recursive: true });
-const dataDir = await mkdtemp(path.join(os.tmpdir(), "open-typora-desktop-"));
-const env: Record<string, string> = { ...process.env, OPEN_TYPORA_DATA_DIR: dataDir };
-delete env.OPEN_TYPORA_DEV_URL;
+const dataDir = await mkdtemp(path.join(os.tmpdir(), "open-markdown-lane-desktop-"));
+const env: Record<string, string> = { ...process.env, OPEN_MARKDOWN_LANE_DATA_DIR: dataDir };
+delete env.OPEN_MARKDOWN_LANE_DEV_URL;
 delete env.ELECTRON_RUN_AS_NODE;
 const errors: string[] = [],
   passed: string[] = [];
 let application!: import("playwright").ElectronApplication, currentPage!: import("playwright").Page;
 async function launch() {
   application = await electron.launch({
-    ...(process.env.OPEN_TYPORA_EXECUTABLE ? { executablePath: process.env.OPEN_TYPORA_EXECUTABLE, args: [] } : { args: [root] }),
+    ...(process.env.OPEN_MARKDOWN_LANE_EXECUTABLE ? { executablePath: process.env.OPEN_MARKDOWN_LANE_EXECUTABLE, args: [] } : { args: [root] }),
     env, timeout: 30000,
   });
   const page = await application.firstWindow({ timeout: 20000 });

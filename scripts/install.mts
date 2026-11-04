@@ -9,14 +9,21 @@ async function exists(file: string) {
   catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return false; throw error; }
 }
 
-export async function installBundle({ source, destination, sign, verify, running = "" }: {source: string; destination: string; sign: (file: string) => unknown | Promise<unknown>; verify: (file: string) => unknown | Promise<unknown>; running?: string}) {
+export async function installBundle({ source, destination, legacyDestination, sign, verify, running = "" }: {source: string; destination: string; legacyDestination?: string; sign: (file: string) => unknown | Promise<unknown>; verify: (file: string) => unknown | Promise<unknown>; running?: string}) {
   const folder = path.dirname(destination);
-  const rollback = path.join(folder, ".Open Typora-rollback.app");
-  if ([destination, rollback].some(file => running.includes(`${file}/Contents/`)))
-    throw new Error("请先正常退出已安装的 Open Typora，再运行安装。");
+  const rollback = path.join(folder, ".Open Markdown Lane-rollback.app");
+  const legacyRollback = path.join(folder, ".Open Typora-rollback.app");
+  if ([destination, rollback, legacyDestination, legacyDestination && legacyRollback].some(file => file && running.includes(`${file}/Contents/`)))
+    throw new Error("请先正常退出已安装的 Open Markdown Lane，再运行安装。");
   if (path.resolve(source) === path.resolve(destination)) throw new Error("安装源与目标不能相同。");
   await stat(source);
   await mkdir(folder, { recursive: true });
+  if (legacyDestination && await exists(legacyRollback)) {
+    if (await exists(legacyDestination)) {
+      await verify(legacyDestination);
+      await rm(legacyRollback, { recursive: true });
+    } else await rename(legacyRollback, legacyDestination);
+  }
 
   // Recover an interrupted replacement before starting another one. Keep the
   // old bundle until the new destination has passed signature verification.
@@ -26,14 +33,16 @@ export async function installBundle({ source, destination, sign, verify, running
       await rm(rollback, { recursive: true });
     } else await rename(rollback, destination);
   }
-  const staging = path.join(folder, `.Open Typora-${Date.now()}-${process.pid}.app`);
+  const staging = path.join(folder, `.Open Markdown Lane-${Date.now()}-${process.pid}.app`);
+  const previous = await exists(destination) ? destination
+    : legacyDestination && await exists(legacyDestination) ? legacyDestination : destination;
   let oldMoved = false, newInstalled = false;
   try {
     await cp(source, staging, { recursive: true, verbatimSymlinks: true });
     await sign(staging);
     await verify(staging);
-    if (await exists(destination)) {
-      await rename(destination, rollback);
+    if (await exists(previous)) {
+      await rename(previous, rollback);
       oldMoved = true;
     }
     await rename(staging, destination);
@@ -41,18 +50,21 @@ export async function installBundle({ source, destination, sign, verify, running
     await verify(destination);
   } catch (error) {
     if (newInstalled) await rm(destination, { recursive: true, force: true });
-    if (oldMoved) await rename(rollback, destination);
+    if (oldMoved) await rename(rollback, previous);
     throw error;
   } finally {
     await rm(staging, { recursive: true, force: true });
   }
   await rm(rollback, { recursive: true, force: true });
+  if (legacyDestination && legacyDestination !== destination)
+    await rm(legacyDestination, { recursive: true, force: true });
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const destination = path.join(os.homedir(), "Applications/Open Typora.app");
+  const destination = path.join(os.homedir(), "Applications/Open Markdown Lane.app");
   await installBundle({
-    source: path.resolve("release/native/Open Typora.app"), destination,
+    source: path.resolve("release/native/Open Markdown Lane.app"), destination,
+    legacyDestination: path.join(os.homedir(), "Applications/Open Typora.app"),
     running: execFileSync("/bin/ps", ["-axo", "comm"], { encoding: "utf8" }),
     sign: file => execFileSync("/usr/bin/codesign", ["--force", "--deep", "--sign", "-", "--timestamp=none", file], { stdio: "inherit" }),
     verify: file => execFileSync("/usr/bin/codesign", ["--verify", "--deep", "--strict", file], { stdio: "inherit" }),

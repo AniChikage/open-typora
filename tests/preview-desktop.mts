@@ -1,19 +1,19 @@
 import { _electron as electron, expect } from 'playwright/test';
 import { mkdtemp,mkdir,writeFile,readFile } from 'node:fs/promises';
 import os from 'node:os';import path from 'node:path';import {createServer} from 'node:http';import assert from 'node:assert/strict';import sharp from 'sharp';
-const directory=await mkdtemp(path.join(os.tmpdir(),'open-typora-preview-')),qa=process.env.OPEN_TYPORA_QA_DIR||path.join(directory,'evidence');await mkdir(qa,{recursive:true});
+const directory=await mkdtemp(path.join(os.tmpdir(),'open-markdown-lane-preview-')),qa=process.env.OPEN_MARKDOWN_LANE_QA_DIR||path.join(directory,'evidence');await mkdir(qa,{recursive:true});
 const image=await sharp({create:{width:300,height:100,channels:3,background:{r:70,g:130,b:180}}}).png().toBuffer();
 const mime: Record<string,string>={'.html':'text/html','.js':'text/javascript','.css':'text/css','.woff2':'font/woff2'};
 const server=createServer(async(req,res)=>{try{const file=path.resolve('dist','.'+decodeURIComponent(new URL(req.url!,'http://local').pathname));assert.ok(file.startsWith(path.resolve('dist')+path.sep));res.setHeader('Content-Type',mime[path.extname(file)]||'application/octet-stream');res.end(await readFile(file));}catch{res.writeHead(404);res.end();}});await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
-const main=path.join(directory,'main.cjs');await writeFile(main,`const {app,BrowserWindow}=require('electron');app.whenReady().then(()=>{const w=new BrowserWindow({width:1080,height:850,webPreferences:{sandbox:true}});w.loadURL(process.env.OPEN_TYPORA_PREVIEW_URL)});`);
-const env: Record<string, string>={...process.env,OPEN_TYPORA_PREVIEW_URL:`http://127.0.0.1:${(server.address() as import("node:net").AddressInfo).port}/preview.html`};delete env.ELECTRON_RUN_AS_NODE;
+const main=path.join(directory,'main.cjs');await writeFile(main,`const {app,BrowserWindow}=require('electron');app.whenReady().then(()=>{const w=new BrowserWindow({width:1080,height:850,webPreferences:{sandbox:true}});w.loadURL(process.env.OPEN_MARKDOWN_LANE_PREVIEW_URL)});`);
+const env: Record<string, string>={...process.env,OPEN_MARKDOWN_LANE_PREVIEW_URL:`http://127.0.0.1:${(server.address() as import("node:net").AddressInfo).port}/preview.html`};delete env.ELECTRON_RUN_AS_NODE;
 let app!: import("playwright").ElectronApplication, page!: import("playwright").Page;const errors: string[]=[],requests: (string|null)[]=[];
 try{
  app=await electron.launch({args:[main],env});page=await app.firstWindow();await page.addInitScript(()=>{const listeners: ((event: {data: unknown})=>void)[]=[];window.chrome={...(window.chrome||{}),webview:{addEventListener:(_name,fn)=>listeners.push(fn),postMessage:value=>window.previewReady=value}};window.deliverPreview=value=>listeners.forEach(fn=>fn({data:value}));});await page.setViewportSize({width:336,height:612});await page.reload();await expect.poll(()=>page.evaluate(()=>window.previewReady)).toBe('ready');page.on('pageerror',error=>errors.push(error.message));
- await page.route('https://document.opentypora.local/**',route=>{requests.push(new URL(route.request().url()).searchParams.get('path'));return route.fulfill({contentType:'image/png',body:image});});
+ await page.route('https://document.openmarkdownlane.local/**',route=>{requests.push(new URL(route.request().url()).searchParams.get('path'));return route.fulfill({contentType:'image/png',body:image});});
  const value='# Complete preview start\n\n![Local diagram](../图片%20预览.png)\n\n| Key | Value |\n|---|---|\n| Alpha | 123 |\n\n'+('Full preview paragraph 中文. **Rich Markdown** remains available beyond the old limit.\n\n').repeat(90000)+'# Complete preview tail\n\n![Tail diagram](../图片%20预览.png)\n';
  assert.ok(Buffer.byteLength(value)>5*1024*1024);const started=Date.now();
- await page.evaluate(value=>window.deliverPreview({source:value,name:'完整预览.md',base:'https://document.opentypora.local/'}),value);
+ await page.evaluate(value=>window.deliverPreview({source:value,name:'完整预览.md',base:'https://document.openmarkdownlane.local/'}),value);
  await expect(page.getByRole('heading',{name:'Complete preview start',exact:true})).toBeVisible();
  await expect.poll(()=>page.getByAltText('Local diagram',{exact:true}).evaluate((image: HTMLImageElement)=>image.naturalWidth)).toBe(300);
  const mounted=await page.locator('#markdown-preview > [data-cid]').count();assert.ok(mounted<300);

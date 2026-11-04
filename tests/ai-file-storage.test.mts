@@ -14,7 +14,7 @@ const unusedProtector = {
 };
 
 test("file credentials survive restart without system storage, stay out of bridge metadata, and honor session/endpoint/clear semantics", async () => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "open-typora-ai-file-"));
+  const directory = await mkdtemp(path.join(os.tmpdir(), "open-markdown-lane-ai-file-"));
   const secret = "owned-file-fixture-not-a-real-key", authorizations: (string | undefined)[] = [];
   const server = createServer(async (request, response) => {
     for await (const _chunk of request) { /* Drain this owned request. */ }
@@ -68,7 +68,7 @@ test("file credentials survive restart without system storage, stay out of bridg
 });
 
 test("legacy encrypted credentials require explicit migration in file mode and are never consulted after migration", async () => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "open-typora-ai-file-legacy-"));
+  const directory = await mkdtemp(path.join(os.tmpdir(), "open-markdown-lane-ai-file-legacy-"));
   const secret = "owned-legacy-fixture", config = { protocol: "openai" as const, baseUrl: "http://127.0.0.1:1234/v1", model: "owned-fixture" };
   let calls = 0;
   const codec = { available: () => { calls++; return true; }, encrypt: (value: string) => Buffer.from(value), decrypt: (bytes: Buffer) => { calls++; return bytes.toString(); } };

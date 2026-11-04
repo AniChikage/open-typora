@@ -434,7 +434,7 @@ export const MarkdownEditor = forwardRef<EditorHandle, Props>(
                 let literal = ["fence", "code_block", "frontmatter", "math_block", "html_block"].includes(doc.nodeAt(selection.from)?.kind || "");
                 for (let node = syntaxTree(view.state).resolveInner(selection.from, 1); node.parent; node = node.parent) if (node.name === "InlineCode") literal = true;
                 if (literal && (/<table\b/i.test(data.getData("text/html")) || data.getData("text/plain").includes("\t"))) return false;
-                const table = !data.getData("text/x-open-typora-markdown") ? clipboardTable(data) : null;
+                const table = !data.getData("text/x-open-markdown-lane-markdown") ? clipboardTable(data) : null;
                 const grid = table?.cells;
                 if (grid) {
                   event.preventDefault();

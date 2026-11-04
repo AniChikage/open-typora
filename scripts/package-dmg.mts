@@ -8,7 +8,7 @@ import pkg from "../package.json" with { type: "json" };
 
 if (process.platform !== "darwin" || process.arch !== "arm64")
   throw new Error("The verified DMG release target is macOS on Apple Silicon.");
-const app = path.resolve("release/native/Open Typora.app");
+const app = path.resolve("release/native/Open Markdown Lane.app");
 const version = execFileSync("/usr/libexec/PlistBuddy", ["-c", "Print :CFBundleShortVersionString", path.join(app, "Contents/Info.plist")], { encoding: "utf8" }).trim();
 if (version !== pkg.version) throw new Error("Build the current native application before packaging the DMG.");
 execFileSync("/usr/bin/codesign", ["--verify", "--deep", "--strict", app]);
@@ -22,12 +22,12 @@ await build({
   publish: "never",
   config: {
     appId: "org.opentypora.desktop",
-    productName: "Open Typora",
+    productName: "Open Markdown Lane",
     directories: { output: "release/native", buildResources: "build" },
     mac: { identity: null },
     dmg: {
-      title: "Open Typora ${version}",
-      artifactName: "Open-Typora-${version}-arm64.dmg",
+      title: "Open Markdown Lane ${version}",
+      artifactName: "Open-Markdown-Lane-${version}-arm64.dmg",
       background: "build/dmg-background.png",
       icon: "build/icon.icns",
       iconSize: 96,
@@ -42,13 +42,13 @@ await build({
   },
 });
 const folder = path.resolve("release/native");
-const name = `Open-Typora-${pkg.version}-arm64.dmg`;
+const name = `Open-Markdown-Lane-${pkg.version}-arm64.dmg`;
 execFileSync("/usr/bin/hdiutil", ["verify", path.join(folder, name)], { stdio: "inherit" });
 // Retain only the current version's distributable archives.
 for (const entry of await readdir(folder))
-  if (/^Open-Typora-[\d.]+-(?:arm64|x64)\.(?:dmg|zip)$/.test(entry) && !entry.startsWith(`Open-Typora-${pkg.version}-`))
+  if (/^Open-Markdown-Lane-[\d.]+-(?:arm64|x64)\.(?:dmg|zip)$/.test(entry) && !entry.startsWith(`Open-Markdown-Lane-${pkg.version}-`))
     await rm(path.join(folder, entry));
-const archives = (await readdir(folder)).filter(entry => entry === name || entry === `Open-Typora-${pkg.version}-arm64.zip`).sort();
+const archives = (await readdir(folder)).filter(entry => entry === name || entry === `Open-Markdown-Lane-${pkg.version}-arm64.zip`).sort();
 const hashes = await Promise.all(archives.map(async entry => `${createHash("sha256").update(await readFile(path.join(folder, entry))).digest("hex")}  ${entry}`));
 await writeFile(path.join(folder, "SHA256SUMS.txt"), hashes.join("\n") + "\n");
 console.log(`DMG: ${path.join(folder, name)}`);

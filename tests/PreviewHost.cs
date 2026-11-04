@@ -54,20 +54,20 @@ public static class PreviewProbe {
     var ini=Path.Combine(directory,"Everything.ini");var list=Path.Combine(directory,"Markdown.efu");
     File.WriteAllText(ini,"[Everything]\r\napp_data=0\r\nrun_as_admin=0\r\nshow_service_not_installed=0\r\nauto_include_fixed_volumes=0\r\nauto_include_removable_volumes=0\r\npreview_visible=1\r\npreview_x=650\r\nshow_preview_handlers_in_preview_pane=1\r\nwindow_wide="+Math.Min(1280,area.Width)+"\r\nwindow_high="+Math.Min(850,area.Height)+"\r\n");
     File.WriteAllText(list,"\"Filename\",\"Size\",\"Date Modified\",\"Date Created\",\"Attributes\"\r\n"+String.Join("\r\n",new[]{first,second}.Select(file=>"\""+file.Replace("\"","\"\"")+"\","+new FileInfo(file).Length+",0,0,0"))+"\r\n",new System.Text.UTF8Encoding(true));
-    var process=Process.Start(new ProcessStartInfo(executable,"-instance OpenTyporaQA -config \""+ini+"\" -filelist \""+list+"\" -select \""+first+"\""){UseShellExecute=false});
+    var process=Process.Start(new ProcessStartInfo(executable,"-instance OpenMarkdownLaneQA -config \""+ini+"\" -filelist \""+list+"\" -select \""+first+"\""){UseShellExecute=false});
     try{
      var deadline=DateTime.UtcNow.AddSeconds(30);IntPtr window=IntPtr.Zero;
      while(DateTime.UtcNow<deadline){process.Refresh();window=process.MainWindowHandle;if(window!=IntPtr.Zero)break;Thread.Sleep(300);}if(window==IntPtr.Zero)throw new Exception("Everything window not found");
      SetWindowPos(window,IntPtr.Zero,area.Left,area.Top,Math.Min(1280,area.Width),Math.Min(850,area.Height),4);Console.WriteLine("PROBE: actual Everything window opened");SetForegroundWindow(window);Wait(window,"Native preview one",75);Wait(window,"Local diagram",30);Image(window,"Local diagram");Capture(window,Path.Combine(directory,"everything-first.png"));
      Console.WriteLine("PROBE: Everything local image passed, scroll to full tail");End(window);Capture(window,Path.Combine(directory,"everything-full-tail.png"));Image(window,"Tail diagram");Capture(window,Path.Combine(directory,"everything-full-tail.png"));
-     var select=Process.Start(new ProcessStartInfo(executable,"-instance OpenTyporaQA -select \""+second+"\""){UseShellExecute=false});select.WaitForExit(10000);
+     var select=Process.Start(new ProcessStartInfo(executable,"-instance OpenMarkdownLaneQA -select \""+second+"\""){UseShellExecute=false});select.WaitForExit(10000);
      Wait(window,"Native preview two",60);Capture(window,Path.Combine(directory,"everything-second.png"));
      File.WriteAllLines(Path.Combine(directory,"everything-accessibility.txt"),Names(window));Console.WriteLine("PASS: actual Everything 1.4 preview pane rendered both selected Markdown files through the registered handler.");
-    }finally{var quit=Process.Start(new ProcessStartInfo(executable,"-instance OpenTyporaQA -exit"){UseShellExecute=false});quit.WaitForExit(10000);process.WaitForExit(10000);}
+    }finally{var quit=Process.Start(new ProcessStartInfo(executable,"-instance OpenMarkdownLaneQA -exit"){UseShellExecute=false});quit.WaitForExit(10000);process.WaitForExit(10000);}
     return 0;
    }
    var output=args[0];var files=new[]{args[1],args[2]};var expected=new[]{"Native preview one","Native preview two"};
-   Application.EnableVisualStyles();var form=new Form{Text="Open Typora native preview acceptance",Width=Math.Min(1050,area.Width),Height=Math.Min(800,area.Height),StartPosition=FormStartPosition.Manual,Location=area.Location};
+   Application.EnableVisualStyles();var form=new Form{Text="Open Markdown Lane native preview acceptance",Width=Math.Min(1050,area.Width),Height=Math.Min(800,area.Height),StartPosition=FormStartPosition.Manual,Location=area.Location};
    object instance=null;IPreview preview=null;IStream stream=null;int phase=0;var started=DateTime.UtcNow;
    var timer=new System.Windows.Forms.Timer{Interval=350};Exception failure=null;
    Action initialize=()=>{Console.WriteLine("PROBE: initialize native phase "+phase);var bounds=new PreviewRect(form.ClientSize.Width,form.ClientSize.Height);Marshal.ThrowExceptionForHR(preview.SetWindow(form.Handle,ref bounds));if(phase==0)Marshal.ThrowExceptionForHR(((IFileInit)instance).Initialize(files[phase],0));else{IShellItem item;var iid=new Guid("43826d1e-e718-42ee-bc55-a1e261c37bfe");Marshal.ThrowExceptionForHR(SHCreateItemFromParsingName(files[phase],IntPtr.Zero,ref iid,out item));try{Marshal.ThrowExceptionForHR(((IItemInit)instance).Initialize(item,0));}finally{Marshal.ReleaseComObject(item);}}Marshal.ThrowExceptionForHR(preview.DoPreview());started=DateTime.UtcNow;};

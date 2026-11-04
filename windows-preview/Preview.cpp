@@ -34,10 +34,10 @@ static HRESULT registration(bool enable,bool extensions){
  const std::wstring root=L"Software\\Classes\\CLSID\\"+std::wstring(clsid), list=L"Software\\Microsoft\\Windows\\CurrentVersion\\PreviewHandlers";
  if(!enable&&_wcsicmp(regGet(root+L"\\InprocServer32").c_str(),modulePath().c_str())!=0)return S_OK;
  if(enable){
-  if(regSet(root,nullptr,L"Open Typora Markdown Preview")||regSet(root,L"AppID",L"{6d2b5079-2f0b-48dd-ab7f-97cec514d30b}")||regSet(root+L"\\InprocServer32",nullptr,modulePath())||regSet(root+L"\\InprocServer32",L"ThreadingModel",L"Apartment")||regSet(list,clsid,L"Open Typora Markdown Preview"))return E_ACCESSDENIED;
+  if(regSet(root,nullptr,L"Open Markdown Lane Markdown Preview")||regSet(root,L"AppID",L"{6d2b5079-2f0b-48dd-ab7f-97cec514d30b}")||regSet(root+L"\\InprocServer32",nullptr,modulePath())||regSet(root+L"\\InprocServer32",L"ThreadingModel",L"Apartment")||regSet(list,clsid,L"Open Markdown Lane Markdown Preview"))return E_ACCESSDENIED;
  }
  for(auto ext:{L".md",L".markdown",L".mdown"}){
-  const std::wstring path=L"Software\\Classes\\"+std::wstring(ext)+previewKey, backup=L"Software\\Open Typora\\PreviewBackup\\"+std::wstring(ext);
+  const std::wstring path=L"Software\\Classes\\"+std::wstring(ext)+previewKey, backup=L"Software\\Open Markdown Lane\\PreviewBackup\\"+std::wstring(ext);
   auto current=regGet(path);
   if(enable&&extensions&&current!=clsid){
    if(regGet(backup,L"Saved").empty()){regSet(backup,L"Previous",current);regSet(backup,L"Saved",L"1");}
@@ -76,7 +76,7 @@ class Preview final:public IPreviewHandler,public IInitializeWithItem,public IIn
    if(!size)size=MultiByteToWideChar(CP_UTF8,0,bytes.data()+offset,count-static_cast<int>(offset),nullptr,0);
    source.resize(size);if(size)MultiByteToWideChar(encoding,0,bytes.data()+offset,count-static_cast<int>(offset),source.data(),size);
   }
-  payload=L"{\"source\":"+quoted(source)+L",\"truncated\":"+(truncated?L"true":L"false")+L",\"name\":"+quoted(PathFindFileNameW(filename.c_str()))+L",\"base\":"+quoted(filename.empty()?L"":L"https://document.opentypora.local/")+L"}";return S_OK;
+  payload=L"{\"source\":"+quoted(source)+L",\"truncated\":"+(truncated?L"true":L"false")+L",\"name\":"+quoted(PathFindFileNameW(filename.c_str()))+L",\"base\":"+quoted(filename.empty()?L"":L"https://document.openmarkdownlane.local/")+L"}";return S_OK;
  }
  HRESULT configure(){
   ComPtr<ICoreWebView2Settings> settings;web->get_Settings(&settings);settings->put_AreDefaultContextMenusEnabled(FALSE);settings->put_AreDevToolsEnabled(FALSE);settings->put_IsStatusBarEnabled(FALSE);
@@ -86,7 +86,7 @@ class Preview final:public IPreviewHandler,public IInitializeWithItem,public IIn
   web->add_WebResourceRequested(Callback<ICoreWebView2WebResourceRequestedEventHandler>([this](ICoreWebView2*,ICoreWebView2WebResourceRequestedEventArgs* args)->HRESULT{
    ComPtr<ICoreWebView2WebResourceRequest> request;args->get_Request(&request);LPWSTR uri=nullptr;request->get_Uri(&uri);std::wstring address=uri?uri:L"";CoTaskMemFree(uri);
    COREWEBVIEW2_WEB_RESOURCE_CONTEXT context;args->get_ResourceContext(&context);
-   const bool localImage=!filename.empty()&&context==COREWEBVIEW2_WEB_RESOURCE_CONTEXT_IMAGE&&address.rfind(L"https://document.opentypora.local/",0)==0;
+   const bool localImage=!filename.empty()&&context==COREWEBVIEW2_WEB_RESOURCE_CONTEXT_IMAGE&&address.rfind(L"https://document.openmarkdownlane.local/",0)==0;
    if(localImage){
     const auto query=address.find(L"?path=");
     if(query!=std::wstring::npos){
@@ -129,7 +129,7 @@ public:
   HRESULT result;try{result=read();}catch(const std::bad_alloc&){return E_OUTOFMEMORY;}if(FAILED(result))return result;
   window=CreateWindowExW(0,L"STATIC",L"Loading Markdown preview...",WS_CHILD|WS_VISIBLE|WS_CLIPCHILDREN,0,0,1,1,parent,nullptr,module,nullptr);if(!window)return HRESULT_FROM_WIN32(GetLastError());resize();
   PWSTR low=nullptr;result=SHGetKnownFolderPath(FOLDERID_LocalAppDataLow,KF_FLAG_CREATE,nullptr,&low);if(FAILED(result))return result;
-  std::wstring userData=std::wstring(low)+L"\\OpenTyporaPreview";CoTaskMemFree(low);SHCreateDirectoryExW(nullptr,userData.c_str(),nullptr);
+  std::wstring userData=std::wstring(low)+L"\\OpenMarkdownLanePreview";CoTaskMemFree(low);SHCreateDirectoryExW(nullptr,userData.c_str(),nullptr);
   const unsigned token=++generation;ComPtr<IPreviewHandler> alive(this);
   result=CreateCoreWebView2EnvironmentWithOptions(nullptr,userData.c_str(),nullptr,Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>([this,token,alive](HRESULT status,ICoreWebView2Environment* input)->HRESULT{
    if(token!=generation||!window)return S_OK;if(FAILED(status)||!input){failure(status);return S_OK;}environment=input;

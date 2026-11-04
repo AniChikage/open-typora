@@ -1,8 +1,8 @@
 $ErrorActionPreference = 'Stop'
-$qa = Join-Path $env:OPEN_TYPORA_QA_DIR 'system-preview'
+$qa = Join-Path $env:OPEN_MARKDOWN_LANE_QA_DIR 'system-preview'
 New-Item -ItemType Directory -Force $qa | Out-Null
-$component=$env:OPEN_TYPORA_PREVIEW_COMPONENT
-$destination = if($component){$component}else{Split-Path $env:OPEN_TYPORA_EXECUTABLE -Parent}
+$component=$env:OPEN_MARKDOWN_LANE_PREVIEW_COMPONENT
+$destination = if($component){$component}else{Split-Path $env:OPEN_MARKDOWN_LANE_EXECUTABLE -Parent}
 $dll = Join-Path $destination $(if($component){'MarkdownPreview.dll'}else{'resources/markdown-preview/MarkdownPreview.dll'})
 if (!(Test-Path $dll)) { throw 'Installed preview handler missing' }
 $regsvr = Join-Path $env:SystemRoot 'System32/regsvr32.exe'

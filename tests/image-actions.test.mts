@@ -7,7 +7,7 @@ import {createServer} from 'node:http';
 import {imageAction} from '../build/runtime/electron/image-actions.mjs';
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aNNsAAAAASUVORK5CYII=','base64');
 async function fixture(t: import("node:test").TestContext) {
-  const root = await mkdtemp(path.join(os.tmpdir(),'open-typora-images-'));
+  const root = await mkdtemp(path.join(os.tmpdir(),'open-markdown-lane-images-'));
   t.after(()=>rm(root,{recursive:true,force:true}));
   const {DocumentStore} = await import('../build/runtime/electron/store.mjs');
   const store = new DocumentStore(path.join(root,'session'));

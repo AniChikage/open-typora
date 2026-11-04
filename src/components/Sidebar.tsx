@@ -1,3 +1,4 @@
+import { storedItem } from "../migrateStorage.ts";
 import { t } from "../i18n";
 import {
   FileText,
@@ -42,11 +43,11 @@ interface Props {
 }
 export function Sidebar(props: Props) {
   const [menu, setMenu] = useState<{ x: number; y: number; file: FileEntry | null } | null>(null);
-  const [sort, setSort] = useState<FileSort>(() => (localStorage.getItem("open-typora-file-sort") || "natural") as FileSort);
-  const [descending, setDescending] = useState(() => localStorage.getItem("open-typora-file-desc") === "true");
-  const [foldersFirst, setFoldersFirst] = useState(() => localStorage.getItem("open-typora-folders-first") !== "false");
+  const [sort, setSort] = useState<FileSort>(() => (storedItem(localStorage, "open-markdown-lane-file-sort") || "natural") as FileSort);
+  const [descending, setDescending] = useState(() => storedItem(localStorage, "open-markdown-lane-file-desc") === "true");
+  const [foldersFirst, setFoldersFirst] = useState(() => storedItem(localStorage, "open-markdown-lane-folders-first") !== "false");
   const sorted = sortFiles(props.files.filter(file => file.isDirectory !== "true"), sort, descending, foldersFirst);
-  useEffect(() => { localStorage.setItem("open-typora-file-sort", sort); localStorage.setItem("open-typora-file-desc", String(descending)); localStorage.setItem("open-typora-folders-first", String(foldersFirst)); }, [sort, descending, foldersFirst]);
+  useEffect(() => { localStorage.setItem("open-markdown-lane-file-sort", sort); localStorage.setItem("open-markdown-lane-file-desc", String(descending)); localStorage.setItem("open-markdown-lane-folders-first", String(foldersFirst)); }, [sort, descending, foldersFirst]);
   useEffect(() => { if (!menu) return; const close = () => setMenu(null); const key = (event: KeyboardEvent) => { if (event.key === "Escape") close(); }; document.addEventListener("click", close); document.addEventListener("keydown", key); return () => { document.removeEventListener("click", close); document.removeEventListener("keydown", key); }; }, [menu]);
   const context = (event: React.MouseEvent, file: FileEntry | null) => { event.preventDefault(); event.stopPropagation(); setMenu({ x: Math.min(event.clientX, window.innerWidth - 210), y: Math.min(event.clientY, window.innerHeight - 380), file }); };
   function operate(action: FileOperation["action"]) {

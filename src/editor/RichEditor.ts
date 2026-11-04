@@ -831,7 +831,7 @@ export class RichEditor {
     const parent = window.getSelection()?.anchorNode?.parentElement;
     if (parent?.closest('.md-inline[data-mark="code"]')) { event.preventDefault(); this.insert(data.getData("text/plain"), "paste"); return; }
     const cell = parent?.closest("td,th");
-    const internal = data.getData("text/x-open-typora-markdown");
+    const internal = data.getData("text/x-open-markdown-lane-markdown");
     const table = !internal || cell ? clipboardTable(data) : null;
     const grid = table?.cells;
     if (grid && cell) {
@@ -853,7 +853,7 @@ export class RichEditor {
       return;
     }
     const html = data.getData("text/html");
-    const text = event.clipboardData?.getData("text/x-open-typora-markdown") || (html ? htmlToMarkdown(html) : event.clipboardData?.getData("text/plain"));
+    const text = event.clipboardData?.getData("text/x-open-markdown-lane-markdown") || (html ? htmlToMarkdown(html) : event.clipboardData?.getData("text/plain"));
     if (text !== undefined) {
       event.preventDefault();
       this.insert(text, "paste");
@@ -942,7 +942,7 @@ export class RichEditor {
     const copied = this.clipboard();
     event.clipboardData.setData("text/plain", copied.plain);
     event.clipboardData.setData("text/html", copied.html);
-    event.clipboardData.setData("text/x-open-typora-markdown", copied.markdown);
+    event.clipboardData.setData("text/x-open-markdown-lane-markdown", copied.markdown);
   };
   private cut = (event: ClipboardEvent) => {
     if ((event.target as HTMLElement).closest(".cm-editor")) return;
@@ -961,7 +961,7 @@ export class RichEditor {
       this.publish();
   };
   private drop = (event: DragEvent) => {
-    const droppedPath = event.dataTransfer?.getData("application/x-open-typora-file");
+    const droppedPath = event.dataTransfer?.getData("application/x-open-markdown-lane-file");
     if (droppedPath) { event.preventDefault(); const name = droppedPath.split("/").at(-1) || "文档"; this.insert(`[${name.replace(/[\[\]]/g, "")}](${encodeURI(droppedPath).replace(/[()]/g, c => "%" + c.charCodeAt(0).toString(16))})`, "drop"); return; }
     const images = [...(event.dataTransfer?.files || [])].filter(file => file.type.startsWith("image/"));
     if (images.length) {

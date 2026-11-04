@@ -13,7 +13,7 @@ type NativeChange = import("../shared/contracts.js").PathChange;
       const id = `request-${++sequence}`;
       pending.set(id, { resolve, reject });
       try {
-        window.webkit.messageHandlers.opentypora.postMessage({
+        window.webkit.messageHandlers.markdownLane.postMessage({
           id,
           name,
           args,
@@ -74,7 +74,7 @@ type NativeChange = import("../shared/contracts.js").PathChange;
     return () => listeners.delete(callback);
   };
   Object.defineProperty(window, "desktop", { value: Object.freeze(desktop) });
-  Object.defineProperty(window, "__openTypora", {
+  Object.defineProperty(window, "__openMarkdownLane", {
     value: Object.freeze({
       fileOperation(phase: string, change: NativeChange) { return fileOperationHandler(phase, change); },
       receive({ id, result }: { id: string; result: NativeResponse<unknown> }) {
