@@ -8,7 +8,7 @@ This is an independent, unofficial project, unaffiliated with Typora. If you can
 - Windows 10/11 x64: `Open-Markdown-Lane-0.24.1-windows-x64-Setup.exe` or ZIP.
 - Linux x64: `Open-Markdown-Lane-0.24.1-linux-x64.deb` or AppImage.
 
-Verify downloads with `SHA256SUMS.txt`. macOS is locally signed, not notarized; Windows is unsigned.
+Verify downloads with `SHA256SUMS.txt`. macOS is locally signed, not notarized; Windows is unsigned. Updating macOS builds may prompt again for Documents-folder access.
 
 ## Changes
 
@@ -23,4 +23,4 @@ Verify downloads with `SHA256SUMS.txt`. macOS is locally signed, not notarized; 
 
 ## Validation scope
 
-Automated coverage includes exact save/undo/redo, split restoration, sidebar state, light/dark and compact layouts, AI review, synthetic Chinese composition and the existing community issue regressions. Controlled HTTP fixtures validate AI integration; they are not live-provider inference or physical-IME acceptance. Platform package and FUSE results are reported by the release workflow. See [verification](https://github.com/AniChikage/open-markdown-lane/blob/v0.24.1/docs/verification.md) for the final evidence and limitations.
+Automated coverage includes exact save/undo/redo, split restoration, sidebar state, light/dark and compact layouts, AI review, synthetic Chinese composition and the existing community issue regressions. Controlled HTTP fixtures validate AI integration; they are not live-provider inference or physical-IME acceptance. The Mac package is locally built and tested from the release tag. Windows/Linux CI packages passed installation regressions, Windows preview checks and real FUSE mounting on Ubuntu 22.04/24.04. Hosted macOS did not receive a runner, so the release is assembled manually from those tested packages. Sogou input and undo/redo were manually confirmed in the 0.24.0 candidate; the final focus patch has separate Chromium and WebKit coverage. See [verification](https://github.com/AniChikage/open-markdown-lane/blob/main/docs/verification.md) for evidence and limitations.

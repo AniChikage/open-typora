@@ -102,6 +102,8 @@ Windows 版目前**没有代码签名证书**，系统可能显示未知发布�
 
 应用采用本地签名，**尚未经过 Apple 公证**。macOS 可能要求在 **系统设置 → 隐私与安全性** 中批准打开，具体操作见 [Apple 官方说明](https://support.apple.com/zh-cn/102445)。请勿为安装而关闭 Gatekeeper。
 
+更新后，macOS 可能因本地签名变化重新询问“文稿”文件夹访问权限；需要重新打开其中的文档时，请选择允许。
+
 ### 从源码构建
 
 所有平台均需 **Node.js 26** 和 npm。macOS 还需 **Xcode Command Line Tools**（`xcode-select --install`），无需安装 Typora。

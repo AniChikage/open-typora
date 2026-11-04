@@ -99,6 +99,8 @@ The Windows build is currently **not code-signed**. Windows may display an unkno
 
 Requires **macOS 14 or later on Apple Silicon**. A ZIP alternative and SHA-256 checksums are included in the release. No Node.js, Xcode, or Typora installation is needed to use the app.
 
+After an update, macOS may ask again for access to Documents because builds use local signatures. Choose Allow if you want to reopen documents in that folder.
+
 The application is locally signed and **not Apple-notarized**. macOS may ask you to approve opening it in **System Settings → Privacy & Security**. See [Apple's instructions](https://support.apple.com/en-us/102445). Never disable Gatekeeper to install it.
 
 ### Build from source
