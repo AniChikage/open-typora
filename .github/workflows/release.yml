@@ -39,7 +39,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - name: Install desktop runtime libraries
-        run: sudo apt-get update && sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2 libgbm1 libxss1 libxtst6 xdg-utils desktop-file-utils libglib2.0-bin dbus-x11 kde-cli-tools fonts-noto-cjk pandoc libreoffice-writer libfuse2
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2 libgbm1 libxss1 libxtst6 xdg-utils desktop-file-utils libglib2.0-bin dbus-x11 kde-cli-tools fonts-noto-cjk pandoc libreoffice-writer libfuse2 gnome-keyring libsecret-tools
       - name: Prepare real FUSE device
         run: sudo modprobe fuse && test -c /dev/fuse
       - name: Prepare actual PDF content validation
@@ -50,6 +50,10 @@ jobs:
       - run: npm test
         env:
           OPEN_MARKDOWN_LANE_REQUIRE_CONVERTERS: "1"
+      - name: Verify old encrypted credentials against a private real system keyring
+        run: |
+          npm run build
+          xvfb-run -a dbus-run-session -- node tests/branding-secrets.mts
       - name: Build Linux x64 DEB and AppImage
         run: npm run package:linux
       - name: Verify rename upgrade preserves drafts and settings

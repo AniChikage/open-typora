@@ -14,6 +14,9 @@ with Typora; please support the [official product](https://typora.io/) if you ca
   `opentypora://app`, asset protocol, background IndexedDB database and legacy
   credential-service ID remain stable for upgrade compatibility. These internal
   identifiers are not the displayed product name.
+- Linux also retains the old name while Electron initializes its libsecret/
+  KWallet encryption provider, then sets the new display name before opening
+  windows. This keeps saved API credentials decryptable with the existing key.
 - Browser preference/session keys are copied to `open-markdown-lane-*` before
   rendering. Existing new keys take precedence. Old keys remain intact; if a
   quota prevents copying, reads fall back to the old value.

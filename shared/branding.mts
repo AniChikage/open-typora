@@ -7,6 +7,12 @@ export const packageName = "open-markdown-lane";
 // Windows upgrades and the pre-file-storage credential migration.
 export const legacyApplicationId = "org.opentypora.desktop";
 
+// Electron captures this name for Linux libsecret/KWallet before `ready`.
+// Changing it would select a new encryption key for existing API credentials.
+export function encryptionApplicationName(platform: string) {
+  return platform === "linux" ? "Open Typora" : productName;
+}
+
 export function applicationDataDirectory(root: string, override?: string) {
   if (override) return override;
   const legacy = path.join(root, "Open Typora");

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, rm, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { applicationDataDirectory, applyLegacyEnvironment, legacyApplicationId } from '../shared/branding.mts';
+import { applicationDataDirectory, applyLegacyEnvironment, legacyApplicationId, encryptionApplicationName } from '../shared/branding.mts';
 import { migrateStorage, storedItem } from '../src/migrateStorage.ts';
 
 function storageFixture(entries: Record<string, string>, full = false): Storage {
@@ -48,6 +48,12 @@ test('old environment names remain accepted and explicit new names take preceden
   applyLegacyEnvironment(env);
   assert.equal(env.OPEN_MARKDOWN_LANE_DATA_DIR,'new');
   assert.equal((env as NodeJS.ProcessEnv).OPEN_MARKDOWN_LANE_AI_SETTINGS_DIR,'private');
+});
+
+test('Linux retains the existing encrypted-credential namespace during bootstrap', () => {
+  assert.equal(encryptionApplicationName('linux'), 'Open Typora');
+  assert.equal(encryptionApplicationName('win32'), 'Open Markdown Lane');
+  assert.equal(encryptionApplicationName('darwin'), 'Open Markdown Lane');
 });
 
 test('package and both platform builders use the new brand with stable upgrade identity', async () => {

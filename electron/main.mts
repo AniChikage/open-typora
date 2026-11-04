@@ -1,4 +1,4 @@
-import { applyLegacyEnvironment, applicationDataDirectory } from "../shared/branding.mjs";
+import { applyLegacyEnvironment, applicationDataDirectory, encryptionApplicationName, productName } from "../shared/branding.mjs";
 import { translate } from "../shared/translate.mjs";
 import type { IpcRequests, Command, PathChange } from "../shared/contracts.js";
 import type { IpcMainInvokeEvent } from "electron";
@@ -40,7 +40,9 @@ const development = process.env.OPEN_MARKDOWN_LANE_DEV_URL;
 const dataDirectory = applicationDataDirectory(app.getPath("appData"), process.env.OPEN_MARKDOWN_LANE_DATA_DIR);
 mkdirSync(dataDirectory, { recursive: true });
 app.setPath("userData", dataDirectory);
-app.setName("Open Markdown Lane");
+// OSCrypt captures the legacy Linux keyring namespace during initialization.
+// Restore the display name after that initialization, before creating windows.
+app.setName(encryptionApplicationName(process.platform));
 protocol.registerSchemesAsPrivileged([
   { scheme: "opentypora", privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
   {
@@ -328,6 +330,7 @@ const handlers: IpcHandlers = {
 app
   .whenReady()
   .then(async () => {
+    app.setName(productName);
     if (process.platform !== "darwin" && !app.hasSingleInstanceLock()) return;
     store = new DocumentStore(app.getPath("userData"));
     ai = new AIService(process.env.OPEN_MARKDOWN_LANE_AI_SETTINGS_DIR || store.dataDir, {
