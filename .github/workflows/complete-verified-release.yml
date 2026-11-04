@@ -17,21 +17,26 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: AniChikage/open-markdown-lane
       RELEASE_TAG: v0.24.1
-      DRAFT_TAG: v0.24.1
       SOURCE_SHA: 3c536b5d69ff03906f5c1aafc17cca00871850a7
     steps:
       - name: Verify frozen source, artifacts and private draft
         shell: bash
         run: |
           set -euo pipefail
+          trap 'echo "::error::Verification failed at script line $LINENO"' ERR
           test "$GITHUB_REPOSITORY" = "$GH_REPO"
           test "$(gh api "repos/$GH_REPO/commits/$RELEASE_TAG" --jq .sha)" = "$SOURCE_SHA"
           test "$(gh api "repos/$GH_REPO/actions/runs/41859795834" --jq .head_sha)" = "$SOURCE_SHA"
           test "$(gh api "repos/$GH_REPO/actions/artifacts/13340806230" --jq .digest)" = "sha256:6dcfb5a460d28cc2753d96067938d020594e1fe28685b592bdbd2ccdedc8dcaf"
           test "$(gh api "repos/$GH_REPO/actions/artifacts/13341020985" --jq .digest)" = "sha256:213fef7a1a58e7b460014677a67551676f77ff5d0d5f380b29ac7acd12c07fb0"
-          gh api "repos/$GH_REPO/releases/tags/$RELEASE_TAG" > "$RUNNER_TEMP/draft.json"
+          gh api "repos/$GH_REPO/releases?per_page=100" > "$RUNNER_TEMP/releases.json"
+          jq '[.[] | {id, tag_name, name, draft, assets: [.assets[] | {name, state}]}]' "$RUNNER_TEMP/releases.json"
+          jq -e '[.[] | select(.draft and .name=="Open Markdown Lane 0.24.1") | select(any(.assets[]; .name=="Open-Markdown-Lane-0.24.1-arm64.zip" and .state=="uploaded"))] | if length==1 then .[0] else error("Expected one matching private draft") end' "$RUNNER_TEMP/releases.json" > "$RUNNER_TEMP/draft.json"
           jq -e '.draft == true and .name == "Open Markdown Lane 0.24.1"' "$RUNNER_TEMP/draft.json"
           echo "RELEASE_ID=$(jq -r .id "$RUNNER_TEMP/draft.json")" >> "$GITHUB_ENV"
+          draft_tag=$(jq -r .tag_name "$RUNNER_TEMP/draft.json")
+          [[ "$draft_tag" =~ ^(untagged-[0-9a-f]+|v0\.24\.1)$ ]]
+          echo "DRAFT_TAG=$draft_tag" >> "$GITHUB_ENV"
       - name: Download already tested Windows and Linux packages
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
@@ -69,7 +74,7 @@ jobs:
           set -euo pipefail
           test "$(gh api "repos/$GH_REPO/releases/$RELEASE_ID" --jq .draft)" = true
           gh release upload "$DRAFT_TAG" release-assets/*-Setup.exe release-assets/*-windows-x64.zip release-assets/*.deb release-assets/*.AppImage release-assets/SHA256SUMS.txt --clobber
-          gh release edit "$DRAFT_TAG" --tag "$RELEASE_TAG" --verify-tag --draft=false --latest
+          gh api --method PATCH "repos/$GH_REPO/releases/$RELEASE_ID" -f tag_name="$RELEASE_TAG" -F draft=false -f make_latest=true --jq .html_url
       - name: Verify the seven public attachments
         shell: bash
         run: |
