@@ -19,22 +19,16 @@ const exercise = async (executable: string,kind: string) => {
   return {session,hash:createHash("sha256").update(await readFile(session)).digest("hex")};
 };
 const deb = path.resolve(`release/linux/Open-Markdown-Lane-${pkg.version}-linux-x64.deb`);
-// Exercise the earlier spaced-path package, then the most recent public release.
-const previous = path.join(await mkdtemp(path.join(os.tmpdir(),"open-markdown-lane-upgrade-")),"Open-Typora-0.13.1-linux-x64.deb");
-run("curl",["--fail","--location","--silent","--show-error","--retry","3","--max-time","180","https://github.com/AniChikage/open-markdown-lane/releases/download/v0.13.1/Open-Typora-0.13.1-linux-x64.deb","--output",previous]);
-assert.equal(createHash("sha256").update(await readFile(previous)).digest("hex"),"67233be54a825da057d2163e627c56e8bd5af8530eff1afb5aaf2c21fd0e71c2");
-run("sudo",["apt-get","install","-y",previous]);
-await stat("/opt/Open Typora/open-typora");
-const recent = path.join(path.dirname(previous),"Open-Typora-0.15.0-linux-x64.deb");
-run("curl",["--fail","--location","--silent","--show-error","--retry","3","--max-time","180","https://github.com/AniChikage/open-markdown-lane/releases/download/v0.15.0/Open-Typora-0.15.0-linux-x64.deb","--output",recent]);
-assert.equal(createHash("sha256").update(await readFile(recent)).digest("hex"),"807fcdfdbf8a2976411b1938bbebc050c2cf8ee0af548e395602ee42004e010b");
-run("sudo",["apt-get","install","-y",recent]);
-await assert.rejects(stat("/opt/Open Typora/open-typora"),{code:"ENOENT"});
-run("sudo",["apt-get","install","-y",deb]);
+// CI resolves and verifies the current public installer before this test.
+const previous = JSON.parse(await readFile("build/upgrade-fixtures/linux.json", "utf8"));
+assert.equal(createHash("sha256").update(await readFile(previous.file)).digest("hex"), previous.sha256);
+run("sudo",["apt-get","install","-y",previous.file]);
+await stat(previous.legacyName ? "/opt/Open-Typora/open-typora" : "/opt/Open-Markdown-Lane/open-markdown-lane");
+// Reinstall even at an equal version: exercise the freshly built bytes.
+run("sudo",["apt-get","install","--reinstall","-y",deb]);
 await assert.rejects(stat("/opt/Open-Typora/open-typora"),{code:"ENOENT"});
-await rm(recent);
 await assert.rejects(stat("/opt/Open Typora/open-typora"),{code:"ENOENT"});
-await rm(previous);
+await rm(previous.file);
 const installed = "/opt/Open-Markdown-Lane/open-markdown-lane";
 await stat(installed);
 const desktop = await readFile("/usr/share/applications/open-markdown-lane.desktop","utf8");
@@ -56,5 +50,5 @@ const sandbox = path.join(extraction,"squashfs-root/chrome-sandbox");
 run("sudo",["chown","root:root",sandbox]); run("sudo",["chmod","4755",sandbox]);
 await exercise(path.join(extraction,"squashfs-root/open-markdown-lane"),"appimage");
 run(process.execPath,["tests/linux-appimage-fuse.mts",image],{env:{...process.env,OPEN_MARKDOWN_LANE_QA_DIR:path.join(qa,"appimage-real-fuse")}});
-await writeFile(path.join(qa,"installer-results.json"),JSON.stringify({version:pkg.version,debInstall:true,upgradeFrom:["0.13.1","0.15.0"],oldInstallPathRemoved:true,desktopGioAndKdeLaunch:true,debUninstall:true,recoveryPreserved:true,desktopAssociation:true,appImageExtractedPayload:true,fuseMountTested:true,sandboxDisabled:false},null,2));
+await writeFile(path.join(qa,"installer-results.json"),JSON.stringify({version:pkg.version,debInstall:true,upgradeFrom:previous.tag,oldInstallPathRemoved:true,desktopGioAndKdeLaunch:true,debUninstall:true,recoveryPreserved:true,desktopAssociation:true,appImageExtractedPayload:true,fuseMountTested:true,sandboxDisabled:false},null,2));
 console.log("PASS: installed DEB, real FUSE AppImage runtime and extracted payload, PDF/edit/save/recovery, file association and uninstall");

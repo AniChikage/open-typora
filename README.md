@@ -8,7 +8,7 @@
 
 <p align="center">
   English · <a href="README.zh-CN.md">简体中文</a><br>
-  <a href="https://open-typora.comicyueyu.chatgpt.site">Try in your browser</a> · <a href="https://github.com/AniChikage/open-markdown-lane/releases/latest">Download</a> · <a href="#features">Features</a> · <a href="#documentation">Docs</a> · <a href="CONTRIBUTING.md">Contributing</a> · <a href="LICENSE">MIT License</a>
+  <a href="https://open-markdown-lane.comicyueyu.chatgpt.site">Try in your browser</a> · <a href="https://github.com/AniChikage/open-markdown-lane/releases/latest">Download</a> · <a href="#features">Features</a> · <a href="#documentation">Docs</a> · <a href="CONTRIBUTING.md">Contributing</a> · <a href="LICENSE">MIT License</a>
 </p>
 
 > [!IMPORTANT]
@@ -20,7 +20,7 @@
 
 Open Markdown Lane is an open-source Markdown editor inspired by Typora's inline editing experience. Write directly in the rendered document, switch to source when you need it, and save ordinary `.md` files in your own folders.
 
-**Status:** early development, version **0.22.0**. Release builds support **macOS 14+ on Apple Silicon**, **Windows 10/11 x64**, and **Linux x64**. The interface supports Simplified Chinese and English (Preferences → Language). This is an independent project, unaffiliated with Typora; full feature and behavior parity is still in progress.
+**Status:** early development, version **0.23.0**. Release builds support **macOS 14+ on Apple Silicon**, **Windows 10/11 x64**, and **Linux x64**. The interface supports Simplified Chinese and English (Preferences → Language). This is an independent project, unaffiliated with Typora; full feature and behavior parity is still in progress.
 
 ## Features
 
@@ -52,31 +52,31 @@ Trying the preview? [Report a problem](https://github.com/AniChikage/open-markdo
 
 ### Try without installing
 
-**[Open the web demo](https://open-typora.comicyueyu.chatgpt.site)** to edit a sample, switch between live and source modes, open a UTF-8 Markdown file, and download your work. It uses the same editing kernel as the desktop app.
+**[Open the web demo](https://open-markdown-lane.comicyueyu.chatgpt.site)** to edit a sample, switch between live and source modes, open a UTF-8 Markdown file, and download your work. It uses the same editing kernel as the desktop app.
 
 The demo keeps documents in the current tab's memory; it does not upload or persist their contents. Refreshing clears edits, so download a copy before leaving. Imports are limited to 1 MB and external embedded media are blocked. Local folders, recovery, other encodings, PDF / HTML export, plugins and AI editing require the desktop app. The demo does not accept model keys or call model services.
 
 ### Downloads
 
-> **Project rename:** Open Typora is now **Open Markdown Lane** (`open-markdown-lane`). The 0.22.0 downloads below were published under the previous name and retain their original filenames. Renamed installers have not been released yet. [Upgrade compatibility](docs/renaming.md).
+> **Project rename:** This release uses **Open Markdown Lane** (`open-markdown-lane`). Existing documents, settings and model configuration are preserved. [Upgrade compatibility](docs/renaming.md).
 
 | Platform | Installer | Alternative |
 | --- | --- | --- |
-| Windows 10/11 · x64 | **[Download Setup.exe](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.22.0/Open-Typora-0.22.0-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.22.0/Open-Typora-0.22.0-windows-x64.zip) |
-| macOS 14+ · Apple Silicon | **[Download DMG](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.22.0/Open-Typora-0.22.0-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.22.0/Open-Typora-0.22.0-arm64.zip) |
-| Linux · x64 | **[Download DEB](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.22.0/Open-Typora-0.22.0-linux-x64.deb)** | [AppImage](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.22.0/Open-Typora-0.22.0-linux-x64.AppImage) |
+| Windows 10/11 · x64 | **[Download Setup.exe](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.23.0/Open-Markdown-Lane-0.23.0-windows-x64-Setup.exe)** | [ZIP](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.23.0/Open-Markdown-Lane-0.23.0-windows-x64.zip) |
+| macOS 14+ · Apple Silicon | **[Download DMG](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.23.0/Open-Markdown-Lane-0.23.0-arm64.dmg)** | [ZIP](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.23.0/Open-Markdown-Lane-0.23.0-arm64.zip) |
+| Linux · x64 | **[Download DEB](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.23.0/Open-Markdown-Lane-0.23.0-linux-x64.deb)** | [AppImage](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.23.0/Open-Markdown-Lane-0.23.0-linux-x64.AppImage) |
 
-[SHA-256 checksums](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.22.0/SHA256SUMS.txt) · [All releases](https://github.com/AniChikage/open-markdown-lane/releases)
+[SHA-256 checksums](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.23.0/SHA256SUMS.txt) · [All releases](https://github.com/AniChikage/open-markdown-lane/releases)
 
 ### Install on Linux
 
 Ubuntu 22.04 or a compatible x64 distribution is the tested baseline. Download the DEB and install it with:
 
 ```sh
-sudo apt install ./Open-Typora-0.22.0-linux-x64.deb
+sudo apt install ./Open-Markdown-Lane-0.23.0-linux-x64.deb
 ```
 
-The desktop launcher and Markdown file association are included. Uninstalling with `sudo apt remove open-typora` retains your documents and recovery data.
+The desktop launcher and Markdown file association are included. Uninstalling with `sudo apt remove open-markdown-lane` retains your documents and recovery data.
 
 For other compatible distributions, make the AppImage executable and run it. Real FUSE mounting, editing and unmounting are tested on Ubuntu 22.04 and 24.04; Ubuntu 24.04 uses an explicit application-specific namespace profile. The launcher keeps Chromium sandboxing enabled. See the [AppImage prerequisites and verification scope](docs/linux-appimage.md).
 
@@ -84,7 +84,7 @@ Additional document conversion on Windows/Linux requires [Pandoc](https://pandoc
 
 ### Install on Windows
 
-Run **Setup.exe**, choose an installation folder, and launch Open Typora from the Start menu. The installer also provides an optional desktop shortcut and Markdown file associations. Updates install into the same application folder; uninstalling preserves your recovery data.
+Run **Setup.exe**, choose an installation folder, and launch Open Markdown Lane from the Start menu. The installer also provides an optional desktop shortcut and Markdown file associations. Updates install into the same application folder; uninstalling preserves your recovery data.
 
 To preview Markdown without opening the editor, enable **系统 Markdown 预览** in Preferences, then show the preview pane in Everything or File Explorer. This is optional and restores the previous handler when disabled. See the [preview guide](docs/windows-preview.md).
 
@@ -92,9 +92,9 @@ The Windows build is currently **not code-signed**. Windows may display an unkno
 
 ### Install on macOS
 
-1. Download **[Open-Typora-0.22.0-arm64.dmg](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.22.0/Open-Typora-0.22.0-arm64.dmg)** from [Releases](https://github.com/AniChikage/open-markdown-lane/releases/latest).
-2. Open the DMG and drag **Open Typora** into **Applications**.
-3. Launch Open Typora from Applications.
+1. Download **[Open-Markdown-Lane-0.23.0-arm64.dmg](https://github.com/AniChikage/open-markdown-lane/releases/download/v0.23.0/Open-Markdown-Lane-0.23.0-arm64.dmg)** from [Releases](https://github.com/AniChikage/open-markdown-lane/releases/latest).
+2. Open the DMG and drag **Open Markdown Lane** into **Applications**.
+3. Launch Open Markdown Lane from Applications.
 
 Requires **macOS 14 or later on Apple Silicon**. A ZIP alternative and SHA-256 checksums are included in the release. No Node.js, Xcode, or Typora installation is needed to use the app.
 
@@ -201,7 +201,6 @@ More editor and desktop suites, test isolation, and build details are in [CONTRI
 
 ## Current limitations
 
-- In 0.22.0, a rich-text regex replacement containing `$<name>` without named capture groups can drop that literal. The source fix is not yet released; see the [audit findings](docs/test-plan.md#本轮发现与处理).
 - Markdown open/save/recovery has no fixed 20 MiB cap. Large documents use viewport rendering, large code blocks use an inner CodeMirror viewport, and large tables mount visible rows. Available memory, initial parsing and runtime string limits still apply; [tested sizes and remaining limits](docs/performance.md). Converted imports and media keep separate resource budgets.
 - Legacy encodings without a BOM require an explicit encoding choice.
 - Rich editing and source editing have separate undo histories; changes made in source mode join the rich history as one transaction when returning.
