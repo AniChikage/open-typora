@@ -17,7 +17,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: AniChikage/open-markdown-lane
       RELEASE_TAG: v0.24.1
-      DRAFT_TAG: untagged-ffbe7a1a527fd02af6dc
+      DRAFT_TAG: v0.24.1
       SOURCE_SHA: 3c536b5d69ff03906f5c1aafc17cca00871850a7
     steps:
       - name: Verify frozen source, artifacts and private draft
@@ -29,7 +29,7 @@ jobs:
           test "$(gh api "repos/$GH_REPO/actions/runs/41859795834" --jq .head_sha)" = "$SOURCE_SHA"
           test "$(gh api "repos/$GH_REPO/actions/artifacts/13340806230" --jq .digest)" = "sha256:6dcfb5a460d28cc2753d96067938d020594e1fe28685b592bdbd2ccdedc8dcaf"
           test "$(gh api "repos/$GH_REPO/actions/artifacts/13341020985" --jq .digest)" = "sha256:213fef7a1a58e7b460014677a67551676f77ff5d0d5f380b29ac7acd12c07fb0"
-          gh api --paginate "repos/$GH_REPO/releases?per_page=100" --jq '.[] | select(.tag_name=="untagged-ffbe7a1a527fd02af6dc")' > "$RUNNER_TEMP/draft.json"
+          gh api "repos/$GH_REPO/releases/tags/$RELEASE_TAG" > "$RUNNER_TEMP/draft.json"
           jq -e '.draft == true and .name == "Open Markdown Lane 0.24.1"' "$RUNNER_TEMP/draft.json"
           echo "RELEASE_ID=$(jq -r .id "$RUNNER_TEMP/draft.json")" >> "$GITHUB_ENV"
       - name: Download already tested Windows and Linux packages
