@@ -8,4 +8,5 @@ import "@fontsource/open-sans/latin-700-italic.css";
 import "./styles.css";
 import "./features.css";
 import "./extensions.css";
+import "./writingWorkspace.css";
 ReactDOM.createRoot(document.getElementById("root")!).render(<App />);

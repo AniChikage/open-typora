@@ -16,7 +16,7 @@ import { AISettingsDialog } from "./components/AISettingsDialog";
 import { AIReviewPanel } from "./components/AIReviewPanel";
 import type { RewriteSelection } from "./editor/aiReview";
 import "./ai.css";
-import { FilePlus2, FolderOpen, X, AlertCircle } from "lucide-react";
+import { FilePlus2, FolderOpen, X, AlertCircle, ListTree, Sparkles, History, PanelRightClose } from "lucide-react";
 import { useDocuments } from "./useDocuments";
 import { EncodingDialog, encodingNames } from "./components/EncodingDialog";
 import { Toolbar } from "./components/Toolbar";
@@ -75,6 +75,12 @@ export default function App() {
   const [dialog, setDialog] = useState<"batch-edit" | "knowledge" | "versions" | "ai-settings" | "preferences" | "plugins" | "quick-open" | "statistics" | "recent" | "global-search" | "encoding" | InsertKind | null>(null);
   const [fileOperation, setFileOperation] = useState<FileOperation | null>(null);
   const [aiSelection, setAISelection] = useState<{ selection: RewriteSelection; id: string } | null>(null);
+  const [rightPanel, setRightPanel] = useState<"outline" | "ai" | null>(null);
+  const toolComposing = useRef(false);
+  function changeRightPanel(next: "outline" | "ai" | null) {
+    if (composing() || toolComposing.current) { session.setMessage(t("请先完成当前输入法组合输入。")); return; }
+    setRightPanel(next);
+  }
   const mutationState = useRef({ readOnly, dialog, aiId: aiSelection?.id }); mutationState.current = { readOnly, dialog, aiId: aiSelection?.id };
   const [batchEditors, setBatchEditors] = useState<string[]>([]);
   const [aiSettingsRevision, setAISettingsRevision] = useState(0);
@@ -82,7 +88,7 @@ export default function App() {
     if (!host.native) { session.setMessage(t("AI 改写请使用桌面应用。")); return; }
     if (composing()) { session.setMessage(t("请先完成当前输入法组合输入。")); return; }
     const selection = editor()?.captureRewrite();
-    if (selection) setAISelection({ selection, id: crypto.randomUUID() });
+    if (selection) { setAISelection({ selection, id: crypto.randomUUID() }); setRightPanel("ai"); }
   }
   const [selectedText, setSelectedText] = useState("");
   const [selection, setSelection] = useState("");
@@ -550,13 +556,29 @@ export default function App() {
           </div>
         ) : (
           <>
-            <div className={"writing-content" + (aiSelection ? " with-ai" : "")}>
+            <div className={"writing-content" + (rightPanel ? " with-tools" : "")}>
             <EditorWorkspace retainedIds={batchEditors} documents={session.documents} activeId={session.activeId} layout={session.workspace} modes={modes}
               preferences={preferences} readOnly={readOnly} typewriter={typewriter} select={selectDocument} register={registerEditor} change={changeDocument} error={session.setMessage} cursor={cursorDocument} selection={selectionDocument} compositionEnd={compositionDocument} mode={modeDocument} closePane={closePane} command={commandDocument} tabAction={tabAction} autosave={session.autosave} composing={composing}
               create={() => void session.create()} close={id => void session.close(id)} reorder={session.reorder} split={direction => void session.split(direction)} swap={session.swapPanes} resize={session.resizeWorkspace} />
+            <aside className="right-tools" aria-label={t("文档工具")} hidden={!rightPanel} onCompositionStartCapture={() => { toolComposing.current = true; }} onCompositionEndCapture={() => { toolComposing.current = false; }}>
+              <div className="right-tools-header">
+                <div className="right-tool-switcher" role="group" aria-label={t("右侧栏视图")}>
+                  <button aria-pressed={rightPanel === "outline"} onClick={() => changeRightPanel("outline")}>{t("大纲")}</button>
+                  <button aria-pressed={rightPanel === "ai"} onPointerDown={event => event.preventDefault()} onClick={() => aiSelection ? changeRightPanel("ai") : startRewrite()}>AI</button>
+                </div>
+                <button className="icon-button" aria-label={t("收起右侧栏")} title={t("收起右侧栏")} onClick={() => changeRightPanel(null)}><PanelRightClose size={16} /></button>
+              </div>
+              <div className="right-outline" hidden={rightPanel !== "outline"}>
+                <p className="right-document-name" title={active.name}>{active.name}</p>
+                <nav className="outline" aria-label={t("右侧文档大纲")}>
+                  {largeDocument && !sourceAnalysis ? <p className="sidebar-empty" role="status">{t("正在分析文档大纲…")}</p> : headings.length ? headings.map((heading, index) => <button key={`${heading.line}-${index}`} style={{paddingLeft: 14 + (heading.level - 1) * 12}} onClick={() => editor()?.jump(heading.line)}><span>{heading.text}</span></button>) : <p className="sidebar-empty">{t("使用 # 标题，")}<br />{t("在这里看见文档结构。")}</p>}
+                  {sourceAnalysis?.truncated && <p className="sidebar-empty">{t("仅显示前 2000 个标题。")}</p>}
+                </nav>
+              </div>
+              <div className="right-ai" hidden={rightPanel !== "ai"}>
             {aiSelection && <AIReviewPanel key={aiSelection.id} selection={aiSelection.selection} documentName={session.documents.find(document => document.id === aiSelection.selection.documentId)?.name || t("已关闭文档")}
               current={!!editor()?.rewriteCurrent(aiSelection.selection)} composing={composing} files={references} documents={session.documents} settingsRevision={aiSettingsRevision}
-              settings={() => setDialog("ai-settings")} recapture={startRewrite} close={() => setAISelection(null)} notify={session.setMessage}
+              settings={() => setDialog("ai-settings")} recapture={startRewrite} close={() => { setAISelection(null); setRightPanel(null); }} notify={session.setMessage}
               apply={async text => {
                 const id = aiSelection.selection.documentId;
                 return historyMutation(id, "ai", () => mutationState.current.aiId === aiSelection.id && !!editors.current.get(id)?.rewriteCurrent(aiSelection.selection), target => {
@@ -566,6 +588,13 @@ export default function App() {
                   return true;
                 });
               }} />}
+              </div>
+            </aside>
+            <div className="right-tool-rail" role="group" aria-label={t("文档工具入口")}>
+              <button className="icon-button" aria-label={t("右侧大纲")} title={t("右侧大纲")} aria-pressed={rightPanel === "outline"} onClick={() => changeRightPanel(rightPanel === "outline" ? null : "outline")}><ListTree size={17} /></button>
+              <button className="icon-button" aria-label={t("AI 侧栏")} title={t("AI 侧栏")} aria-pressed={rightPanel === "ai"} onPointerDown={event => event.preventDefault()} onClick={() => aiSelection ? changeRightPanel(rightPanel === "ai" ? null : "ai") : startRewrite()}><Sparkles size={17} /></button>
+              <button className="icon-button" aria-label={t("版本历史")} title={t("版本历史")} onClick={() => commands.current({ action: "versions" })}><History size={17} /></button>
+            </div>
             </div>
             <article
               className="print-document"

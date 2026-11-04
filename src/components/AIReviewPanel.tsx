@@ -56,7 +56,7 @@ export function AIReviewPanel({ selection, documentName, current, composing, fil
   }
   function cancel() { retrieval.current?.abort(); const id = pending.current; pending.current = ""; setBusy(false); if (id) void host.aiCancel(id).catch(error => setError(error.message)); }
   return <aside className="ai-review-panel" aria-label={t("AI 改写选区")}>
-    <div className="ai-panel-heading"><h2>{t("改写选区")}</h2><button className="icon-button" aria-label={t("模型设置")} title={t("模型设置")} onClick={settings}><Settings2 size={16} /></button><button className="icon-button" aria-label={t("关闭 AI 改写")} onClick={close}><X size={17}/></button></div>
+    <div className="ai-panel-heading"><h2>{t("改写选区")}</h2><button className="icon-button" aria-label={t("模型设置")} title={t("模型设置")} onClick={settings}><Settings2 size={16} /></button><button className="icon-button" aria-label={t("关闭 AI 改写")} onClick={() => { if (!blocked()) close(); }}><X size={17}/></button></div>
     <div className="ai-panel-body">
       <p className="ai-target" title={documentName}>{documentName} · {selection.text.length.toLocaleString()} {t("字符")}</p>
       <p className="dialog-note">{references.length ? t("将发送所选文字、改写要求和所选文件的相关片段。") : t("仅发送所选文字与改写要求。建议需经你审阅后才会写入文档。")}</p>

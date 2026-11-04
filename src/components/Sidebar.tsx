@@ -8,7 +8,7 @@ import {
   Moon,
   Sun,
   X,
-  ChevronDown, MoreHorizontal, Search, History,
+  ChevronDown, MoreHorizontal, Search, History, ListTree, List, ListOrdered,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { DocumentRecord, FileEntry, FileOperation } from "../types";
@@ -103,6 +103,10 @@ export function Sidebar(props: Props) {
           </div>
         )}
       </div>
+      <div className="sidebar-navigation" role="group" aria-label={t("侧栏视图")}>
+        {([ ["files", List, "文件"], ["tree", ListTree, "文件树"], ["outline", ListOrdered, "大纲"] ] as const).map(([tab, Icon, label]) => <button key={tab} aria-pressed={props.tab === tab} onClick={() => props.setTab(tab)} title={t(label)}><Icon size={15} aria-hidden="true" /><span>{t(label)}</span></button>)}
+      </div>
+      <button className="sidebar-search" aria-label={t("搜索文档")} onClick={props.search}><Search size={14} aria-hidden="true" /><span>{t("搜索文件夹")}</span><kbd>{shortcutLabel("Mod-Shift-F")}</kbd></button>
       <div className="sidebar-body">
         {props.tab !== "outline" ? (
           <>

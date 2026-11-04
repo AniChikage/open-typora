@@ -1,7 +1,7 @@
 import { t } from "../i18n";
 import { memo, useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, KeyboardEvent } from "react";
-import { Plus, X, Columns2, Rows2, ArrowLeftRight } from "lucide-react";
+import { Plus, X, Columns2, Rows2, ArrowLeftRight, FileText } from "lucide-react";
 import { MarkdownEditor } from "../editor/MarkdownEditor";
 import type { EditorHandle } from "../editor/MarkdownEditor";
 import type { DocumentRecord } from "../types";
@@ -67,6 +67,7 @@ interface Props extends Omit<EditorProps, "record" | "active" | "visible" | "slo
 export function EditorWorkspace(props: Props) {
   const tabs = useRef<HTMLDivElement>(null), body = useRef<HTMLDivElement>(null), visited = useRef(new Set<string>());
   const layout = props.layout;
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ id: string; x: number; y: number; origin: HTMLElement } | null>(null);
   const record = props.documents.find(record => record.id === menu?.id);
   function openMenu(id: string, origin: HTMLElement, x?: number, y?: number) {
@@ -106,13 +107,13 @@ export function EditorWorkspace(props: Props) {
   return <div className="editor-workspace">
     <div className="workspace-bar">
       <div className="document-tabs" ref={tabs} role="tablist" aria-label={t("文档标签")}>
-        {props.documents.map((record,index) => <div className={`document-tab ${record.id === props.activeId ? "selected" : ""} ${visible.has(record.id) ? "visible-pane" : ""}`} key={record.id}
+        {props.documents.map((record,index) => <div className={`document-tab ${record.id === props.activeId ? "selected" : ""} ${visible.has(record.id) ? "visible-pane" : ""} ${dropTarget === record.id ? "tab-drop-target" : ""}`} key={record.id}
           onContextMenu={event => { event.preventDefault(); event.stopPropagation(); openMenu(record.id, event.currentTarget.querySelector<HTMLElement>('[role="tab"]')!, event.clientX, event.clientY); }}
-          onDragOver={event => { if (event.dataTransfer.types.includes("application/x-open-markdown-lane-tab")) event.preventDefault(); }} onDrop={event => { const id=event.dataTransfer.getData("application/x-open-markdown-lane-tab"); if(id){event.preventDefault();props.reorder(id,record.id);} }}>
+          onDragOver={event => { if (event.dataTransfer.types.includes("application/x-open-markdown-lane-tab")) { event.preventDefault(); setDropTarget(record.id); } }} onDragLeave={() => setDropTarget(null)} onDragEnd={() => setDropTarget(null)} onDrop={event => { setDropTarget(null); const id=event.dataTransfer.getData("application/x-open-markdown-lane-tab"); if(id){event.preventDefault();props.reorder(id,record.id);} }}>
           <button role="tab" aria-selected={record.id === props.activeId} aria-controls={`document-${record.id}`} aria-label={record.name} title={`${record.path || record.name}${record.content !== record.savedContent ? t(" · 未保存") : ""}`} tabIndex={record.id === props.activeId ? 0 : -1} data-tab-id={record.id} draggable
             onDragStart={event => {if(!props.select(record.id)){event.preventDefault();return;} event.dataTransfer.setData("application/x-open-markdown-lane-tab",record.id);event.dataTransfer.effectAllowed="move";}}
             onMouseDown={event => {if(event.button===0)event.preventDefault();}} onClick={() => props.select(record.id)} onAuxClick={event => {if(event.button===1){event.preventDefault();props.close(record.id);}}} onKeyDown={event => tabKey(event,index)}>
-            <span>{record.name}</span>{record.content !== record.savedContent && <span className="tab-dirty" aria-hidden="true">•</span>}
+            <FileText className="tab-file-icon" size={14} aria-hidden="true" /><span className="tab-name">{record.name}</span>{record.content !== record.savedContent && <span className="tab-dirty" aria-hidden="true">•</span>}
           </button><button className="tab-close" aria-label={t("关闭标签 {0}", record.name)} title={t("关闭标签")} onClick={() => props.close(record.id)}><X size={12} /></button>
         </div>)}
       </div>

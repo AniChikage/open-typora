@@ -915,5 +915,13 @@
   "清理未完成记录": "Remove a pending record",
   "未完成不代表文档没有改过。移除记录会删除这一批的恢复备份，不会修改文档。": "Pending does not mean documents were unchanged. Removing this record deletes its recovery backup without editing documents.",
   "确认不再需要这条未完成恢复记录。": "I no longer need this pending recovery record.",
-  "移除此未完成记录": "Remove this pending record"
+  "移除此未完成记录": "Remove this pending record",
+  "侧栏视图": "Sidebar views",
+  "文档工具": "Document tools",
+  "右侧栏视图": "Right sidebar views",
+  "收起右侧栏": "Collapse right sidebar",
+  "右侧文档大纲": "Document outline",
+  "文档工具入口": "Document tools",
+  "右侧大纲": "Outline sidebar",
+  "AI 侧栏": "AI sidebar"
 }
