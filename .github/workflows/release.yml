@@ -336,3 +336,6 @@ jobs:
           fi
           gh release upload "$RELEASE_TAG" release-assets/*.dmg release-assets/*-Setup.exe release-assets/*.zip release-assets/*.deb release-assets/*.AppImage release-assets/SHA256SUMS.txt
           gh release edit "$RELEASE_TAG" --draft=false --latest
+      - name: Retire legacy releases after verifying all published replacement assets
+        if: env.RELEASE_TAG == 'v0.23.0'
+        run: node scripts/retire-legacy-releases.mts

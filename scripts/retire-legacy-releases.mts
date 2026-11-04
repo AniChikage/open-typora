@@ -7,7 +7,7 @@ import path from 'node:path';
 import manifest from './legacy-release-manifest.json' with {type:'json'};
 const repository='AniChikage/open-markdown-lane', tag='v0.23.0';
 assert.equal(process.env.GH_REPO,repository);
-assert.equal(process.env.GITHUB_REF,'refs/heads/main');
+assert.ok(['refs/heads/main','refs/tags/v0.23.0'].includes(process.env.GITHUB_REF || ''), 'Cleanup is restricted to main or the verified release tag');
 const api=(endpoint:string)=>JSON.parse(execFileSync('gh',['api',`repos/${repository}/${endpoint}`],{encoding:'utf8'}));
 const replacement=api(`releases/tags/${tag}`);
 assert.equal(replacement.draft,false);assert.equal(replacement.prerelease,false);
