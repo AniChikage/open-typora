@@ -20,6 +20,7 @@ import {
   safeStorage,
 } from "electron";
 import path from "node:path";
+import { mkdirSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { imageAction, imageName } from "./image-actions.mjs";
 import { libreOfficePath, pandocPath, convertExport, convertImport, themes, installTheme } from "./interchange.mjs";
@@ -36,7 +37,9 @@ const runtimeRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const root = app.isPackaged ? runtimeRoot : path.resolve(runtimeRoot, "../..");
 applyLegacyEnvironment(process.env);
 const development = process.env.OPEN_MARKDOWN_LANE_DEV_URL;
-app.setPath("userData", applicationDataDirectory(app.getPath("appData"), process.env.OPEN_MARKDOWN_LANE_DATA_DIR));
+const dataDirectory = applicationDataDirectory(app.getPath("appData"), process.env.OPEN_MARKDOWN_LANE_DATA_DIR);
+mkdirSync(dataDirectory, { recursive: true });
+app.setPath("userData", dataDirectory);
 app.setName("Open Markdown Lane");
 protocol.registerSchemesAsPrivileged([
   { scheme: "opentypora", privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
