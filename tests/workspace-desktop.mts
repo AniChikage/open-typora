@@ -34,7 +34,7 @@ try{
  const bounds=await page.locator('.right-tools').boundingBox();assert.ok(bounds&&bounds.width>200&&bounds.height>=180);
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
  await page.screenshot({path:path.join(qa,'workspace-outline-compact.png')});
- await page.setViewportSize({width:1380,height:900});await page.getByRole('button',{name:'收起右侧栏',exact:true}).click();
+ await page.setViewportSize({width:1380,height:900});await page.getByRole('button',{name:'收起右侧栏',exact:true}).click();await expect(pane(records[0].id).locator('.rich-document')).toBeFocused();
  assert.equal(await pane(records[0].id).locator('.rich-document').getAttribute('data-ui-identity'),'retained');
  await page.getByRole('button',{name:'版本历史',exact:true}).click();await expect(page.getByRole('dialog',{name:'版本历史',exact:true})).toBeVisible();await page.getByRole('button',{name:'关闭版本历史',exact:true}).click();
  assert.equal(await readFile(records[0].path,'utf8'),texts[0]);

@@ -24,7 +24,7 @@ async function runWebKitAITests(endpoint:string) {
       await begin(before);await wait(()=>!!panel()?.querySelector('.ai-change'));
       if(before==='普通') {
         const retained=panel(), prompt=panel().querySelector<HTMLTextAreaElement>('[aria-label="AI 改写要求"]')!, instruction=prompt.value;
-        document.querySelector<HTMLButtonElement>('[aria-label="收起右侧栏"]')!.click();await wait(()=>!!document.querySelector<HTMLElement>('.right-tools')!.hidden);
+        document.querySelector<HTMLButtonElement>('[aria-label="收起右侧栏"]')!.click();await wait(()=>!!document.querySelector<HTMLElement>('.right-tools')!.hidden);check(document.activeElement===root(),'native dock collapse returns keyboard focus to the editor');
         document.querySelector<HTMLButtonElement>('[aria-label="AI 侧栏"]')!.click();await wait(()=>!document.querySelector<HTMLElement>('.right-tools')!.hidden);
         check(panel()===retained&&prompt.value===instruction&&!!panel().querySelector('.ai-change'),'native dock collapse retains the prompt and generated review');
         prompt.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true,data:'zhong'}));

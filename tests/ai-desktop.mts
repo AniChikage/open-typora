@@ -42,7 +42,7 @@ try{
  await dialog.getByRole("button",{name:"关闭模型设置",exact:true}).click();pass("Credential policy is visible: macOS saves owner-only local configuration and clears persisted keys in session mode; other hosts retain their system-storage policy.");
  await selectText(sentence);await root().evaluate(element=>element.dataset.aiRoot="stable");await open();
  await panel().getByRole("textbox",{name:"AI 改写要求",exact:true}).fill("保留这条改写要求");
- await page.getByRole("button",{name:"收起右侧栏",exact:true}).click();await expect(panel()).toBeHidden();
+ await page.getByRole("button",{name:"收起右侧栏",exact:true}).click();await expect(panel()).toBeHidden();await expect(root()).toBeFocused();
  await page.getByRole("button",{name:"AI 侧栏",exact:true}).click();await expect(panel()).toBeVisible();
  const draft=panel().getByRole("textbox",{name:"AI 改写要求",exact:true});await expect(draft).toHaveValue("保留这条改写要求");
  await draft.dispatchEvent("compositionstart",{data:"zhong"});

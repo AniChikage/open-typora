@@ -80,6 +80,7 @@ export default function App() {
   function changeRightPanel(next: "outline" | "ai" | null) {
     if (composing() || toolComposing.current) { session.setMessage(t("请先完成当前输入法组合输入。")); return; }
     setRightPanel(next);
+    if (next === null) editor()?.focus();
   }
   const mutationState = useRef({ readOnly, dialog, aiId: aiSelection?.id }); mutationState.current = { readOnly, dialog, aiId: aiSelection?.id };
   const [batchEditors, setBatchEditors] = useState<string[]>([]);

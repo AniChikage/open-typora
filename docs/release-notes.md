@@ -1,16 +1,18 @@
-Open Markdown Lane 0.24.0 improves the writing workspace while retaining the existing Markdown editing and storage model.
+Open Markdown Lane 0.24.1 improves the writing workspace while retaining the existing Markdown editing and storage model.
 
 This is an independent, unofficial project, unaffiliated with Typora. If you can afford it, please [buy Typora](https://store.typora.io/) and support its official developers.
 
 ## Downloads
 
-- macOS 14+, Apple Silicon: `Open-Markdown-Lane-0.24.0-arm64.dmg` or ZIP.
-- Windows 10/11 x64: `Open-Markdown-Lane-0.24.0-windows-x64-Setup.exe` or ZIP.
-- Linux x64: `Open-Markdown-Lane-0.24.0-linux-x64.deb` or AppImage.
+- macOS 14+, Apple Silicon: `Open-Markdown-Lane-0.24.1-arm64.dmg` or ZIP.
+- Windows 10/11 x64: `Open-Markdown-Lane-0.24.1-windows-x64-Setup.exe` or ZIP.
+- Linux x64: `Open-Markdown-Lane-0.24.1-linux-x64.deb` or AppImage.
 
 Verify downloads with `SHA256SUMS.txt`. macOS is locally signed, not notarized; Windows is unsigned.
 
 ## Changes
+
+- Return keyboard focus to the current document when collapsing the right sidebar, so focus cannot remain in a hidden control.
 
 - Clearer active tabs, document icons, unsaved indicators and drag destination feedback. Existing tab menus, keyboard navigation and split views remain available.
 - Direct file/list/outline navigation, a visible folder-search entry and more legible selected files and tree rows.
@@ -21,4 +23,4 @@ Verify downloads with `SHA256SUMS.txt`. macOS is locally signed, not notarized; 
 
 ## Validation scope
 
-Automated coverage includes exact save/undo/redo, split restoration, sidebar state, light/dark and compact layouts, AI review, synthetic Chinese composition and the existing community issue regressions. Controlled HTTP fixtures validate AI integration; they are not live-provider inference or physical-IME acceptance. Platform package and FUSE results are reported by the release workflow. See [verification](https://github.com/AniChikage/open-markdown-lane/blob/v0.24.0/docs/verification.md) for the final evidence and limitations.
+Automated coverage includes exact save/undo/redo, split restoration, sidebar state, light/dark and compact layouts, AI review, synthetic Chinese composition and the existing community issue regressions. Controlled HTTP fixtures validate AI integration; they are not live-provider inference or physical-IME acceptance. Platform package and FUSE results are reported by the release workflow. See [verification](https://github.com/AniChikage/open-markdown-lane/blob/v0.24.1/docs/verification.md) for the final evidence and limitations.
