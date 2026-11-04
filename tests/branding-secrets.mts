@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { _electron as electron, expect } from 'playwright/test';
 import { spawn, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 const exec = promisify(execFile);
@@ -16,6 +16,15 @@ const daemon=spawn('gnome-keyring-daemon',['--foreground','--unlock','--componen
 daemon.stdin.end('owned-ephemeral-keyring-password\n');
 let app: import('playwright').ElectronApplication | undefined;
 try {
+  // --unlock creates the private login keyring but does not initialize a full
+  // session. Initialize it before any D-Bus call can auto-start another daemon.
+  let controlReady=false;
+  for(let i=0;i<60;i++) {
+    try {await stat(path.join(root,'control/control'));controlReady=true;break;}catch{}
+    await new Promise(resolve=>setTimeout(resolve,100));
+  }
+  assert.ok(controlReady,'Owned keyring control socket was created');
+  await exec('gnome-keyring-daemon',['--start','--components=secrets','--control-directory='+path.join(root,'control')],{env,timeout:10000});
   let ready=false;
   for(let i=0;i<60;i++) {
     try {await exec('gdbus',['call','--session','--dest','org.freedesktop.secrets','--object-path','/org/freedesktop/secrets','--method','org.freedesktop.DBus.Peer.Ping'],{env,timeout:2000});ready=true;break;}catch{}
@@ -40,7 +49,8 @@ try {
   await app?.close();
   if (daemon.exitCode === null && daemon.signalCode === null) {
     const ended=new Promise<void>(resolve=>daemon.once('exit',()=>resolve()));
-    daemon.kill('SIGTERM');await ended;
+    const deadline=setTimeout(()=>daemon.kill('SIGKILL'),2000);
+    daemon.kill('SIGTERM');await ended;clearTimeout(deadline);
   }
   await rm(root,{recursive:true,force:true});
 }
