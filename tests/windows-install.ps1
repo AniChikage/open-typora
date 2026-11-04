@@ -4,14 +4,15 @@ $installer = Join-Path $PWD "release/windows/Open-Markdown-Lane-$version-windows
 $destination = Join-Path $env:RUNNER_TEMP 'OpenMarkdownLaneInstalled'
 $env:OPEN_MARKDOWN_LANE_QA_DIR = Join-Path $env:RUNNER_TEMP 'open-markdown-lane-windows-qa'
 New-Item -ItemType Directory -Force $env:OPEN_MARKDOWN_LANE_QA_DIR | Out-Null
-$previous = Join-Path $env:RUNNER_TEMP 'Open-Markdown-Lane-0.15.0-Setup.exe'
-curl.exe --fail --location --silent --show-error --retry 3 --connect-timeout 30 --max-time 180 'https://github.com/AniChikage/open-markdown-lane/releases/download/v0.15.0/Open-Markdown-Lane-0.15.0-windows-x64-Setup.exe' --output $previous
+$previous = Join-Path $env:RUNNER_TEMP 'Open-Typora-0.15.0-Setup.exe'
+curl.exe --fail --location --silent --show-error --retry 3 --connect-timeout 30 --max-time 180 'https://github.com/AniChikage/open-markdown-lane/releases/download/v0.15.0/Open-Typora-0.15.0-windows-x64-Setup.exe' --output $previous
 if ($LASTEXITCODE -ne 0 -or (Get-FileHash $previous -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'f0563c64e25fd7b116c61d761a2d48233b28857401e8ae79ba49293f9369e59e') { throw 'Previous public installer download verification failed' }
 $prior = Start-Process -FilePath $previous -ArgumentList @('/S', "/D=$destination") -Wait -PassThru
 if ($prior.ExitCode -ne 0) { throw 'Previous-version installation failed' }
 $process = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$destination") -Wait -PassThru
 if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
 $env:OPEN_MARKDOWN_LANE_EXECUTABLE = Join-Path $destination 'Open Markdown Lane.exe'
+if (Test-Path (Join-Path $destination 'Open Typora.exe')) { throw 'Upgrade retained the old application executable' }
 if (!(Test-Path $env:OPEN_MARKDOWN_LANE_EXECUTABLE)) { throw 'Installer did not produce the application executable' }
 node tests/batch-desktop.mts
 if ($LASTEXITCODE -ne 0) { throw "Multi-document review and restart recovery acceptance failed" }

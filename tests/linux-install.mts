@@ -20,19 +20,20 @@ const exercise = async (executable: string,kind: string) => {
 };
 const deb = path.resolve(`release/linux/Open-Markdown-Lane-${pkg.version}-linux-x64.deb`);
 // Exercise the earlier spaced-path package, then the most recent public release.
-const previous = path.join(await mkdtemp(path.join(os.tmpdir(),"open-markdown-lane-upgrade-")),"Open-Markdown-Lane-0.13.1-linux-x64.deb");
-run("curl",["--fail","--location","--silent","--show-error","--retry","3","--max-time","180","https://github.com/AniChikage/open-markdown-lane/releases/download/v0.13.1/Open-Markdown-Lane-0.13.1-linux-x64.deb","--output",previous]);
+const previous = path.join(await mkdtemp(path.join(os.tmpdir(),"open-markdown-lane-upgrade-")),"Open-Typora-0.13.1-linux-x64.deb");
+run("curl",["--fail","--location","--silent","--show-error","--retry","3","--max-time","180","https://github.com/AniChikage/open-markdown-lane/releases/download/v0.13.1/Open-Typora-0.13.1-linux-x64.deb","--output",previous]);
 assert.equal(createHash("sha256").update(await readFile(previous)).digest("hex"),"67233be54a825da057d2163e627c56e8bd5af8530eff1afb5aaf2c21fd0e71c2");
 run("sudo",["apt-get","install","-y",previous]);
-await stat("/opt/Open Markdown Lane/open-markdown-lane");
-const recent = path.join(path.dirname(previous),"Open-Markdown-Lane-0.15.0-linux-x64.deb");
-run("curl",["--fail","--location","--silent","--show-error","--retry","3","--max-time","180","https://github.com/AniChikage/open-markdown-lane/releases/download/v0.15.0/Open-Markdown-Lane-0.15.0-linux-x64.deb","--output",recent]);
+await stat("/opt/Open Typora/open-typora");
+const recent = path.join(path.dirname(previous),"Open-Typora-0.15.0-linux-x64.deb");
+run("curl",["--fail","--location","--silent","--show-error","--retry","3","--max-time","180","https://github.com/AniChikage/open-markdown-lane/releases/download/v0.15.0/Open-Typora-0.15.0-linux-x64.deb","--output",recent]);
 assert.equal(createHash("sha256").update(await readFile(recent)).digest("hex"),"807fcdfdbf8a2976411b1938bbebc050c2cf8ee0af548e395602ee42004e010b");
 run("sudo",["apt-get","install","-y",recent]);
-await assert.rejects(stat("/opt/Open Markdown Lane/open-markdown-lane"),{code:"ENOENT"});
+await assert.rejects(stat("/opt/Open Typora/open-typora"),{code:"ENOENT"});
 run("sudo",["apt-get","install","-y",deb]);
+await assert.rejects(stat("/opt/Open-Typora/open-typora"),{code:"ENOENT"});
 await rm(recent);
-await assert.rejects(stat("/opt/Open Markdown Lane/open-markdown-lane"),{code:"ENOENT"});
+await assert.rejects(stat("/opt/Open Typora/open-typora"),{code:"ENOENT"});
 await rm(previous);
 const installed = "/opt/Open-Markdown-Lane/open-markdown-lane";
 await stat(installed);
