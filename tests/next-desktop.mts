@@ -13,7 +13,11 @@ const records: (import("../shared/contracts.js").DocumentRecord & {path: string}
 await writeFile(path.join(profile,'session.json'),JSON.stringify({version:1,documents:records,activeId:records[0].id}));
 const env: Record<string, string>={...process.env,OPEN_MARKDOWN_LANE_DATA_DIR:profile};delete env.ELECTRON_RUN_AS_NODE;delete env.OPEN_MARKDOWN_LANE_DEV_URL;
 let app!: import("playwright").ElectronApplication, page!: import("playwright").Page;const errors: string[]=[],timings: Record<string, number | number[]>={},checks: string[]=[],mod=process.platform==='darwin'?'Meta':'Control';
-async function command(action: string){await app.evaluate(({BrowserWindow},action: string)=>BrowserWindow.getAllWindows()[0].webContents.send('app:command',{action}),action);}
+async function command(action: string) {
+ const window=await app.browserWindow(page);
+ try { await window.evaluate((target,action: string)=>target.webContents.send('app:command',{action}),action); }
+ finally { await window.dispose(); }
+}
 async function launch(initial=false){const at=Date.now();app=await electron.launch({...(process.env.OPEN_MARKDOWN_LANE_EXECUTABLE?{executablePath:process.env.OPEN_MARKDOWN_LANE_EXECUTABLE,args:[]}:{args:[process.cwd()]}),env,timeout:45000});page=await app.firstWindow();page.on('pageerror',error=>errors.push(error.message));await page.setViewportSize({width:1400,height:950});await expect(page.getByRole('tab',{name:'Five.md',exact:true})).toBeVisible({timeout:30000});if(initial){await expect(page.locator('.document-editor[data-document-id="next-0"] .rich-document[data-virtualized="true"] h1')).toBeVisible();timings.fiveMBStartupMs=Date.now()-at;}}
 try{
  await launch(true);const source=page.locator('.document-editor[data-document-id="next-0"] .rich-document');
