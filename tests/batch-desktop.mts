@@ -50,7 +50,10 @@ async function closeDialog() { await dialog().getByRole('button', { name: 'Close
 async function historyFirst() { await command('batch-edit'); await dialog().getByRole('button', { name: 'Batch recovery', exact: true }).click(); await expect(dialog().locator('.batch-history-list button').first()).toBeVisible(); await dialog().locator('.batch-history-list button').first().click(); await expect(dialog().getByRole('heading', { name: 'Documents to restore', exact: true })).toBeVisible(); await dialog().getByLabel('I reviewed these documents and want to restore the entire batch.', { exact: true }).check(); }
 try {
   await launch();
-  await page.evaluate(() => { localStorage.setItem('open-markdown-lane-autosave', 'false'); const preferences = JSON.parse(localStorage.getItem('open-markdown-lane-preferences') || '{}'); preferences.language = 'en'; localStorage.setItem('open-markdown-lane-preferences', JSON.stringify(preferences)); }); await page.reload();
+  await command('preferences');
+  await page.getByRole('combobox', {name:'Language',exact:true}).selectOption('en');
+  await page.getByRole('button', {name:'Close Preferences',exact:true}).click();
+  await page.evaluate(() => localStorage.setItem('open-markdown-lane-autosave', 'false')); await page.reload();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en'); await expect(page.getByRole('tab', { name: 'proposal.md', exact: true })).toBeVisible();
   await page.evaluate(async endpoint => { const response = await window.desktop!.aiSettings({ protocol: 'openai', baseUrl: endpoint, model: 'owned-batch-fixture', rememberKey: false }); if (!response.ok) throw Error(response.error); }, endpoint);
   assert.match(page.url(), /index\.html/); assert.match(await page.title(), /Open Markdown Lane/); assert.ok((await page.locator('body').innerText()).includes('Old Product')); await expect(page.locator('vite-error-overlay')).toHaveCount(0);

@@ -1,4 +1,4 @@
-Open Markdown Lane 0.24.3 adds system-language detection and English first-run notes.
+Open Markdown Lane 0.24.4 adds system-language detection and English first-run notes.
 
 This is an independent, unofficial project, unaffiliated with Typora. If you can afford it, please [buy Typora](https://store.typora.io/) and support its official developers.
 
