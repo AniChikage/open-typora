@@ -13,6 +13,7 @@
 - 0.24.3 候选未发布：批量改写测试直接改写缓存语言时保留了“跟随系统”标记。测试改为通过真实语言设置控件切换后，完整批量改写及三平台回归通过；0.24.4 的编辑功能代码与该候选相同。
 - 共享网页试玩构建及九项流程通过。Browser 插件未提供，桌面验收使用项目现有 Electron／WebKit 隔离测试；网页测试因 Playwright 默认浏览器缓存缺失，改用本机已安装的 Chrome 隔离上下文，不使用用户浏览器配置。
 - 六个公开安装文件均独立下载，大小、SHA-256、GitHub 资源摘要和汇总校验文件一致；公开 Mac DMG／ZIP 与已验收的 CI 产物匹配。
+- 已在 [AppImage 收录 PR](https://github.com/AppImage/appimage.github.io/pull/11234#issuecomment-6702216907) 回复并申请复测。[上游复测](https://github.com/AppImage/appimage.github.io/actions/runs/42338396290)实际下载公开的 0.24.4 AppImage 并通过，英文截图检测到 0 个中日韩字符，生成 `screenshot-ok`。此记录仅代表自动复测通过，收录 PR 仍待维护者合并。
 
 ---
 
