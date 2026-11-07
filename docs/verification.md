@@ -1,14 +1,16 @@
 # 0.24.2 空行与缺失文件批量打开回归
 
-针对 [#16](https://github.com/AniChikage/open-markdown-lane/issues/16) 和 [#17](https://github.com/AniChikage/open-markdown-lane/issues/17)。本轮使用隔离会话和自建文档，没有操作用户原有文档、设置或插件配置。
+针对 [#16](https://github.com/AniChikage/open-markdown-lane/issues/16) 和 [#17](https://github.com/AniChikage/open-markdown-lane/issues/17)，已发布 [v0.24.2](https://github.com/AniChikage/open-markdown-lane/releases/tag/v0.24.2)，发行源码为 `f0e5774001cb65fc669b8511a29aa70bc972b61d`。[正式流水线](https://github.com/AniChikage/open-markdown-lane/actions/runs/42317677639)的 macOS、Windows、Linux、Windows 预览、真实 FUSE 和发布六项任务通过。本轮使用隔离会话和自建文档，没有操作用户原有文档、设置或插件配置。
 
 - #16：修复前，连续第二次回车后的可编辑段落数量仍为 2（应为 3），额外源码空行也未显示。修复保留额外空段落节点及稳定身份，普通 Markdown 段间分隔不额外展开；LF／CRLF 原文不重写，包含大块增量编辑检查。
 - #17：在不安装 OT1 的原版 Electron 宿主里，以 35 个缺失路径和一个可读文件复现了 35 次原生错误框调用。修复后批量请求按队列执行，失败合并为非模态提示，可读文件继续打开；35 份未保存内容及恢复记录保持原样，不静默删除已有标签或缓存正文。OT1 的具体启动脚本和插件组合未单独验收。
 - 本地单测 244 项通过。原生 WebKit 完整套件 166 项断言通过，新增连续回车、源码往返、移动光标及逐步撤销／重做；包含既有表格、公式、插件、剪贴板、分页导出和合成组合输入回归。
-- Chromium 实际渲染检查连续回车后可见段落数量及纵向位置、源码往返与精确保存；批量缺失文件为 0 次原生错误框、1 条汇总提示，并核对所有恢复草稿和磁盘文件没有被写回或丢失。
+- Chromium 实际渲染检查连续回车后可见段落数量及纵向位置、源码往返与精确保存；批量缺失文件为 0 次原生错误框、1 条汇总提示，并核对所有恢复草稿和磁盘文件没有被写回或丢失。另一次真实进程重启后，额外空段落、精确源码及包含 35 份恢复草稿的全部 37 个测试标签仍保留。
 - 32+ MiB 代码块及 80,000 行表格回归通过，包含中文组合输入、局部增删、撤销和重启恢复；没有将这些单项结果作为与其他编辑器的性能排名。
 - Browser 插件未提供，使用项目既有 Playwright/Electron 与原生 WebKit 隔离验收入口。实体中文输入法、本轮反馈者的 macOS 27.0.1 和 OT1 环境未冒充已实测。
-- 新的 `issues-desktop.mts` 已加入 Windows NSIS、Linux DEB／AppImage 安装后回归。正式平台构建与公开下载校验结果将在完成后补记。
+- 新的 `issues-desktop.mts` 已加入 Windows NSIS、Linux DEB／AppImage 安装后回归，三个安装载荷的两项 Issue 用例均通过。Windows 升级、文件关联、恢复数据保留和卸载通过；Linux 的桌面启动、升级、卸载通过。Ubuntu 22.04.5／24.04.5 普通用户真实 FUSE 挂载、沙箱启动、编辑保存／撤销和正常卸载通过，测试镜像 SHA-256 与公开 AppImage 相同。
+- 六个公开安装文件全部独立下载，大小、SHA-256、发布资源摘要及汇总校验文件一致。Mac DMG／ZIP 同时匹配已下载核对的 CI 产物，应用版本为 0.24.2，签名校验通过。
+- 5／10 MiB 文档编辑、主题定制及实际 Letter PDF 分页回归通过。测试入口随后改为绑定编辑器窗口，不再依赖包含临时 PDF 窗口的枚举顺序；这一测试维护提交未改变发行包的生产代码。
 
 ---
 
