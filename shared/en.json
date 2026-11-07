@@ -923,5 +923,6 @@
   "右侧文档大纲": "Document outline",
   "文档工具入口": "Document tools",
   "右侧大纲": "Outline sidebar",
-  "AI 侧栏": "AI sidebar"
+  "AI 侧栏": "AI sidebar",
+  "有 {0} 个文件未能打开，可能已移动、删除或暂时无法访问。已有恢复草稿仍保留。": "{0} files could not be opened. They may have moved, been deleted, or be temporarily inaccessible. Existing recovery drafts are retained."
 }

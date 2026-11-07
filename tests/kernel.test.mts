@@ -71,6 +71,47 @@ function input(root: HTMLElement, type: string, data: string | null = null) {
     }),
   );
 }
+test("consecutive Enter keeps each empty paragraph visible after typing, caret moves and undo/redo", () => {
+  const f = fixture("正文");
+  point(f.editor, 2);
+  for (let count = 1; count <= 3; count++) {
+    input(f.root, "insertParagraph");
+    assert.equal(f.root.querySelectorAll("p").length, count + 1);
+  }
+  assert.equal(f.model.text, "正文\n\n\n\n\n\n");
+  input(f.root, "insertText", "结尾");
+  const expected = "正文\n\n\n\n\n\n结尾";
+  assert.equal(f.model.text, expected);
+  point(f.editor, 0); f.model.refreshCaret(); f.editor.render();
+  assert.equal(f.root.querySelectorAll("p").length, 4);
+  assert.equal(f.model.toMarkdown(), expected);
+  for (let count = 0; count < 4; count++) f.editor.undo();
+  assert.equal(f.model.text, "正文");
+  for (let count = 0; count < 4; count++) f.editor.redo();
+  assert.equal(f.model.text, expected);
+  assert.equal(f.root.querySelectorAll("p").length, 4);
+  assert.equal(new Set(f.model.nodes.map(node=>node.id)).size,f.model.nodes.length);
+  f.close();
+});
+test("extra source blank lines render without expanding ordinary paragraph separators or rewriting CRLF", () => {
+  const source = "甲\r\n\r\n\r\n乙\r\n\r\n丙";
+  const f = fixture(source);
+  assert.equal(f.root.querySelectorAll("p").length, 4);
+  point(f.editor, f.model.text.length); f.model.refreshCaret(); f.editor.render();
+  assert.equal(f.root.querySelectorAll("p").length, 4);
+  assert.equal(f.model.toMarkdown(), source);
+  f.close();
+});
+test("large-block incremental edits retain extra blank rows and unique node identities", () => {
+  const code='```text\n'+'x'.repeat(310_000)+'\n```', original=code+'\n\n\n结尾';
+  const model=new MarkdownDocument(original,'\n'); model.enableRichParsing();
+  assert.equal(model.nodes.filter(node=>node.kind==='empty').length,1);
+  model.replace(20,20,'y','typing');
+  assert.equal(model.nodes.filter(node=>node.kind==='empty').length,1);
+  assert.equal(model.nodes.find(node=>node.kind==='empty')!.from,code.length+3);
+  assert.equal(new Set(model.nodes.map(node=>node.id)).size,model.nodes.length);
+  model.undo(); assert.equal(model.toMarkdown(),original);
+});
 test("unmodified node-tree rendering preserves Markdown, CRLF, YAML, delimiters and whitespace", () => {
   const source =
     "---\r\ntitle: 中文\r\n---\r\n\r\n# 标题\r\n\r\n**粗体** 和 `代码`，保留空格  \r\n";

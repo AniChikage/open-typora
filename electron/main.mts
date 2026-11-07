@@ -56,14 +56,32 @@ let window: BrowserWindow | null,
   closing = false;
 const pending: string[] = [];
 let rendererReady = false;
+let openingFiles = false;
 const pluginToken = randomUUID();
 const authorizedPlugin = <T extends { id: string; name: string; url: string } | null>(item: T): T => item && ({ ...item, url: item.url + "?token=" + pluginToken }) as T;
 function openFiles(files: string[]) {
-  for (const file of files) {
-    if (window && rendererReady) store.open(file)
-      .then(document => send({ action: "opened", document })).catch(showError);
-    else pending.push(file);
-  }
+  pending.push(...files);
+  if (window && rendererReady) void drainOpenFiles();
+}
+async function drainOpenFiles() {
+  if (openingFiles || !window || !rendererReady) return;
+  openingFiles = true;
+  let failed = 0;
+  const visited = new Set<string>();
+  try {
+    // Native open-file/second-instance events can arrive as one event per file.
+    // Coalesce the burst and keep opening readable files without modal errors.
+    await new Promise(resolve => setTimeout(resolve, 0));
+    while (pending.length) {
+      for (const file of pending.splice(0)) {
+        if (visited.has(file)) continue;
+        visited.add(file);
+        try { send({ action: "opened", document: await store.open(file) }); }
+        catch { failed++; }
+      }
+    }
+  } finally { openingFiles = false; }
+  if (failed) send({action:"notice",message:translate(uiLocale,"有 {0} 个文件未能打开，可能已移动、删除或暂时无法访问。已有恢复草稿仍保留。",failed)});
 }
 if (process.platform !== "darwin") {
   if (process.platform === "win32") app.setAppUserModelId("org.opentypora.desktop");
@@ -155,10 +173,7 @@ const handlers: IpcHandlers = {
     if (action === "delete") { const result = await dialog.showMessageBox(window!,{type:"warning",message:l("删除图片文件？"),detail:l("图片文件会移到废纸篓，文档中的引用也会移除。"),buttons:[l("取消"),l("移到废纸篓")],defaultId:0,cancelId:0}); if(result.response !== 1) return null; }
     return imageAction({store,id,sources,action,options,destination,directory,trash:file=>shell.trashItem(file),notice:message=>window!.webContents.send("app:command",{action:"notice",message})});
   },
-  ready: async () => { rendererReady = true; for (const file of pending.splice(0)) {
-    try { send({ action: "opened", document: await store.open(file) }); }
-    catch (errorCaught) { const error = errorCaught as NodeJS.ErrnoException; showError(error); }
-  } return true; },
+  ready: async () => { rendererReady = true; await drainOpenFiles(); return true; },
   cancelClose: () => { closing = false; },
   recent: () => workspace.recent(),
   recentAction: async (_, action, file) => { if (action !== "open") return workspace.recentAction(action, file); const item = (await workspace.recent()).find(item => item.path === file); if (!item) throw new Error("最近项目已移除。"); await workspace.remember(file!, item.folder); return item.folder ? store.scan(file!) : store.open(file!); },

@@ -1,26 +1,20 @@
-Open Markdown Lane 0.24.1 improves the writing workspace while retaining the existing Markdown editing and storage model.
+Open Markdown Lane 0.24.2 fixes repeated Enter in rendered editing and missing-file dialog storms.
 
 This is an independent, unofficial project, unaffiliated with Typora. If you can afford it, please [buy Typora](https://store.typora.io/) and support its official developers.
 
+## Fixes
+
+- **[#16](https://github.com/AniChikage/open-markdown-lane/issues/16):** Keep empty paragraphs created by repeated Enter visible after typing, moving the caret and switching source modes. Normal paragraph separators remain unchanged; Markdown/CRLF preservation and undo/redo are covered.
+- **[#17](https://github.com/AniChikage/open-markdown-lane/issues/17):** Batch startup, file-association and native open-file requests. Missing or unreadable files produce an aggregate, non-modal notice while readable files continue opening. Existing recovery drafts are retained; the fix does not silently delete missing-file tabs or unsaved text.
+
 ## Downloads
 
-- macOS 14+, Apple Silicon: `Open-Markdown-Lane-0.24.1-arm64.dmg` or ZIP.
-- Windows 10/11 x64: `Open-Markdown-Lane-0.24.1-windows-x64-Setup.exe` or ZIP.
-- Linux x64: `Open-Markdown-Lane-0.24.1-linux-x64.deb` or AppImage.
+- macOS 14+, Apple Silicon: DMG or ZIP.
+- Windows 10/11 x64: Setup.exe or ZIP.
+- Linux x64: DEB or AppImage.
 
-Verify downloads with `SHA256SUMS.txt`. macOS is locally signed, not notarized; Windows is unsigned. Updating macOS builds may prompt again for Documents-folder access.
+Verify the six packages with `SHA256SUMS.txt`. macOS is locally signed, not notarized; Windows is unsigned. macOS may request Documents-folder access again after an update.
 
-## Changes
+## Validation
 
-- Return keyboard focus to the current document when collapsing the right sidebar, so focus cannot remain in a hidden control.
-
-- Clearer active tabs, document icons, unsaved indicators and drag destination feedback. Existing tab menus, keyboard navigation and split views remain available.
-- Direct file/list/outline navigation, a visible folder-search entry and more legible selected files and tree rows.
-- A right-hand outline and AI tool area, plus a version-history shortcut. Collapsing the sidebar or switching to the outline retains the AI instruction and generated review. The explicit Close AI action ends the review.
-- Protect active editor and AI-prompt composition when switching or collapsing the right sidebar; the AI Close action also respects composition.
-- Improve heading hierarchy and page spacing while retaining saved font, line-height, width, theme and background settings.
-- Keep interactive controls outside the native macOS window-drag strip. Existing documents, drafts, model settings and application-data locations are retained.
-
-## Validation scope
-
-Automated coverage includes exact save/undo/redo, split restoration, sidebar state, light/dark and compact layouts, AI review, synthetic Chinese composition and the existing community issue regressions. Controlled HTTP fixtures validate AI integration; they are not live-provider inference or physical-IME acceptance. The Mac package is locally built and tested from the release tag. Windows/Linux CI packages passed installation regressions, Windows preview checks and real FUSE mounting on Ubuntu 22.04/24.04. Hosted macOS did not receive a runner, so the release is assembled manually from those tested packages. Sogou input and undo/redo were manually confirmed in the 0.24.0 candidate; the final focus patch has separate Chromium and WebKit coverage. See [verification](https://github.com/AniChikage/open-markdown-lane/blob/main/docs/verification.md) for evidence and limitations.
+The regression fixture opens 35 missing files plus a readable file, checks that no per-file native error dialogs appear, and verifies all 35 unsaved recovery records remain intact. Empty-paragraph tests cover rendered positions, source roundtrip, exact save and undo/redo in Chromium and native WebKit. The Windows/Linux installer acceptance suites include the new regression. Platform results and remaining limits are recorded in [verification](https://github.com/AniChikage/open-markdown-lane/blob/main/docs/verification.md).

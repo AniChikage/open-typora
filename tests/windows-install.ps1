@@ -14,6 +14,8 @@ if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
 $env:OPEN_MARKDOWN_LANE_EXECUTABLE = Join-Path $destination 'Open Markdown Lane.exe'
 if (Test-Path (Join-Path $destination 'Open Typora.exe')) { throw 'Upgrade retained the old application executable' }
 if (!(Test-Path $env:OPEN_MARKDOWN_LANE_EXECUTABLE)) { throw 'Installer did not produce the application executable' }
+node tests/issues-desktop.mts
+if ($LASTEXITCODE -ne 0) { throw "Blank-line rendering and missing-file launch acceptance failed" }
 node tests/batch-desktop.mts
 if ($LASTEXITCODE -ne 0) { throw "Multi-document review and restart recovery acceptance failed" }
 node tests/knowledge-desktop.mts

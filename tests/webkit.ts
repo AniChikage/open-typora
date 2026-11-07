@@ -79,6 +79,23 @@ try {
   const originalResponse = await desktop.restore();
   if (!originalResponse.ok) throw new Error(originalResponse.error);
   const original = originalResponse.value!.documents[0].content;
+  const paragraphCount=root().querySelectorAll('p').length;
+  pointText('。',1);
+  for(let count=1;count<=3;count++) {
+    input('insertParagraph');
+    check(root().querySelectorAll('p').length===paragraphCount+count,'native consecutive Enter retains visible empty paragraph '+count);
+  }
+  input('insertText','空行验收');
+  const blankExpected=original.replace('。','。\n\n\n\n\n\n空行验收');
+  await sourceMode(true); check(readSource()===blankExpected,'native extra paragraphs preserve exact Markdown source');
+  await sourceMode(false); pointText('普通',0); document.dispatchEvent(new Event('selectionchange'));
+  check(root().querySelectorAll('p').length===paragraphCount+3,'native extra paragraphs survive source roundtrip and caret move');
+  for(let count=0;count<4;count++)window.__openMarkdownLane.command({action:'undo'});
+  await sourceMode(true); check(readSource()===original,'native empty-paragraph edits undo to original source'); await sourceMode(false);
+  for(let count=0;count<4;count++)window.__openMarkdownLane.command({action:'redo'});
+  await sourceMode(true); check(readSource()===blankExpected,'native empty-paragraph edits redo exactly'); await sourceMode(false);
+  for(let count=0;count<4;count++)window.__openMarkdownLane.command({action:'undo'});
+  await sourceMode(true); check(readSource()===original,'native empty-paragraph fixture restored'); await sourceMode(false);
   for (const [query, replacement] of [["普(通)", "$<word>"], ["普(?<word>通)", "字$<word>"], ["普(?<word>通)", "$<missing>-$<word>"]]) {
     window.__openMarkdownLane.command({ action: "find" }); await wait(() => document.querySelector(".rich-search"));
     const field = (label: string, value: string) => {

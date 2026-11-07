@@ -233,13 +233,41 @@ export class MarkdownDocument {
       return true;
     }
   }
-  private ensureCaretNode() {
-    const caret=this.selection.head;
-    this.nodes=this.nodes.filter(node=>node.kind!=="empty"||node.from===this.text.length||node.from===caret);
+  private ensureCaretNode(previous = this.nodes) {
+    const caret=this.selection.head, tail=this.nodes.findLast(node=>node.kind==="empty"&&node.from===this.text.length);
+    const oldEmpty = new Map(previous.filter(node=>node.kind==="empty").map(node=>[node.from,node]));
+    const blocks = this.nodes.filter(node=>node.kind!=="empty"), nodes: DocumentNode[] = [];
+    const used = new Set(blocks.map(node=>node.id));
+    const empty = (from: number, line: number) => {
+      const previousId=oldEmpty.get(from)?.id, id=previousId&&!used.has(previousId)?previousId:`node-${++sequence}`;
+      used.add(id); nodes.push({id,from,to:from,source:"",kind:"empty",line});
+    };
+    let before: DocumentNode | undefined;
+    for (const after of [...blocks, undefined]) {
+      const start = before?.to ?? 0, end = after?.from ?? this.text.length;
+      if(end<=start) { if(after)nodes.push(after); before=after; continue; }
+      const breaks: number[] = [];
+      for (let at=start;at<end;at++) if(this.text[at]==="\n") breaks.push(at+1);
+      const endLine = after?.line ?? tail?.line ?? (before ? before.line + (before.source.match(/\n/g)?.length || 0) : 1) + breaks.length;
+      // One logical paragraph break uses two source newlines. Keep additional
+      // empty paragraphs, without exposing the ordinary Markdown separator.
+      for (let index=before?1:-1;index<breaks.length;index+=2) {
+        const at=index<0?start:breaks[index];
+        if(at>=end)continue;
+        const next=this.text.indexOf("\n",at), finish=next<0||next>end?end:next;
+        if(!/^[ \t]*$/.test(this.text.slice(at,finish)))continue;
+        const line=endLine-breaks.length+index+1;
+        empty(at,line);
+      }
+      if(after)nodes.push(after);
+      before=after;
+    }
+    if(tail)nodes.push(used.has(tail.id)?{...tail,id:`node-${++sequence}`}:tail);
+    this.nodes=nodes;
     if(caret<this.text.length&&!this.nodes.some(node=>caret>=node.from&&caret<=node.to)) {
       this.nodes.push({id:`gap-${caret}`,from:caret,to:caret,source:"",kind:"empty",line:1+(this.text.slice(0,caret).match(/\n/g)?.length||0)});
-      this.nodes.sort((a,b)=>a.from-b.from);
     }
+    this.nodes.sort((a,b)=>a.from-b.from);
   }
   private rebuildRoot() {
     const children: DocumentNode[] = []; let end=0;
@@ -300,23 +328,6 @@ export class MarkdownDocument {
         };
       },
     );
-    const caret = this.selection.head;
-    if (
-      caret < this.text.length &&
-      !this.nodes.some((node) => caret >= node.from && caret <= node.to)
-    ) {
-      const gapId = used.has(`gap-${caret}`) ? `node-${++sequence}` : `gap-${caret}`;
-      used.add(gapId);
-      this.nodes.push({
-        id: gapId,
-        from: caret,
-        to: caret,
-        source: "",
-        kind: "empty",
-        line: this.text.slice(0, caret).split("\n").length,
-      });
-      this.nodes.sort((a, b) => a.from - b.from);
-    }
     if (!this.nodes.length || /\n$/.test(this.text))
       this.nodes.push({
         id: old.findLast(n => n.kind === "empty" && !used.has(n.id))?.id || `node-${++sequence}`,
@@ -326,6 +337,7 @@ export class MarkdownDocument {
         kind: "empty",
         line: offsets.length,
       });
+    this.ensureCaretNode(old);
     const children: DocumentNode[] = [];
     let end = 0;
     for (const node of this.nodes) {
