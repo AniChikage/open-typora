@@ -1,4 +1,5 @@
-import { _electron as electron, expect } from "playwright/test";
+import { expect } from "playwright/test";
+import { electron } from "./chinese-launch.mts";
 import assert from "node:assert/strict";
 import { createServer, type ServerResponse } from "node:http";
 import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";

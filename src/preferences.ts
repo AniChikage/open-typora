@@ -1,7 +1,9 @@
 import { storedItem } from "./migrateStorage.ts";
 import { backgroundDefaults } from "./background.ts";
+import { initialLocale } from './initialLocale.ts';
 export interface Preferences {
   language: "zh-CN" | "en";
+  languageMode?: 'system';
   imageUploader: string; imageAutoUpload: boolean;
   remoteImages: boolean; imageFolder: string; imagePrefix: boolean; imageEscape: boolean;
   pdfPaper: "a4" | "letter"; pdfMargin: number; pdfHeader: string; pdfFooter: string;
@@ -17,8 +19,8 @@ export const defaultPreferences: Preferences = { language: "zh-CN", ...backgroun
 export function loadPreferences(): Preferences {
   try {
     const saved = JSON.parse(storedItem(localStorage, "open-markdown-lane-preferences") || "{}");
-    const next = { ...defaultPreferences };
-    if (saved.language === "en") next.language = "en";
+    const next: Preferences = { ...defaultPreferences, language: initialLocale() };
+    if (saved.languageMode === 'system' || !['en','zh-CN'].includes(saved.language)) next.languageMode = 'system';
     if (Number.isFinite(saved.backgroundOpacity)) next.backgroundOpacity = Math.max(0,Math.min(100,saved.backgroundOpacity));
     if (Number.isFinite(saved.backgroundBlur)) next.backgroundBlur = Math.max(0,Math.min(30,saved.backgroundBlur));
     if (["center","top","bottom","left","right"].includes(saved.backgroundPosition)) next.backgroundPosition = saved.backgroundPosition;
@@ -35,5 +37,5 @@ export function loadPreferences(): Preferences {
     if (Number.isFinite(saved.fontSize)) next.fontSize = Math.max(12, Math.min(28, saved.fontSize));
     if ([2, 4].includes(saved.tabSize)) next.tabSize = saved.tabSize;
     return next;
-  } catch { return { ...defaultPreferences }; }
+  } catch { return { ...defaultPreferences, language: initialLocale(), languageMode: 'system' }; }
 }

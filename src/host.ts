@@ -2,6 +2,8 @@ import { storedItem } from "./migrateStorage.ts";
 import type { BridgeResponse } from "../shared/contracts.js";
 import type { DocumentRecord, Host, Recovery, SessionSnapshot } from "./types";
 import samples from "../shared/samples.json";
+import englishSamples from '../shared/samples.en.json';
+import { normalizeLocale } from '../shared/locale.mts';
 import { browserBackground, chooseBrowserBackground } from "./browserBackground";
 const browserRecords = new Map<string, DocumentRecord>();
 const key = "open-markdown-lane-session-v1";
@@ -39,6 +41,7 @@ const browser: Host = {
   async captureVersion() { return { versions: [] }; },
   async readVersion() { throw new Error('持久化版本历史请使用桌面应用。'); },
   async setLocale() {},
+  async systemLocale() { return normalizeLocale(navigator.language); },
 
   native: false,
   async cancelClose() {},
@@ -52,13 +55,13 @@ const browser: Host = {
   async removePlugin() { throw new Error("移除本地插件请使用桌面应用。"); },
   async conversionSettings() { return { pandoc: "", word: false }; },
   async importDocument() { throw new Error("导入文档请使用桌面应用。"); }, async exportConverted() { throw new Error("此格式导出请使用桌面应用。"); },
-  async restore() {
+  async restore(locale) {
     let session: Recovery | null = null;
     try {
       session = JSON.parse(storedItem(localStorage, key) || "null");
     } catch {}
     session ??= {
-      documents: samples.map((sample) => draft(sample.name, sample.content)),
+      documents: (normalizeLocale(locale ?? navigator.language) === 'en' ? englishSamples : samples).map((sample) => draft(sample.name, sample.content)),
     };
     for (const record of session.documents)
       browserRecords.set(record.id, record);

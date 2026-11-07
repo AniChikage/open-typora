@@ -1,5 +1,6 @@
 import sharp from "sharp";
-import {_electron as electron,expect} from 'playwright/test';
+import { expect } from "playwright/test";
+import { electron } from "./chinese-launch.mts";
 import assert from 'node:assert/strict';
 import {mkdtemp,mkdir,writeFile,readFile,stat,copyFile} from 'node:fs/promises';
 import {execFile} from 'node:child_process';

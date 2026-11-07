@@ -215,6 +215,8 @@ jobs:
         run: npm run test:branding
       - name: Verify real native spreadsheet clipboard, source mode and undo
         run: node scripts/test-webkit.mts --clipboard
+      - name: Verify native first-run locale, manual preferences and welcome documents
+        run: node scripts/test-webkit.mts --locale
       - name: Verify native AI review, Chinese composition guards and exact undo
         run: node scripts/test-webkit.mts --ai
       - run: mv release/native/SHA256SUMS.txt release/native/SHA256SUMS-macos-arm64.txt

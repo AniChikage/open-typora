@@ -1,5 +1,6 @@
 import { applyLegacyEnvironment, applicationDataDirectory, encryptionApplicationName, productName } from "../shared/branding.mjs";
 import { translate } from "../shared/translate.mjs";
+import { systemLocale, normalizeLocale } from '../shared/locale.mjs';
 import type { IpcRequests, Command, PathChange } from "../shared/contracts.js";
 import type { IpcMainInvokeEvent } from "electron";
 type IpcHandlers = { [K in keyof IpcRequests]: (event: IpcMainInvokeEvent, ...args: Parameters<IpcRequests[K]>) => Awaited<ReturnType<IpcRequests[K]>> | Promise<Awaited<ReturnType<IpcRequests[K]>>> };
@@ -115,6 +116,7 @@ let uiLocale = 'zh-CN';
 const l = (source: string) => translate(uiLocale, source);
 let buildMenu = () => {};
 const handlers: IpcHandlers = {
+  systemLocale: () => systemLocale(process.platform, process.env, app.getLocale()),
   aiSettings: (_, update) => ai.settings(update),
   editBatches: () => new EditBatchStore(app.getPath('userData')).list(),
   prepareEditBatch: (_, input) => new EditBatchStore(app.getPath('userData')).prepare(input, store),
@@ -198,20 +200,21 @@ const handlers: IpcHandlers = {
       await prepareOperation("commit", change); return change;
     } finally { try { await prepareOperation("release", {}); } finally { operationRunning = false; } }
   },
-  restore: async () => {
+  restore: async (_, locale) => {
     const restored = await store.restore();
     if (restored) return restored;
+    const language = normalizeLocale(locale ?? systemLocale(process.platform, process.env, app.getLocale()));
     const samples = JSON.parse(
-      await readFile(path.join(root, "shared/samples.json"), "utf-8"),
+      await readFile(path.join(root, language === 'en' ? "shared/samples.en.json" : "shared/samples.json"), "utf-8"),
     );
-    const folder = path.join(app.getPath("userData"), "示例笔记");
+    const folder = path.join(app.getPath("userData"), language === 'en' ? 'Sample Notes' : "示例笔记");
     const documents = [];
     for (const sample of samples) {
       const file = path.join(folder, sample.name);
       try {
         await readFile(file);
       } catch (errorCaught) { const error = errorCaught as NodeJS.ErrnoException;
-        if (error.code === "ENOENT") await atomicWrite(file, process.platform === "win32" ? sample.content.replace(/⌘\s*/g, "Ctrl+") : sample.content);
+        if (error.code === "ENOENT") await atomicWrite(file, process.platform === "darwin" ? sample.content : sample.content.replace(/⌘\s*/g, "Ctrl+"));
         else throw error;
       }
       documents.push(await store.open(file));
@@ -443,6 +446,7 @@ app
     const groups = JSON.parse(await readFile(path.join(root, "shared/commands.json"), "utf8")) as {title: string; items: {action: string; label: string; key?: string; pcKey?: string; selector?: string}[]}[];
     const roles: Record<string, import("electron").MenuItemConstructorOptions["role"]> = { "cut:": "cut", "copy:": "copy", "paste:": "paste", "selectAll:": "selectAll" };
     const accelerator = (key?: string) => key?.replaceAll("Mod-", "CommandOrControl+").replaceAll("Ctrl-", "Control+").replaceAll("Alt-", "Alt+").replaceAll("Shift-", "Shift+");
+    uiLocale = systemLocale(process.platform, process.env, app.getLocale());
     buildMenu = () => Menu.setApplicationMenu(Menu.buildFromTemplate([
       { label: "Open Markdown Lane", submenu: [{ label: l("关于 Open Markdown Lane"), click: command("about") }, { label: l("偏好设置…"), accelerator: "CommandOrControl+,", click: command("preferences") }, ...(process.platform === "darwin" ? [{ type: "separator" as const }, { role: "hide" as const, label: l("隐藏 Open Markdown Lane") }, { role: "hideOthers" as const, label: l("隐藏其他应用") }] : []), { type: "separator" as const }, { label: l("退出 Open Markdown Lane"), accelerator: "CommandOrControl+Q", click: command("quit") }] },
       ...groups.map(group => ({ label: uiLocale === "en" && group.title === "文件" ? "File" : l(group.title), submenu: group.items.filter(item => item.action !== "preferences").map(item => ({ label: l(item.label), accelerator: accelerator(process.platform === "darwin" ? item.key : item.pcKey ?? item.key), ...(item.selector ? { role: roles[item.selector] } : { click: command(item.action) }) })) })),

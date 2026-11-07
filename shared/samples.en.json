@@ -1,0 +1,14 @@
+[
+  {
+    "name": "Welcome.md",
+    "content": "# A quieter place to write.\n\nWelcome to Open Markdown Lane, a local Markdown editor. Your notes stay as ordinary files on your computer.\n\nClick any paragraph to start writing.\n\n## Start with one line\n\n- Write with Markdown and see formatting as you type\n- Switch between live editing and source mode\n- Save your work as a portable .md file\n\n## Make room for your ideas\n\nOpen a folder to browse your notes. Keep several documents in tabs, or use split view to work with two notes side by side.\n\nChoose **Preferences → Language** to change the interface language. Your choice is remembered. Existing notes are never translated or replaced when you switch languages.\n\n> Keep your attention on the words.\n\n| Action | Shortcut |\n| --- | --- |\n| Save | ⌘ S |\n| Find | ⌘ F |\n"
+  },
+  {
+    "name": "Writing Example.md",
+    "content": "# Write a little today.\n\nYou do not need a finished idea. Open a note and write the first sentence.\n\n## A short checklist\n\n- [x] Give your idea a title\n- [ ] Write down three points\n- [ ] Leave time for a revision\n\n## Make complex things clear\n\n```javascript\nconst ideas = ['observe', 'record', 'connect'];\nideas.forEach(idea => console.log(idea));\n```\n\nSome ideas are best expressed as a formula:\n\n$$\nE = mc^2\n$$\n\n## Follow the thought\n\n```mermaid\ngraph LR\n    A[Observe] --> B[Record]\n    B --> C[Organize]\n    C --> D[Write]\n```\n\n> One paragraph at a time. One idea per paragraph.\n"
+  },
+  {
+    "name": "Markdown Guide.md",
+    "content": "# Markdown guide\n\nMarkdown files are plain text. You can open them in other editors and keep them wherever you like.\n\n## Everyday formatting\n\n**Bold**, *italic*, ~~strikethrough~~ and `inline code`.\n\n### Lists\n\n1. The first point\n2. The second point\n   - A supporting detail\n\n### Links and images\n\n[CommonMark documentation](https://commonmark.org/)\n\nAfter saving a note, paste or drop in a local image. By default, images are copied to an `.assets` folder beside the document. Image and remote-image settings are available in Preferences.\n\n## Editing and saving\n\nEdit the formatted document directly. Inline Markdown markers appear when the caret enters a formatted span. Switch to source mode whenever you want to edit the original text. Switching modes does not rewrite your file.\n\nExisting files use autosave by default. Choose a save location for a new draft. If another program changes a file, the editor reports the conflict and keeps your draft.\n\n## More ways to write\n\nUse the menus to change themes, manage plugins, toggle focus mode or export a PDF. Live editing supports task lists, code highlighting, mathematical formulas, Mermaid diagrams and tables.\n\nAI features are optional. Configure your own API or local model, review the proposed changes, then choose whether to apply them.\n"
+  }
+]

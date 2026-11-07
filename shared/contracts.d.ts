@@ -86,6 +86,7 @@ export interface Host {
   captureVersion(id: string, content: string, reason: string): Promise<VersionResult>;
   readVersion(id: string, versionId: string): Promise<{ version: DocumentVersion; content: string }>;
   setLocale(locale: string): Promise<unknown>;
+  systemLocale(): Promise<string>;
   cancelClose(): Promise<unknown>;
   windowAction(action: string): Promise<unknown>;
   imageAction(id: string, sources: string[], action: string, options?: Record<string, unknown>): Promise<Record<string, string> | null>;
@@ -101,7 +102,7 @@ export interface Host {
   conversionSettings(choose?: boolean): Promise<{ pandoc: string; word: boolean; libreOffice?: string }>;
   importDocument(): Promise<{ html?: string; markdown?: string; name: string } | null>;
   exportConverted(id: string, format: string, source: string, html: string): Promise<string | null>;
-  restore(): Promise<Recovery | null>;
+  restore(locale?: string): Promise<Recovery | null>;
   registerDraft(record: DocumentRecord): Promise<unknown>;
   open(): Promise<DocumentRecord | null>;
   openFolder(): Promise<FolderResult | null>;

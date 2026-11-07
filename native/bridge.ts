@@ -24,7 +24,7 @@ type NativeChange = import("../shared/contracts.js").PathChange;
       }
     }) as Promise<NativeResponse<T>>;
   const methods = [
-    "editBatches", "prepareEditBatch", "readEditBatch", "finishEditBatch",
+    "systemLocale", "editBatches", "prepareEditBatch", "readEditBatch", "finishEditBatch",
     "aiSettings", "aiRewrite", "aiCancel", "readContext", "versions", "captureVersion", "readVersion", "setLocale",
     "background", "chooseBackground", "clearBackground",
     "restore", "imageAction", "importDocument", "exportConverted", "themes", "installTheme", "plugins", "validatePlugin", "installPlugin", "removePlugin", "conversionSettings", "ready", "fileOperation", "recent", "recentAction", "searchFiles", "reveal",

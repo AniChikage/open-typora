@@ -1,4 +1,5 @@
 import { t } from "../i18n";
+import { systemLocale } from '../initialLocale';
 import { useEffect, useState } from "react";
 import { host } from "../host";
 import { Dialog } from "./Dialog";
@@ -15,7 +16,7 @@ export function PreferencesDialog({ value, change, theme, changeTheme, themes, i
   useEffect(() => { void host.conversionSettings().then(setConversion).catch(e => setError(e.message)); }, []);
   const options = [["imageAutoUpload", t("插入后通过 PicGo 自动上传")], ["remoteImages", t("显示远程图片")], ["imagePrefix", t("相对图片路径使用 ./ 前缀")], ["imageEscape", t("自动转义图片路径")], ["spellcheck", t("拼写检查")], ["autoPair", t("自动配对括号与引号")], ["highlight", t("高亮：==文字==")], ["subscript", t("下标：H~2~O")], ["superscript", t("上标：X^2^")], ["emoji", "Emoji：:smile:"], ["inlineMath", t("行内公式：$x^2$")]] as const;
   return <Dialog title={t("偏好设置")} close={close}>
-    <fieldset><legend>{t("语言 / Language")}</legend><label>{t("界面语言")}<select aria-label="Language" value={value.language} onChange={event => change({ ...value, language: event.target.value === "en" ? "en" : "zh-CN" })}><option value="zh-CN">{t("简体中文")}</option><option value="en">English</option></select></label></fieldset>
+    <fieldset><legend>{t("语言 / Language")}</legend><label>{t("界面语言")}<select aria-label="Language" value={value.languageMode === 'system' ? 'system' : value.language} onChange={event => change({ ...value, languageMode: event.target.value === 'system' ? 'system' : undefined, language: event.target.value === 'system' ? systemLocale() : event.target.value === "en" ? "en" : "zh-CN" })}><option value="system">{t("跟随系统语言")}</option><option value="zh-CN">{t("简体中文")}</option><option value="en">English</option></select></label></fieldset>
     <fieldset><legend>{t("AI 改写")}</legend><p className="dialog-note">{t("使用自定义 API 或本地模型改写选区，审阅差异后再应用。")}</p><button onClick={models}>{t("模型设置…")}</button></fieldset>
     <ThemePicker value={theme} change={changeTheme} custom={themes} install={async () => { try { await installTheme(); } catch (error) { setError((error as Error).message); } }} />
     <ThemeCustomizer value={customization} change={customize} reset={resetTheme} save={saveTheme} />

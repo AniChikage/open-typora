@@ -1,7 +1,12 @@
 import Foundation
 
 enum UILanguage {
-  static var current = "zh-CN"
+  static let system = normalize(Locale.preferredLanguages.first ?? "")
+  static var current = system
+  static func normalize(_ value: String) -> String {
+    let base = value.lowercased().components(separatedBy: CharacterSet(charactersIn: "-_@.")).first ?? ""
+    return base == "zh" ? "zh-CN" : "en"
+  }
   static let english: [String: String] = {
     let candidates = [Bundle.main.url(forResource: "en", withExtension: "json"), Bundle.main.executableURL?.deletingLastPathComponent().appendingPathComponent("en.json")].compactMap { $0 }
     for file in candidates { if let data = try? Data(contentsOf: file), let value = try? JSONDecoder().decode([String: String].self, from: data) { return value } }

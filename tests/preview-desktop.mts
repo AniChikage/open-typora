@@ -1,4 +1,5 @@
-import { _electron as electron, expect } from 'playwright/test';
+import { expect } from "playwright/test";
+import { electron } from "./chinese-launch.mts";
 import { mkdtemp,mkdir,writeFile,readFile } from 'node:fs/promises';
 import os from 'node:os';import path from 'node:path';import {createServer} from 'node:http';import assert from 'node:assert/strict';import sharp from 'sharp';
 const directory=await mkdtemp(path.join(os.tmpdir(),'open-markdown-lane-preview-')),qa=process.env.OPEN_MARKDOWN_LANE_QA_DIR||path.join(directory,'evidence');await mkdir(qa,{recursive:true});

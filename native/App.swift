@@ -467,6 +467,7 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
   }
   func handle(_ name: String, _ args: [Any]) throws -> Any? {
     switch name {
+    case "systemLocale": return UILanguage.system
     case "setLocale":
       let next = try arg(args, 0, String.self) == "en" ? "en" : "zh-CN"
       if owner.uiLocale != next { owner.uiLocale = next; UILanguage.current = next; for host in owner.hosts { host.buildMenu() } }
@@ -542,11 +543,12 @@ final class NativeWindowHost: NSObject, NSWindowDelegate, WKScriptMessageHandler
         return try jsonValue(seed)
       }
       if let session = try store.restore() { return try jsonValue(session) }
+      let language = UILanguage.normalize(args.first as? String ?? UILanguage.system)
       let samples =
         try JSONSerialization.jsonObject(
-          with: Data(contentsOf: Bundle.main.resourceURL!.appendingPathComponent("samples.json")))
+          with: Data(contentsOf: Bundle.main.resourceURL!.appendingPathComponent(language == "en" ? "samples.en.json" : "samples.json")))
         as! [[String: String]]
-      let folder = store.dataDirectory.appendingPathComponent("示例笔记")
+      let folder = store.dataDirectory.appendingPathComponent(language == "en" ? "Sample Notes" : "示例笔记")
       var records = [DocumentRecord]()
       for sample in samples {
         let file = folder.appendingPathComponent(sample["name"]!)
@@ -852,7 +854,7 @@ final class NativeApplication: NSObject, NSApplicationDelegate, NSMenuItemValida
   lazy var ai = NativeAIService(laneEnvironment("AI_SETTINGS_DIR").map { URL(fileURLWithPath: $0) } ?? directory)
   lazy var workspace = Workspace(directory)
   lazy var editBatches = EditBatchStore(directory)
-  var uiLocale = "zh-CN"
+  var uiLocale = UILanguage.system
   var fileOperationRunning = false
   var recentClosedFiles: [(url: URL, group: String?)] = []
   lazy var commandGroups: [CommandGroup] = {

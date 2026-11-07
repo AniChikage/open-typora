@@ -1,4 +1,5 @@
-import { _electron as electron, expect } from 'playwright/test';
+import { expect } from "playwright/test";
+import { electron } from "./chinese-launch.mts";
 import type { ElectronApplication, Page } from 'playwright';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';

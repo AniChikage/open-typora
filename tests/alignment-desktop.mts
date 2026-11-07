@@ -1,4 +1,5 @@
-import { _electron as electron, expect } from "playwright/test";
+import { expect } from "playwright/test";
+import { electron } from "./chinese-launch.mts";
 import assert from "node:assert/strict";
 import sharp from "sharp";
 import { mkdtemp, writeFile, mkdir, readFile, realpath, stat } from "node:fs/promises";

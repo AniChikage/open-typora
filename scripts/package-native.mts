@@ -44,6 +44,7 @@ await rm(path.join(resources, "dist"), { recursive: true, force: true });
 await cp("dist", path.join(resources, "dist"), { recursive: true });
 await cp("build/runtime/native/bridge.js", path.join(resources, "bridge.js"));
 await cp("shared/samples.json", path.join(resources, "samples.json"));
+await cp("shared/samples.en.json", path.join(resources, "samples.en.json"));
 await cp("shared/commands.json", path.join(resources, "commands.json"));
 await cp("shared/en.json", path.join(resources, "en.json"));
 await cp("build/runtime/shared/plugin-loader.mjs", path.join(resources, "plugin-loader.js"));

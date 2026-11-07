@@ -1,3 +1,13 @@
+# 0.24.3 系统语言与首次欢迎文档
+
+- 首次渲染前读取宿主系统语言，再解析已保存的选择。Linux 优先级为 `LC_ALL` → `LC_MESSAGES` → `LANG`；中文环境使用简体中文，其他语言和 C/POSIX 回退英文。macOS 原生宿主使用系统首选语言。
+- 新用户默认为“跟随系统语言”；手动选择中英文后保持选择。旧品牌存储键与既有语言设置继续优先，不重置其他偏好。恢复已有会话先于示例生成，切换界面语言不翻译、改名或覆盖文档。
+- 新建英文配置使用 `Sample Notes`、`Welcome.md`、`Writing Example.md`、`Markdown Guide.md`；Windows/Linux 示例快捷键使用 Ctrl，macOS 使用 ⌘。
+- 本机 Electron 隔离进程验证英／中／法文启动、英文菜单及无中文的首次界面、自动跟随系统变化、双向手动选择与重启、旧语言键和其他设置保留。原生 WebKit 五组进程验证英／中／法文、手动选择覆盖系统、英文菜单及已有欢迎文档和会话不被覆盖。
+- 新用例已接入正式 macOS 流水线，以及安装后的 Windows、Linux DEB 和 AppImage 载荷验收。既有使用中文标签的交互测试显式声明测试语言，不依赖运行机器的默认语言。
+
+---
+
 # 0.24.2 空行与缺失文件批量打开回归
 
 针对 [#16](https://github.com/AniChikage/open-markdown-lane/issues/16) 和 [#17](https://github.com/AniChikage/open-markdown-lane/issues/17)，已发布 [v0.24.2](https://github.com/AniChikage/open-markdown-lane/releases/tag/v0.24.2)，发行源码为 `f0e5774001cb65fc669b8511a29aa70bc972b61d`。[正式流水线](https://github.com/AniChikage/open-markdown-lane/actions/runs/42317677639)的 macOS、Windows、Linux、Windows 预览、真实 FUSE 和发布六项任务通过。本轮使用隔离会话和自建文档，没有操作用户原有文档、设置或插件配置。

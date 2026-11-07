@@ -1,6 +1,7 @@
 import { storedItem } from "./migrateStorage.ts";
 import { useEffect, useRef, useState } from "react";
 import { host } from "./host";
+import { initialLocale } from './initialLocale';
 import { normalizeWorkspace, activateWorkspace, reorderDocuments } from "./workspace";
 import type { WorkspaceLayout } from "./workspace";
 import { documentFileName, pathContains } from "./filePaths";
@@ -44,7 +45,7 @@ export function useDocuments(canPrepare: () => boolean = () => true) {
   useEffect(() => {
     let disposed = false;
     void host
-      .restore()
+      .restore(initialLocale())
       .then(async (session) => {
         if (disposed) return;
         const records = session?.documents || [];
